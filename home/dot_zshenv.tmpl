@@ -109,6 +109,9 @@ path+=("$PNPM_HOME")
 export BUN_INSTALL="$HOME/.bun"
 path+=("$BUN_INSTALL/bin")
 
+# Antigravity
+path+={{ .chezmoi.homeDir }}/.antigravity/antigravity/bin
+
 # Local user binaries (prepended to override system commands)
 path=({{ .chezmoi.homeDir }}/.local/bin $path)
 
@@ -158,9 +161,15 @@ npx() {
 
 This wrapper exists to BREAK YOUR npx HABIT and teach you bunx.
 
+WHY THIS WRAPPER EXISTS:
+─────────────────────────
   • npx is slow and requires Node.js runtime
   • bunx uses Bun's optimized runtime - faster startup and execution
   • This wrapper passes your command to bunx so it still works
+
+═══════════════════════════════════════════════════════════════════════════
+  BUNX-SPECIFIC FEATURES
+═══════════════════════════════════════════════════════════════════════════
 
   bunx --bun <pkg>         # Force Bun runtime instead of Node.js
 EOF
@@ -180,17 +189,62 @@ pip() {
 ║                        🛑  STOP USING PIP  🛑                              ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
 
+This wrapper exists to BREAK YOUR pip HABIT and teach you uv.
+
+WHY THIS WRAPPER EXISTS:
+─────────────────────────
+  • pip is slow and doesn't have modern dependency resolution
   • uv is 10-100x faster (written in Rust) with parallel downloads
   • uv uses lock files for reproducible builds by default
+  • This wrapper passes your command to uv so it still works
+
+Just use uv directly instead of pip.
+
+═══════════════════════════════════════════════════════════════════════════
+  UV-SPECIFIC FEATURES (beyond pip replacement)
+═══════════════════════════════════════════════════════════════════════════
 
   uv tool install <pkg>    # Install Python CLI tool globally (like pipx)
   uvx <tool>               # Run tool in isolated env (like npx for Python)
+  uvx ruff check .         # Example: run ruff without installing
+  uv pip compile           # Compile requirements.in to lock file
 EOF
   fi
   return $ret
 }
 
-pip3() { pip "$@"; }
+pip3() {
+  uv pip "$@"
+  local ret=$?
+  if [[ $ret -ne 0 ]]; then
+    cat >&2 << 'EOF'
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                        🛑  STOP USING PIP3  🛑                             ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+This wrapper exists to BREAK YOUR pip3 HABIT and teach you uv.
+
+WHY THIS WRAPPER EXISTS:
+─────────────────────────
+  • pip3 is slow and doesn't have modern dependency resolution
+  • uv is 10-100x faster (written in Rust) with parallel downloads
+  • uv uses lock files for reproducible builds by default
+  • This wrapper passes your command to uv so it still works
+
+Just use uv directly instead of pip3.
+
+═══════════════════════════════════════════════════════════════════════════
+  UV-SPECIFIC FEATURES (beyond pip replacement)
+═══════════════════════════════════════════════════════════════════════════
+
+  uv tool install <pkg>    # Install Python CLI tool globally (like pipx)
+  uvx <tool>               # Run tool in isolated env (like npx for Python)
+  uvx ruff check .         # Example: run ruff without installing
+  uv pip compile           # Compile requirements.in to lock file
+EOF
+  fi
+  return $ret
+}
 {{- end }}
 
 {{- if lookPath "mamba" }}
@@ -204,10 +258,18 @@ conda() {
 ║                       🛑  STOP USING CONDA  🛑                             ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
 
+This wrapper exists to BREAK YOUR conda HABIT and teach you mamba.
+
+WHY THIS WRAPPER EXISTS:
+─────────────────────────
+  • conda is slow and has poor dependency resolution
   • mamba is faster with better parallel downloads and solving
-  • For project environments, consider using pixi instead
+  • mamba is generally compatible with conda commands
+  • This wrapper passes your command to mamba so it still works
 
 Just use mamba directly instead of conda.
+
+For project environments, consider using pixi instead (see: mamba env)
 EOF
   fi
   return $ret
@@ -221,11 +283,71 @@ mamba() {
 ║                     🛑  STOP USING MAMBA ENV  🛑                           ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
 
-Use pixi for project environments:
-  pixi init myproject && pixi add python numpy
-  pixi shell  # Activate
+This wrapper intercepts 'mamba env' to teach you pixi for project environments.
+
+WHY THIS WRAPPER EXISTS:
+─────────────────────────
+  • pixi UNIFIES conda-forge (pre-compiled) + PyPI (via uv) in ONE project
+  • Replaces BOTH conda/mamba env AND .venv with a single workflow
+  • Workspace-based: one folder contains manifest, lock file, environments
+  • Built-in task runner, lock files, multi-environment support
+
+═══════════════════════════════════════════════════════════════════════════
+  QUICK START (Python project example)
+═══════════════════════════════════════════════════════════════════════════
+
+  pixi init myproject && cd myproject
+  pixi add python numpy pandas           # conda-forge packages (fast, pre-compiled)
+  pixi add --pypi requests               # PyPI-only packages via uv
+  pixi shell                             # Activate environment
+  pixi run python script.py              # Run without activating
+
+═══════════════════════════════════════════════════════════════════════════
+  MIGRATION FROM CONDA/MAMBA
+═══════════════════════════════════════════════════════════════════════════
+
+  conda create -n myenv python=3.11  →  pixi init myenv && pixi add python=3.11
+  conda activate myenv               →  pixi shell
+  conda deactivate                   →  exit
+  conda install numpy                →  pixi add numpy
+  conda remove numpy                 →  pixi remove numpy
+  conda env export > env.yml         →  pixi workspace export conda-environment
+  conda env create -f env.yml        →  pixi import conda-environment env.yml
+
+═══════════════════════════════════════════════════════════════════════════
+  GLOBAL TOOLS (replaces brew/apt for CLI tools)
+═══════════════════════════════════════════════════════════════════════════
+
+  pixi global install ripgrep bat fd gh nvim btop
+  pixi global list
+  pixi global update
+
+═══════════════════════════════════════════════════════════════════════════
+  TASK RUNNER (define in pixi.toml)
+═══════════════════════════════════════════════════════════════════════════
+
+  pixi task add test pytest tests/
+  pixi task add build "python -m build"
+  pixi run test                         # Run task
+  pixi run build
+
+═══════════════════════════════════════════════════════════════════════════
+  MULTI-ENVIRONMENT (dev, test, docs in one project)
+═══════════════════════════════════════════════════════════════════════════
+
+  pixi add --feature dev pytest ruff
+  pixi add --feature docs sphinx
+  pixi shell --environment dev
+
+═══════════════════════════════════════════════════════════════════════════
+  ONE-OFF COMMANDS (no project needed)
+═══════════════════════════════════════════════════════════════════════════
+
+  pixi exec python -VV                  # Run in temp environment
+  pixi exec --spec "python=3.12" python -VV
 
 Docs: https://pixi.sh
+      https://pixi.sh/latest/switching_from/conda/
 EOF
             __mamba_wrap "$@"
             ;;
@@ -234,4 +356,5 @@ EOF
             ;;
     esac
 }
-{{- end }}
+{{ end }}
+
