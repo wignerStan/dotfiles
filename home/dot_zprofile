@@ -1,0 +1,8 @@
+# ═══════════════════════════════════════════════════════════════
+# some duplicate setting as it already exists in .zshenv but necessary and acceptable
+# Since .zshenv was loaded before /etc/zprofile path_helper and the path order will change
+# ═══════════════════════════════════════════════════════════════
+#eval "$(/opt/homebrew/bin/brew shellenv)"
+mamba activate base 2>/dev/null
+
+

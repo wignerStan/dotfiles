@@ -1,0 +1,116 @@
+# Starship config — based on linux.do community recommendation
+# Ref: https://linux.do/t/topic/1301315
+"$schema" = 'https://starship.rs/config-schema.json'
+
+format = """
+$os$username$directory$git_branch$git_status$nodejs$python$rust$golang$bun$time$line_break$character"""
+
+command_timeout = 1000
+
+[os]
+disabled = false
+format = "[$symbol]($style) "
+style = "bold white"
+
+[os.symbols]
+Macos = ""
+Linux = ""
+Windows = ""
+
+[username]
+disabled = false
+show_always = true
+format = "[$user]($style) "
+style_user = "bold cyan"
+style_root = "bold red"
+
+[directory]
+format = "[$path]($style)[$read_only]($read_only_style) "
+style = "bold blue"
+truncation_length = 3
+truncate_to_repo = true
+fish_style_pwd_dir_length = 1
+
+[git_branch]
+format = "[$symbol$branch(:$remote_branch)]($style) "
+symbol = " "
+style = "bold purple"
+
+[git_status]
+format = "([$all_status$ahead_behind]($style) )"
+style = "bold yellow"
+conflicted = " "
+ahead = "${count} "
+behind = "${count} "
+diverged = "${ahead_count}${behind_count} "
+untracked = " "
+stashed = " "
+modified = " "
+staged = " "
+renamed = " "
+deleted = " "
+
+[nodejs]
+format = "[$symbol($version)]($style) "
+symbol = " "
+style = "bold green"
+detect_folders = ["node_modules"]
+detect_extensions = [".js", ".ts", ".mjs", ".cjs"]
+not_capable_style = "bold red"
+
+[python]
+format = "[$symbol($virtualenv)]($style) "
+symbol = " "
+style = "bold yellow"
+pyenv_version_name = true
+pyenv_prefix = "py "
+
+[rust]
+format = "[$symbol($version)]($style) "
+symbol = " "
+style = "bold red"
+
+[golang]
+format = "[$symbol($version)]($style) "
+symbol = "ﳑ "
+style = "bold cyan"
+
+[bun]
+format = "[$symbol($version)]($style) "
+symbol = " "
+style = "bold dimmed green"
+
+[time]
+disabled = false
+format = "[$time]($style) "
+style = "dimmed white"
+time_format = "%H:%M"
+
+[character]
+success_symbol = "[❯](bold green)"
+error_symbol = "[❯](bold red)"
+
+[cmd_duration]
+min_time = 2000
+format = "[$duration](bold yellow) "
+show_milliseconds = false
+
+[container]
+format = "[$symbol$name]($style) "
+symbol = " "
+style = "bold red dimmed"
+
+[docker_context]
+format = "[$symbol$context]($style) "
+symbol = " "
+style = "bold blue"
+
+# Show in k8s contexts
+[kubernetes]
+disabled = false
+format = "[$symbol$context( $namespace)]($style) "
+symbol = "ﴱ "
+style = "bold blue"
+
+[line_break]
+disabled = false

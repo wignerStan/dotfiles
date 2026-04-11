@@ -1,0 +1,106 @@
+# Jacob's Mihomo (Clash Meta) Config
+# Consolidated Mature Version
+
+mixed-port: 7890
+allow-lan: false
+mode: rule
+log-level: info
+ipv6: false
+external-controller: 127.0.0.1:9090
+
+dns:
+  enable: true
+  listen: 0.0.0.0:53
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  nameserver:
+    - https://dns.alidns.com/dns-query
+    - https://doh.pub/dns-query
+  fallback:
+    - https://dns.google/dns-query
+    - https://1.1.1.1/dns-query
+
+# Proxy Providers Or Proxies
+proxies:
+  - name: "Personal Proxy"
+    type: shadowsocks
+    server: server.example.com
+    port: 443
+    cipher: aes-256-gcm
+    password: "password"
+
+proxy-groups:
+  - name: "🚀 Proxy"
+    type: select
+    proxies: [ "⚙️ Auto", "Personal Proxy", "DIRECT" ]
+  - name: "⚙️ Auto"
+    type: url-test
+    url: "http://www.gstatic.com/generate_204"
+    interval: 300
+    tolerance: 50
+    proxies: [ "Personal Proxy" ]
+  - name: "全局直连"
+    type: select
+    proxies: [ "DIRECT", "🚀 Proxy" ]
+  - name: "节点选择"
+    type: select
+    proxies: [ "🚀 Proxy", "DIRECT" ]
+  - name: "广告过滤"
+    type: select
+    proxies: [ "REJECT", "DIRECT" ]
+  - name: "电报消息"
+    type: select
+    proxies: [ "🚀 Proxy" ]
+  - name: "YouTube"
+    type: select
+    proxies: [ "🚀 Proxy", "DIRECT" ]
+  - name: "Netflix"
+    type: select
+    proxies: [ "🚀 Proxy", "DIRECT" ]
+  - name: "AI"
+    type: select
+    proxies: [ "🚀 Proxy", "DIRECT" ]
+
+rule-providers:
+  reject:
+    type: http
+    behavior: domain
+    url: "https://fastly.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/reject.txt"
+    path: ./ruleset/loyalsoldier/reject.yaml
+    interval: 86400
+  gfw:
+    type: http
+    behavior: domain
+    url: "https://fastly.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/gfw.txt"
+    path: ./ruleset/loyalsoldier/gfw.yaml
+    interval: 86400
+  direct:
+    type: http
+    behavior: domain
+    url: "https://fastly.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/direct.txt"
+    path: ./ruleset/loyalsoldier/direct.yaml
+    interval: 86400
+  applications:
+    type: http
+    behavior: classical
+    url: "https://fastly.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/applications.txt"
+    path: ./ruleset/loyalsoldier/applications.yaml
+    interval: 86400
+  ai:
+    type: http
+    behavior: classical
+    url: "https://fastly.jsdelivr.net/gh/xiaolin-007/clash@main/rule/AI.txt"
+    path: ./ruleset/xiaolin-007/AI.yaml
+    interval: 86400
+
+rules:
+  - IP-CIDR,223.5.5.5/32,DIRECT,no-resolve
+  - DOMAIN-SUFFIX,github.com,🚀 Proxy
+  - DOMAIN-SUFFIX,githubusercontent.com,🚀 Proxy
+  - RULE-SET,applications,全局直连
+  - RULE-SET,reject,广告过滤
+  - RULE-SET,ai,AI
+  - RULE-SET,gfw,🚀 Proxy
+  - RULE-SET,direct,DIRECT
+  - GEOIP,CN,DIRECT
+  - MATCH,🚀 Proxy

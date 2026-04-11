@@ -1,0 +1,20 @@
+# Shared Aliases (used by zsh and fish templates)
+# — Chezmoi productivity
+alias cz='chezmoi'
+alias cza='chezmoi apply'
+alias cze='chezmoi edit'
+alias czd='chezmoi diff'
+alias czm='chezmoi manage'
+
+# — Navigation
+alias .='cd'
+alias ..='cd ..'
+alias ...='cd ../..'
+alias g='git'
+
+# — Editor
+alias vi='nvim'
+alias vim='nvim'
+
+# — System
+alias brew_update='brew update && brew upgrade && brew cleanup'

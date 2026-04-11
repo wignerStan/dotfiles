@@ -1,0 +1,3 @@
+# Chezmoi source directory .gitignore
+*.age
+*.asc

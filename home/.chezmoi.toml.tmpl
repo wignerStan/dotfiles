@@ -1,0 +1,37 @@
+{{- /* Machine Configuration Logic */ -}}
+{{- $ephemeral := false -}}
+{{- $work := false -}}
+{{- $headless := false -}}
+{{- $personal := true -}}
+{{- $use_china_mirrors := true -}}
+
+{{- /* Detection */ -}}
+{{- if or (env "CODESPACES") (env "REMOTE_CONTAINERS_IPC") (eq .chezmoi.username "root" "ubuntu") -}}
+{{-   $ephemeral = true -}}
+{{-   $headless = true -}}
+{{- end -}}
+
+{{- $hostname := .chezmoi.hostname -}}
+{{- if eq .chezmoi.os "darwin" -}}
+{{-   $hostname = output "scutil" "--get" "LocalHostName" | trim -}}
+{{- end -}}
+
+{{- /* Custom Prompts */ -}}
+{{- $github_user := "jacob" -}}
+{{- if stdinIsATTY -}}
+{{-   $github_user = promptStringOnce . "github_user" "What is your GitHub username?" "jacob" -}}
+{{- end -}}
+
+[data]
+    name = "Jacob"
+    github_user = {{ $github_user | quote }}
+    hostname = {{ $hostname | quote }}
+    is_ephemeral = {{ $ephemeral }}
+    is_headless = {{ $headless }}
+    is_work = {{ $work }}
+    use_china_mirrors = {{ $use_china_mirrors }}
+    arch = {{ .chezmoi.arch | quote }}
+    
+    # Paths for modern tools
+    ghostty_config = "~/.config/ghostty/config"
+    nvim_config = "~/.config/nvim"

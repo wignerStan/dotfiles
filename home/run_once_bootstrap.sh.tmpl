@@ -1,0 +1,57 @@
+#!/bin/bash
+
+# ═══════════════════════════════════════════════════════════════
+# Jacob's Multi-Machine Bootstrap v2
+# ═══════════════════════════════════════════════════════════════
+
+set -euo pipefail
+
+echo "=== Starting Jacob's Dotfiles Bootstrap v2 ==="
+
+# 1. Mirror-aware Homebrew setup
+{{- if .use_china_mirrors }}
+export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.ustc.edu.cn/brew.git"
+export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.ustc.edu.cn/homebrew-core.git"
+export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.ustc.edu.cn/homebrew-bottles"
+export HOMEBREW_API_DOMAIN="https://mirrors.ustc.edu.cn/homebrew-bottles/api"
+{{- end }}
+
+if ! command -v brew &> /dev/null; then
+    echo "Homebrew not found. Installing..."
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+fi
+
+# 2. Package Installation
+echo "Installing/Updating core packages..."
+packages=(
+    zsh
+    fish
+    nushell
+    tmux
+    zellij
+    starship
+    zoxide
+    eza
+    bat
+    ripgrep
+    fd
+    mihomo
+    neovim
+    ghostty
+    
+    # LSP & LazyVim dependencies
+    npm
+    cargo
+    go
+    stylua
+    luarocks
+    fzf
+    kubecolor
+)
+
+brew install "${packages[@]}"
+
+# 3. Extra Setup
+# (Add any specific tool setup logic here, e.g. tpm for tmux)
+
+echo "=== Bootstrap v2 Complete ==="

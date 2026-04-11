@@ -1,0 +1,40 @@
+# Jacob's Fish Configuration - Mature Version
+# Managed by Chezmoi
+
+if status is-interactive
+    # 1. Environment & Prompt (Starship)
+    if command -v starship &>/dev/null
+        starship init fish | source
+    end
+
+    # 2. Zoxide (Smart CD)
+    if command -v zoxide &>/dev/null
+        zoxide init fish | source
+    end
+
+    # 3. Sheldon (Plugin Management)
+    if command -v sheldon &>/dev/null
+        sheldon source | source
+    end
+
+    # 4. History settings
+    history merge # Sync between sessions
+    
+    # 5. Welcome back message
+    echo (set_color green)"Welcome back, {{ .name }}. Shell: Fish (Desktop)"(set_color normal)
+end
+
+# 6. Shared Aliases from Chezmoi
+{{- range $line := (splitList "\n" (includeTemplate "aliases" .)) }}
+{{- if (hasPrefix "alias " $line) }}
+{{ $line }}
+{{- end }}
+{{- end }}
+
+# Set Fisher path if exists
+if test -f "$HOME/.config/fish/functions/fisher.fish"
+    set -gp fish_function_path "$HOME/.config/fish/functions"
+end
+
+# Ensure consistent shell environment
+set -gx SHELL (which fish)

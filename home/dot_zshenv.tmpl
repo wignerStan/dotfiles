@@ -1,0 +1,237 @@
+# ═══════════════════════════════════════════════════════════════
+# .zshenv — Loaded for ALL shells (interactive and non-interactive)
+# Agent-friendly: ensures env is available in non-login/non-interactive shells
+# (e.g. agent bash tools, SSH commands, CI runners)
+# ═══════════════════════════════════════════════════════════════
+
+# Prevent PATH from accumulating duplicates
+typeset -U path PATH
+
+# ── XDG Base Directory ───────────────────────────────────────────
+export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
+export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+export XDG_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
+
+# ── Homebrew ──────────────────────────────────────────────────
+{{- if eq .chezmoi.os "darwin" }}
+eval "$(/opt/homebrew/bin/brew shellenv)"
+{{- else if eq .chezmoi.os "linux" }}
+if [[ -d "/home/linuxbrew/.linuxbrew" ]]; then
+    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+fi
+{{- end }}
+
+{{- if .use_china_mirrors }}
+# ── Homebrew (China mirrors) ──────────────────────────────────
+export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.ustc.edu.cn/brew.git"
+export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.ustc.edu.cn/homebrew-core.git"
+export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.ustc.edu.cn/homebrew-bottles"
+export HOMEBREW_API_DOMAIN="https://mirrors.ustc.edu.cn/homebrew-bottles/api"
+
+# ── HuggingFace & Models ──────────────────────────────────────
+export HF_ENDPOINT=https://hf-mirror.com
+{{- end }}
+
+# ── Proxy ─────────────────────────────────────────────────────
+export NO_PROXY="127.0.0.1,192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,100.64.0.0/10,100.100.0.0/16,localhost,*.local,*.crashlytics.com"
+export no_proxy="$NO_PROXY"
+# Uncomment to enable proxy:
+# export proxy_url="{{ .proxy_url }}"
+# export all_proxy=$proxy_url
+# export http_proxy=$proxy_url
+# export https_proxy=$proxy_url
+# export ALL_PROXY=$proxy_url
+# export HTTP_PROXY=$proxy_url
+# export HTTPS_PROXY=$proxy_url
+
+# ── Editor ────────────────────────────────────────────────────
+export EDITOR="nvim"
+
+# ── iTerm2 Shell Integration with tmux ──────────────────────
+export ITERM_ENABLE_SHELL_INTEGRATION_WITH_TMUX=YES
+
+# ── Telemetry & API ───────────────────────────────────────────
+export DISABLE_TELEMETRY="true"
+export DISABLE_COST_WARNINGS="true"
+export API_TIMEOUT_MS="600000"
+
+# ── HuggingFace & Models ──────────────────────────────────────
+export NANOBANANA_MODEL=gemini-3-pro-image-preview
+
+# ── Mamba (global Python base environment) ─────────────────
+# Provides a shared Python environment for commonly needed Python libraries.
+# uv is used as the pip backend (see ~/.condarc: use_uv: true).
+{{- if lookPath "micromamba" }}
+export MAMBA_EXE='{{- if eq .chezmoi.os "darwin" -}}/opt/homebrew/opt/micromamba/bin/mamba{{- else -}}/home/linuxbrew/.linuxbrew/opt/micromamba/bin/mamba{{- end }}'
+export MAMBA_ROOT_PREFIX='{{ .mamba_root }}'
+__mamba_setup="$("$MAMBA_EXE" shell hook --shell zsh --root-prefix "$MAMBA_ROOT_PREFIX" 2> /dev/null)"
+if [ $? -eq 0 ]; then
+    eval "$__mamba_setup"
+else
+    alias mamba="$MAMBA_EXE"
+fi
+unset __mamba_setup
+
+# Activate mamba base (for non-login/non-interactive shells — e.g. agent tools)
+mamba activate base 2>/dev/null
+{{- end }}
+
+# ── Pixi (project Python environments) ──────────────────────
+{{- if lookPath "pixi" }}
+export PIXI_HOME="${HOME}/.pixi"
+path+=("${PIXI_HOME}/bin")
+{{- end }}
+
+# ── Direnv (auto-load project-level environment) ─────────────
+{{- if lookPath "direnv" }}
+eval "$(direnv hook zsh)"
+_direnv_hook() { eval "$(direnv export zsh 2>/dev/null)"; }
+# Load direnv immediately for non-interactive shells (hooks don't fire there)
+eval "$(direnv export zsh 2>/dev/null)"
+{{- end }}
+
+# ── Shell handler ──────────────────────────────────────────────
+
+command_not_found_handler() {
+  echo "zsh: command not found: '$1'"
+  echo "zsh: current directory is $PWD"
+  return 127
+}
+
+# ── PATH (appended last so all above env is available first) ──
+
+# pnpm
+export PNPM_HOME="{{ .chezmoi.homeDir }}/Library/pnpm"
+path+=("$PNPM_HOME")
+
+# Bun
+export BUN_INSTALL="$HOME/.bun"
+path+=("$BUN_INSTALL/bin")
+
+# Local user binaries (prepended to override system commands)
+path=({{ .chezmoi.homeDir }}/.local/bin $path)
+
+# Fail-safe: ensure PATH is exported regardless of how the shell was started
+export PATH
+
+# ═══════════════════════════════════════════════════════════════
+# Dev tool wrappers (modern replacements) — loaded last
+# ═══════════════════════════════════════════════════════════════
+{{- if lookPath "pnpm" }}
+
+npm() {
+  pnpm "$@"
+  local ret=$?
+  if [[ $ret -ne 0 ]]; then
+    cat >&2 << 'EOF'
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                        🛑  STOP USING NPM  🛑                              ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+This wrapper exists to BREAK YOUR npm HABIT and teach you pnpm.
+
+WHY THIS WRAPPER EXISTS:
+──────────────────────────
+  • npm wastes disk space with duplicate node_modules across projects
+  • pnpm uses content-addressable storage - packages stored once, hard-linked everywhere
+  • pnpm is faster with strict dependency resolution (no phantom dependencies)
+  • This wrapper passes your command to pnpm so it still works
+
+Just use pnpm directly instead of npm.
+EOF
+  fi
+  return $ret
+}
+{{- end }}
+
+{{- if lookPath "bun" }}
+
+npx() {
+  bunx "$@"
+  local ret=$?
+  if [[ $ret -ne 0 ]]; then
+    cat >&2 << 'EOF'
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                        🛑  STOP USING NPX  🛑                              ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+This wrapper exists to BREAK YOUR npx HABIT and teach you bunx.
+
+  • npx is slow and requires Node.js runtime
+  • bunx uses Bun's optimized runtime - faster startup and execution
+  • This wrapper passes your command to bunx so it still works
+
+  bunx --bun <pkg>         # Force Bun runtime instead of Node.js
+EOF
+  fi
+  return $ret
+}
+{{- end }}
+
+{{- if lookPath "uv" }}
+
+pip() {
+  uv pip "$@"
+  local ret=$?
+  if [[ $ret -ne 0 ]]; then
+    cat >&2 << 'EOF'
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                        🛑  STOP USING PIP  🛑                              ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+  • uv is 10-100x faster (written in Rust) with parallel downloads
+  • uv uses lock files for reproducible builds by default
+
+  uv tool install <pkg>    # Install Python CLI tool globally (like pipx)
+  uvx <tool>               # Run tool in isolated env (like npx for Python)
+EOF
+  fi
+  return $ret
+}
+
+pip3() { pip "$@"; }
+{{- end }}
+
+{{- if lookPath "mamba" }}
+
+conda() {
+  mamba "$@"
+  local ret=$?
+  if [[ $ret -ne 0 ]]; then
+    cat >&2 << 'EOF'
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                       🛑  STOP USING CONDA  🛑                             ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+  • mamba is faster with better parallel downloads and solving
+  • For project environments, consider using pixi instead
+
+Just use mamba directly instead of conda.
+EOF
+  fi
+  return $ret
+}
+
+mamba() {
+    case "${1-}" in
+        env)
+            cat >&2 << 'EOF'
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                     🛑  STOP USING MAMBA ENV  🛑                           ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+Use pixi for project environments:
+  pixi init myproject && pixi add python numpy
+  pixi shell  # Activate
+
+Docs: https://pixi.sh
+EOF
+            __mamba_wrap "$@"
+            ;;
+        *)
+            __mamba_wrap "$@"
+            ;;
+    esac
+}
+{{- end }}

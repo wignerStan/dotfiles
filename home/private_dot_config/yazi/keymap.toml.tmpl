@@ -1,0 +1,16 @@
+[mgr]
+prepend_keymap = [
+{{- if eq .chezmoi.os "darwin" }}
+	{ on = "y", run = [ 'shell -- printf "%%s" %s | pbcopy', "yank" ], desc = "Yank (clipboard + yank)" },
+	{ on = "Y", run = 'shell -- pwd | tr -d "\\n" | pbcopy', desc = "Copy cwd to clipboard" },
+{{- else }}
+	{ on = "y", run = [ 'shell --block -- printf "\033]52;c;$(echo -n %s | /usr/bin/base64 -w0)\007"', "yank" ], desc = "Yank files (OSC 52 clipboard + file yank)" },
+	{ on = "Y", run = 'shell --block -- printf "\033]52;c;$(pwd | tr -d "\\n" | /usr/bin/base64 -w0)\007"', desc = "Copy cwd to clipboard (OSC 52)" },
+{{- end }}
+	{ on = [ "G" ], run = "shell --block lazygit", desc = "Lazygit" },
+	{ on = [ "g", "c" ], run = "cd ~/.config", desc = "Go to .config" },
+	{ on = [ "g", "d" ], run = "cd ~/Downloads", desc = "Go to Downloads" },
+	{ on = [ "g", "t" ], run = "cd /tmp", desc = "Go to /tmp" },
+	{ on = [ "g", "r" ], run = 'shell -- ya emit cd "$(git rev-parse --show-toplevel)"', desc = "Go to git root" },
+	{ on = [ "c", "c" ], run = "cd ~/.claude", desc = "Go to .claude" },
+]

@@ -1,0 +1,61 @@
+# 操作系统文件
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 编辑器文件
+**/.vscode/
+**/.idea/
+*.swp
+*~
+
+**/.worktrees/
+
+**/.venv/
+**/node_modules/
+**/target/
+
+
+# 环境文件
+.env
+**/ENV/
+.env.*
+
+
+# AI助手配置文件
+**/.github/copilot-instructions.md
+**/.github/prompts/
+**/.github/agents/
+**/_bmad
+**/_bmad-output
+**/.kiro
+**/.iflow
+**/.gemini
+**/.qwen
+**/.agent
+**/.claude
+**/.cursor
+**/.trae
+.windsurf
+#.aider
+**/.kilocodemodes
+**/.opencode
+**/.serena
+
+#.copilot
+#.continue
+#.codeium
+**/.codemachine
+**/.auto-claude
+# 第二阶段：明确允许模板文件
+!*.example
+!*.template
+!*.dist
+!*.sample
+
+
+
+#local file
+**/*local*
+
+

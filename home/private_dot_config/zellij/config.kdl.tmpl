@@ -1,0 +1,27 @@
+// Jacob's Zellij Configuration
+// Managed by Chezmoi
+
+keybinds {
+    normal {
+        // Unbind Ctrl-b to avoid conflict with Tmux if running both
+        unbind "Ctrl b"
+        bind "Ctrl a" { SwitchToMode "Tmux"; }
+    }
+}
+
+theme "catppuccin-mocha"
+default_layout "compact"
+default_shell "fish"
+pane_frames true
+mouse_mode true
+copy_on_select true
+
+ui {
+    pane_frames {
+        rounded_corners true
+        hide_session_name true
+    }
+}
+
+// Global Aliases if needed
+// Aliases are better in shells, but zellij can handle sessions

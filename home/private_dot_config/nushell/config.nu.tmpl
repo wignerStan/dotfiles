@@ -1,0 +1,41 @@
+# Jacob's Nushell Config - Mature Version
+# Managed by Chezmoi
+
+let-env config = {
+    show_banner: false,
+    history: {
+        max_size: 100000,
+        sync_on_enter: true,
+        file_format: "sqlite",
+    }
+    table: {
+        mode: expanded,
+    }
+}
+
+# Starship Prompt
+if (which starship | length) > 0 {
+    mkdir ($nu.cache-dir | path join "starship")
+    starship init nu | save -f ($nu.cache-dir | path join "starship" "init.nu")
+    source ($nu.cache-dir | path join "starship" "init.nu")
+}
+
+# Zoxide (Smart CD)
+if (which zoxide | length) > 0 {
+    zoxide init nu | save -f ($nu.cache-dir | path join "zoxide.nu")
+    source ($nu.cache-dir | path join "zoxide.nu")
+}
+
+# 4. Shared Aliases from Common Template (Filter-Convert)
+{{- range $line := (splitList "\n" (includeTemplate "aliases" .)) }}
+{{- if (hasPrefix "alias " $line) }}
+{{-   $p1 := (trimPrefix "alias " $line) }}
+{{-   $parts := (splitList "=" $p1) }}
+{{-   if gt (len $parts) 1 }}
+alias {{ index $parts 0 }} = {{ index $parts 1 | trimAll "'" | trimAll "\"" }}
+{{-   end }}
+{{- end }}
+{{- end }}
+
+# Welcome back
+print (ansi green) "Welcome back, {{ .name }}. Current shell: Nushell" (ansi reset)

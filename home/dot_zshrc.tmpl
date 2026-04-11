@@ -1,0 +1,190 @@
+# ═══════════════════════════════════════════════════════════════
+# .zshrc — Interactive Shell (managed by chezmoi)
+# ═══════════════════════════════════════════════════════════════
+
+# ═══════════════════════════════════════════════════════════════
+# Completion system
+# ═══════════════════════════════════════════════════════════════
+
+{{- if lookPath "brew" }}
+FPATH="$(brew --prefix)/share/zsh-completions:$FPATH"
+FPATH="$(brew --prefix)/share/zsh/site-functions:$FPATH"
+{{- end }}
+
+autoload -Uz compinit
+# Rebuild completion cache once per day
+if [[ -n ${${ZDOTDIR:-$HOME}/.zcompdump}(#qN.mh+24) ]]; then
+    compinit
+else
+    compinit -C
+fi
+
+# Custom zsh functions
+fpath=(~/.zsh/functions $fpath)
+if [[ -d $HOME/.zsh/functions ]]; then
+    for func_file in $HOME/.zsh/functions/*(.N); do
+        autoload -Uz -- "$func_file:t"
+    done
+fi
+fpath=($HOME/.zsh/completions $fpath)
+
+ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE="fg=10"
+zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
+zstyle ':completion:*:*:*:*:*' menu select
+
+# ═══════════════════════════════════════════════════════════════
+# Plugins (via Homebrew)
+# ═══════════════════════════════════════════════════════════════
+
+{{- if lookPath "brew" }}
+_brew_prefix="$(brew --prefix)"
+
+[[ -f $_brew_prefix/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]] && source $_brew_prefix/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+[[ -f $_brew_prefix/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]] && source $_brew_prefix/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+
+# Fzf (fuzzy finder)
+[[ -f $_brew_prefix/opt/fzf/shell/key-bindings.zsh ]] && source $_brew_prefix/opt/fzf/shell/key-bindings.zsh
+[[ -f $_brew_prefix/opt/fzf/shell/completion.zsh ]] && source $_brew_prefix/opt/fzf/shell/completion.zsh
+
+# History substring search (must load before zsh-vi-mode)
+[[ -f $_brew_prefix/share/zsh-history-substring-search/zsh-history-substring-search.zsh ]] && source $_brew_prefix/share/zsh-history-substring-search/zsh-history-substring-search.zsh
+{{- end }}
+
+# ═══════════════════════════════════════════════════════════════
+# Vi mode (zsh-vi-mode)
+# ═══════════════════════════════════════════════════════════════
+
+ZVM_ESCAPE_KEYTIMEOUT=0.03
+ZVM_LINE_INIT_MODE="i"
+
+{{- if lookPath "brew" }}
+[[ -f $_brew_prefix/share/zsh-vi-mode/zsh-vi-mode.plugin.zsh ]] && source $_brew_prefix/share/zsh-vi-mode/zsh-vi-mode.plugin.zsh
+{{- end }}
+
+function zvm_after_init() {
+  # Restore fzf bindings (zsh-vi-mode overrides them)
+  zvm_bindkey vicmd '^r' fzf-history-widget
+  zvm_bindkey viins '^r' fzf-history-widget
+  zvm_bindkey vicmd '^t' fzf-file-widget
+  zvm_bindkey viins '^t' fzf-file-widget
+  # History substring search on arrow keys (both modes)
+  zvm_bindkey vicmd '^[[A' history-substring-search-up
+  zvm_bindkey vicmd '^[[B' history-substring-search-down
+  zvm_bindkey viins '^[[A' history-substring-search-up
+  zvm_bindkey viins '^[[B' history-substring-search-down
+}
+
+unset _brew_prefix
+
+# ═══════════════════════════════════════════════════════════════
+# History
+# ═══════════════════════════════════════════════════════════════
+
+HISTFILE=~/.zsh_history
+HISTSIZE=50000
+SAVEHIST=50000
+setopt SHARE_HISTORY
+setopt HIST_IGNORE_ALL_DUPS
+setopt HIST_SAVE_NO_DUPS
+
+# ═══════════════════════════════════════════════════════════════
+# Aliases
+# ═══════════════════════════════════════════════════════════════
+
+alias lg="lazygit"
+{{- if lookPath "eza" }}
+alias ls="eza --icons --git --group-directories-first"
+alias ll="eza -l --icons --git --group-directories-first"
+alias la="eza -a --icons --git --group-directories-first"
+{{- end }}
+{{- if lookPath "bat" }}
+alias cat="bat --plain"
+alias catp="bat"
+{{- end }}
+
+# ═══════════════════════════════════════════════════════════════
+# CLI tools
+# ═══════════════════════════════════════════════════════════════
+
+# Zoxide (smarter cd)
+{{- if lookPath "zoxide" }}
+eval "$(zoxide init zsh)"
+{{- end }}
+
+# Bun completions
+{{- if stat (joinPath .chezmoi.homeDir ".bun" "_bun") }}
+[ -s "$HOME/.bun/_bun" ] && source "$HOME/.bun/_bun"
+{{- end }}
+
+# Yazi (file manager) shell wrapper
+{{- if lookPath "yazi" }}
+function y() {
+    local tmp="$(mktemp -t "yazi-cwd.XXXXXX")"
+    yazi "$@" --cwd-file="$tmp"
+    if cwd="$(cat -- "$tmp")" && [ -n "$cwd" ] && [ "$cwd" != "$PWD" ]; then
+        builtin cd -- "$cwd"
+    fi
+    rm -f -- "$tmp"
+}
+{{- end }}
+
+# ═══════════════════════════════════════════════════════════════
+# Display
+# ═══════════════════════════════════════════════════════════════
+
+export BAT_THEME="Solarized (dark)"
+
+export LESS_TERMCAP_mb=$'\E[01;31m'
+export LESS_TERMCAP_md=$'\E[01;31m'
+export LESS_TERMCAP_me=$'\E[0m'
+export LESS_TERMCAP_so=$'\E[01;44;33m'
+export LESS_TERMCAP_se=$'\E[0m'
+export LESS_TERMCAP_us=$'\E[01;32m'
+export LESS_TERMCAP_ue=$'\E[0m'
+
+# ═══════════════════════════════════════════════════════════════
+# Interactive-only (skip in tmux — agent-oriented)
+# ═══════════════════════════════════════════════════════════════
+
+if [[ -z "$TMUX" ]]; then
+    # Prompt — Starship
+{{- if lookPath "starship" }}
+    if command -v starship &>/dev/null; then
+        eval "$(starship init zsh)"
+    fi
+{{- end }}
+
+    # Git aliases (from oh-my-zsh git plugin, standalone)
+{{- if stat (joinPath .chezmoi.homeDir ".oh-my-zsh/plugins/git/git.plugin.zsh") }}
+    autoload -Uz is-at-least
+
+    function __git_prompt_git() {
+      GIT_OPTIONAL_LOCKS=0 command git "$@"
+    }
+
+    function git_current_branch() {
+      local ref
+      ref=$(__git_prompt_git symbolic-ref --quiet HEAD 2> /dev/null)
+      local ret=$?
+      if [[ $ret != 0 ]]; then
+        [[ $ret == 128 ]] && return
+        ref=$(__git_prompt_git rev-parse --short HEAD 2> /dev/null) || return
+      fi
+      echo ${ref#refs/heads/}
+    }
+
+    source ~/.oh-my-zsh/plugins/git/git.plugin.zsh
+{{- end }}
+
+    # System info — Fastfetch (~30ms)
+{{- if lookPath "fastfetch" }}
+    if command -v fastfetch &>/dev/null; then
+        fastfetch
+    fi
+{{- end }}
+fi
+
+# iTerm2 Shell Integration
+{{- if stat (joinPath .chezmoi.homeDir ".iterm2_shell_integration.zsh") }}
+test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell_integration.zsh"
+{{- end }}
