@@ -36,14 +36,16 @@ export HF_ENDPOINT=https://hf-mirror.com
 # ── Proxy ─────────────────────────────────────────────────────
 export NO_PROXY="127.0.0.1,192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,100.64.0.0/10,100.100.0.0/16,localhost,*.local,*.crashlytics.com"
 export no_proxy="$NO_PROXY"
-# Uncomment to enable proxy:
-# export proxy_url="{{ .proxy_url }}"
+# export proxy_url="socks5h://127.0.0.1:7897"
 # export all_proxy=$proxy_url
 # export http_proxy=$proxy_url
 # export https_proxy=$proxy_url
 # export ALL_PROXY=$proxy_url
 # export HTTP_PROXY=$proxy_url
 # export HTTPS_PROXY=$proxy_url
+
+# ---Display --------------------------------------------------
+#export DISPLAY=10.0.0.201:1
 
 # ── Editor ────────────────────────────────────────────────────
 export EDITOR="nvim"
@@ -59,12 +61,15 @@ export API_TIMEOUT_MS="600000"
 # ── HuggingFace & Models ──────────────────────────────────────
 export NANOBANANA_MODEL=gemini-3-pro-image-preview
 
+# ── Cargo ─────────────────────────────────────────────────────
+. "$HOME/.cargo/env"
+
 # ── Mamba (global Python base environment) ─────────────────
 # Provides a shared Python environment for commonly needed Python libraries.
 # uv is used as the pip backend (see ~/.condarc: use_uv: true).
 {{- if lookPath "micromamba" }}
 export MAMBA_EXE='{{- if eq .chezmoi.os "darwin" -}}/opt/homebrew/opt/micromamba/bin/mamba{{- else -}}/home/linuxbrew/.linuxbrew/opt/micromamba/bin/mamba{{- end }}'
-export MAMBA_ROOT_PREFIX='{{ .mamba_root }}'
+export MAMBA_ROOT_PREFIX="$HOME/mamba"
 __mamba_setup="$("$MAMBA_EXE" shell hook --shell zsh --root-prefix "$MAMBA_ROOT_PREFIX" 2> /dev/null)"
 if [ $? -eq 0 ]; then
     eval "$__mamba_setup"
@@ -101,19 +106,23 @@ command_not_found_handler() {
 
 # ── PATH (appended last so all above env is available first) ──
 
+# Go
+path+=("$HOME/go/bin")
+
 # pnpm
-export PNPM_HOME="{{ .chezmoi.homeDir }}/Library/pnpm"
+export PNPM_HOME="$HOME/Library/pnpm"
 path+=("$PNPM_HOME")
+
+# Antigravity
+path+=$HOME/.antigravity/antigravity/bin
 
 # Bun
 export BUN_INSTALL="$HOME/.bun"
 path+=("$BUN_INSTALL/bin")
-
-# Antigravity
-path+={{ .chezmoi.homeDir }}/.antigravity/antigravity/bin
+export BUN_CONFIG_REGISTRY="https://registry.npmmirror.com"
 
 # Local user binaries (prepended to override system commands)
-path=({{ .chezmoi.homeDir }}/.local/bin $path)
+path=($HOME/.local/bin $path)
 
 # Fail-safe: ensure PATH is exported regardless of how the shell was started
 export PATH

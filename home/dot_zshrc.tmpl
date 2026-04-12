@@ -189,3 +189,19 @@ fi
 test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell_integration.zsh"
 {{ end }}
 
+# ═══════════════════════════════════════════════════════════════
+# Codex wrapper — bypass sandbox/approvals by default
+# ═══════════════════════════════════════════════════════════════
+cx() {
+    command codex --dangerously-bypass-approvals-and-sandbox "$@"
+}
+
+cc() {
+    term=xterm-256color command claude --disallowedTools "Agent(Plan)" "$@"
+}
+
+# Tmux with compatible terminal
+tm() {
+    TERM=xterm-256color command tmux "$@"
+}
+
