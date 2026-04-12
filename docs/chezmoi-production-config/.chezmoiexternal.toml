@@ -1,0 +1,77 @@
+# External Resources Configuration
+# These files will be downloaded and managed by chezmoi without storing them in the repo
+
+# Oh My Zsh framework
+".oh-my-zsh" = {
+    type = "archive"
+    url = "https://github.com/ohmyzsh/ohmyzsh/archive/master.tar.gz"
+    exact = true
+    stripComponents = 1
+    refreshPeriod = "168h"  # Refresh weekly
+}
+
+# Powerlevel10k theme for Zsh
+".oh-my-zsh/custom/themes/powerlevel10k" = {
+    type = "archive"
+    url = "https://github.com/romkatv/powerlevel10k/archive/v1.20.0.tar.gz"
+    exact = true
+    stripComponents = 1
+}
+
+# Zsh autosuggestions plugin
+".oh-my-zsh/custom/plugins/zsh-autosuggestions" = {
+    type = "archive"
+    url = "https://github.com/zsh-users/zsh-autosuggestions/archive/master.tar.gz"
+    exact = true
+    stripComponents = 1
+    refreshPeriod = "168h"
+}
+
+# Zsh syntax highlighting plugin
+".oh-my-zsh/custom/plugins/zsh-syntax-highlighting" = {
+    type = "archive"
+    url = "https://github.com/zsh-users/zsh-syntax-highlighting/archive/master.tar.gz"
+    exact = true
+    stripComponents = 1
+    refreshPeriod = "168h"
+}
+
+# fzf-tab plugin
+".oh-my-zsh/custom/plugins/fzf-tab" = {
+    type = "archive"
+    url = "https://github.com/Aloxaf/fzf-tab/archive/master.tar.gz"
+    exact = true
+    stripComponents = 1
+    refreshPeriod = "168h"
+}
+
+# Nerd Fonts (JetBrainsMono for terminal)
+{{ if eq .chezmoi.os "darwin" }}
+"Library/Fonts/JetBrainsMonoNerdFont-Regular.ttf" = {
+    type = "file"
+    url = "https://github.com/ryanoasis/nerd-fonts/raw/master/patched-fonts/JetBrainsMono/Ligatures/Regular/JetBrainsMonoNerdFont-Regular.ttf"
+    refreshPeriod = "720h"  # Refresh monthly
+}
+{{ else if eq .chezmoi.os "linux" }}
+".local/share/fonts/JetBrainsMonoNerdFont-Regular.ttf" = {
+    type = "file"
+    url = "https://github.com/ryanoasis/nerd-fonts/raw/master/patched-fonts/JetBrainsMono/Ligatures/Regular/JetBrainsMonoNerdFont-Regular.ttf"
+    refreshPeriod = "720h"
+}
+{{ end }}
+
+# Vim plugin manager (vim-plug)
+".vim/autoload/plug.vim" = {
+    type = "file"
+    url = "https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim"
+    refreshPeriod = "168h"
+}
+
+# Tmux Plugin Manager
+".tmux/plugins/tpm" = {
+    type = "archive"
+    url = "https://github.com/tmux-plugins/tpm/archive/master.tar.gz"
+    exact = true
+    stripComponents = 1
+    refreshPeriod = "168h"
+}

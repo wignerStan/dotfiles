@@ -1,0 +1,168 @@
+# Git Configuration (Managed by Chezmoi)
+# User: {{ .name }} <{{ .email }}>
+# Profile: {{ .profile }}
+
+[user]
+    name = {{ .name }}
+    email = {{ .email }}
+    {{- if lookPath "gpg" }}
+    signingkey = {{ .email }}
+    {{- end }}
+
+[core]
+    editor = {{ if lookPath "code" }}code --wait{{ else if lookPath "vim" }}vim{{ else }}nano{{ end }}
+    {{- if lookPath "delta" }}
+    pager = delta
+    {{- else }}
+    pager = less -R
+    {{- end }}
+    autocrlf = input
+    excludesfile = ~/.gitignore_global
+    {{- if eq .chezmoi.os "darwin" }}
+    ignorecase = false
+    {{- end }}
+
+[init]
+    defaultBranch = main
+
+[pull]
+    rebase = true
+
+[push]
+    default = current
+    autoSetupRemote = true
+    {{- if lookPath "gpg" }}
+    gpgsign = true
+    {{- end }}
+
+[commit]
+    {{- if lookPath "gpg" }}
+    gpgsign = true
+    {{- end }}
+    verbose = true
+
+[fetch]
+    prune = true
+    pruneReflogExpired = now
+
+[rebase]
+    autoStash = true
+    autoSquash = true
+
+[merge]
+    {{- if lookPath "code" }}
+    tool = vscode
+    {{- else if lookPath "vimdiff" }}
+    tool = vimdiff
+    {{- end }}
+    conflictstyle = zdiff3
+
+{{- if lookPath "code" }}
+[mergetool "vscode"]
+    cmd = code --wait --merge $REMOTE $LOCAL $BASE $MERGED
+    trustExitCode = true
+{{- end }}
+
+[diff]
+    algorithm = histogram
+    colorMoved = default
+    {{- if lookPath "delta" }}
+    tool = delta
+    {{- end }}
+
+{{- if lookPath "delta" }}
+# Delta configuration
+[delta]
+    navigate = true
+    light = false
+    line-numbers = true
+    side-by-side = true
+    syntax-theme = Dracula
+
+[interactive]
+    diffFilter = delta --color-only
+{{- end }}
+
+[alias]
+    # Common shortcuts
+    st = status -sb
+    co = checkout
+    br = branch
+    ci = commit
+    ca = commit --amend
+    unstage = reset HEAD --
+    last = log -1 HEAD
+    
+    # Logging
+    lg = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit
+    lga = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit --all
+    ls = log --pretty=format:"%C(yellow)%h%Cred%d\\ %Creset%s%Cblue\\ [%cn]" --decorate
+    ll = log --pretty=format:"%C(yellow)%h%Cred%d\\ %Creset%s%Cblue\\ [%cn]" --decorate --numstat
+    
+    # Show changes
+    changed = diff --name-only
+    diffstat = diff --stat
+    
+    # Stash operations
+    stash-all = stash save --include-untracked
+    
+    # Undo
+    undo = reset --soft HEAD^
+    amend = commit --amend --no-edit
+    
+    # Cleanup
+    cleanup = "!git branch --merged | grep  -v '\\*\\|main\\|master\\|develop' | xargs -n 1 git branch -d"
+
+[color]
+    ui = auto
+    branch = auto
+    diff = auto
+    status = auto
+
+[color "branch"]
+    current = yellow reverse
+    local = yellow
+    remote = green
+
+[color "diff"]
+    meta = yellow bold
+    frag = magenta bold
+    old = red bold
+    new = green bold
+
+[color "status"]
+    added = green
+    changed = yellow
+    untracked = red
+
+# URL shortcuts
+[url "git@github.com:"]
+    {{- if eq .profile "work" }}
+    insteadOf = https://github.com/
+    {{- end }}
+
+{{- if eq .profile "work" }}
+# Work-specific Git configuration
+[includeIf "gitdir:~/work/"]
+    path = ~/.gitconfig_work
+{{- end }}
+
+# Performance optimizations
+[feature]
+    manyFiles = true
+
+[index]
+    version = 4
+
+[protocol]
+    version = 2
+
+# Security
+[transfer]
+    fsckObjects = true
+
+[fetch]
+    fsckObjects = true
+
+[receive]
+    fsckObjects = true

@@ -1,0 +1,95 @@
+{{- /* This is a production-ready chezmoi configuration template */ -}}
+{{- /* It will be evaluated during 'chezmoi init' to create the actual config file */ -}}
+
+{{- /* Detect OS and architecture */ -}}
+{{- $osid := .chezmoi.os -}}
+{{- if hasKey .chezmoi "osRelease" -}}
+{{-   if hasKey .chezmoi.osRelease "id" -}}
+{{-     $osid = printf "%s-%s" .chezmoi.os .chezmoi.osRelease.id -}}
+{{-   end -}}
+{{- end -}}
+
+{{- /* Interactive prompts for user-specific data */ -}}
+{{- $email := promptStringOnce . "user.email" "Email address for git configuration" -}}
+{{- $profile := promptChoiceOnce . "user.profile" "Machine Profile" (list "personal" "work") "personal" -}}
+{{- $name := promptStringOnce . "user.name" "Full name for git configuration" -}}
+
+{{- /* Choose encryption based on availability */ -}}
+{{- $encryption := "age" -}}
+{{- if lookPath "gpg" -}}
+{{-   $useGpg := promptBoolOnce . "encryption.useGpg" "Use GPG instead of age for encryption" false -}}
+{{-   if $useGpg -}}
+{{-     $encryption = "gpg" -}}
+{{-   end -}}
+{{- end -}}
+
+# Chezmoi Configuration File (Auto-generated from .chezmoi.toml.tmpl)
+# Generated on: {{ now | date "2006-01-02 15:04:05 MST" }}
+# OS: {{ .chezmoi.os }} ({{ .chezmoi.arch }})
+# Hostname: {{ .chezmoi.hostname }}
+
+[data]
+    # User-specific data available in all templates
+    email = {{ $email | quote }}
+    name = {{ $name | quote }}
+    profile = {{ $profile | quote }}
+    osid = {{ $osid | quote }}
+
+[diff]
+    # Use delta for beautiful diffs if available
+    {{- if lookPath "delta" }}
+    pager = "delta"
+    {{- else }}
+    pager = "less -R"
+    {{- end }}
+    # Show detailed diff output
+    exclude = ["scripts"]
+
+[merge]
+    # Configure merge tool
+    {{- if lookPath "code" }}
+    command = "code"
+    args = ["--wait", "--merge", "{{ "{{" }} .Destination {{ "}}" }}", "{{ "{{" }} .Source {{ "}}" }}", "{{ "{{" }} .Target {{ "}}" }}"]
+    {{- else if lookPath "vim" }}
+    command = "vimdiff"
+    {{- end }}
+
+[git]
+    # Automatically commit and push changes
+    autoCommit = true
+    autoPush = false  # Set to true only when you trust the setup
+
+{{- if eq $encryption "age" }}
+[age]
+    # Age encryption configuration
+    # Generate your identity with: age-keygen -o ~/.config/chezmoi/key.txt
+    identity = "{{ .chezmoi.homeDir }}/.config/chezmoi/key.txt"
+    recipient = "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"  # Replace with your public key
+{{- else if eq $encryption "gpg" }}
+[gpg]
+    recipient = "{{ $email }}"
+{{- end }}
+
+[edit]
+    # Use preferred editor
+    {{- if lookPath "code" }}
+    command = "code"
+    args = ["--wait"]
+    {{- else if lookPath "vim" }}
+    command = "vim"
+    {{- end }}
+
+# CD command configuration
+[cd]
+    command = "{{ .chezmoi.homeDir }}/.local/share/chezmoi"
+
+# Hooks for pre/post operations
+[hooks.apply.pre]
+    command: ".chezmoiscripts/pre-apply.sh"
+
+[hooks.apply.post]
+    command: ".chezmoiscripts/post-apply.sh"
+
+# Warning thresholds
+[warnings]
+    configFileTemplateHasChanged = true

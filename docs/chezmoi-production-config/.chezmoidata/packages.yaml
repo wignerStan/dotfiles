@@ -1,0 +1,64 @@
+# Production Package Manifest
+# This file defines packages to install across different operating systems
+# Referenced by run_onchange_install-packages.sh.tmpl
+
+# Cross-platform CLI tools
+common:
+  - git
+  - vim
+  - tmux
+  - curl
+  - wget
+  - jq
+  - ripgrep
+  - fd
+  - bat
+  - eza
+  - zoxide
+  - fzf
+  - age  # For encryption
+
+# macOS-specific packages (via Homebrew)
+darwin:
+  - homebrew/cask/iterm2
+  - homebrew/cask/visual-studio-code
+  - coreutils
+  - gnu-sed
+  - htop
+  - tree
+  - delta  # Git diff tool
+
+# Debian/Ubuntu packages
+linux-debian:
+  - build-essential
+  - software-properties-common
+  - git-delta
+  - htop
+  - tree
+  - apt-transport-https
+
+# Fedora/RHEL packages
+linux-fedora:
+  - gcc
+  - gcc-c++
+  - make
+  - git-delta
+  - htop
+  - tree
+
+# Arch Linux packages
+linux-arch:
+  - base-devel
+  - git-delta
+  - htop
+  - tree
+
+# Development tools (optional, based on user profile)
+dev-tools:
+  - docker
+  - kubectl
+  - terraform
+  - node
+  - python3
+  - go
+  - rust

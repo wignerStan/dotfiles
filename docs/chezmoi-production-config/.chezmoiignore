@@ -1,0 +1,54 @@
+# Chezmoi Ignore Patterns (Production Configuration)
+# Files and patterns listed here will be ignored by chezmoi
+
+# README files in source directory
+README.md
+
+# Editor and IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Ignore based on OS
+{{ if ne .chezmoi.os "darwin" }}
+# Ignore macOS-specific files on non-macOS systems
+Library/
+dot_hammerspoon/
+dot_config/karabiner/
+{{ end }}
+
+{{ if ne .chezmoi.os "linux" }}
+# Ignore Linux-specific files on non-Linux systems
+dot_config/i3/
+dot_config/sway/
+{{ end }}
+
+{{ if ne .chezmoi.os "windows" }}
+# Ignore Windows-specific files on non-Windows systems
+AppData/
+{{ end }}
+
+# Ignore based on profile
+{{ if eq .profile "personal" }}
+# Ignore work-specific files for personal machines
+dot_config/work/
+{{ end }}
+
+{{ if eq .profile "work" }}
+# Ignore personal files for work machines
+dot_config/personal/
+dot_config/games/
+{{ end }}
+
+# Temporary and build artifacts
+*.log
+*.tmp
+node_modules/
+.cache/
+
+# Private files that should never be synced (even encrypted)
+**/*_local
+**/*_local.*

@@ -1,0 +1,119 @@
+#!/bin/bash
+# run_onchange_install-packages.sh.tmpl
+# This script installs packages from .chezmoidata/packages.yaml
+# It will re-run automatically when packages.yaml changes
+
+# Hash: {{ include ".chezmoidata/packages.yaml" | sha256sum }}
+
+set -e
+
+echo "🔧 Installing packages for {{ .chezmoi.os }} ({{ .osid }})..."
+
+# Load package data
+{{- $packages := (include ".chezmoidata/packages.yaml" | fromYaml) }}
+
+# Determine package manager and install packages based on OS
+{{- if eq .chezmoi.os "darwin" }}
+
+# macOS: Use Homebrew
+if ! command -v brew &> /dev/null; then
+    echo "📦 Installing Homebrew..."
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+fi
+
+echo "📦 Updating Homebrew..."
+brew update
+
+echo "📦 Installing common packages..."
+{{- range $packages.common }}
+brew install {{ . }} || true
+{{- end }}
+
+echo "📦 Installing macOS-specific packages..."
+{{- range $packages.darwin }}
+brew install {{ . }} || true
+{{- end }}
+
+{{- if eq .profile "work" }}
+echo "📦 Installing development tools (work profile)..."
+{{- range $packages.devTools }}
+brew install {{ . }} || true
+{{- end }}
+{{- end }}
+
+brew cleanup
+
+{{- else if eq .chezmoi.os "linux" }}
+
+# Linux: Detect distribution and use appropriate package manager
+{{- if or (eq .osid "linux-ubuntu") (eq .osid "linux-debian") }}
+
+echo "📦 Updating apt..."
+sudo apt update
+
+echo "📦 Installing common packages..."
+{{- range $packages.common }}
+sudo apt install -y {{ . }} || true
+{{- end }}
+
+echo "📦 Installing Debian/Ubuntu-specific packages..."
+{{- range $packages.linuxDebian }}
+sudo apt install -y {{ . }} || true
+{{- end }}
+
+{{- if eq .profile "work" }}
+echo "📦 Installing development tools (work profile)..."
+{{- range $packages.devTools }}
+sudo apt install -y {{ . }} || true
+{{- end }}
+{{- end }}
+
+{{- else if or (eq .osid "linux-fedora") (eq .osid "linux-rhel") }}
+
+echo "📦 Updating dnf..."
+sudo dnf update -y
+
+echo "📦 Installing common packages..."
+{{- range $packages.common }}
+sudo dnf install -y {{ . }} || true
+{{- end }}
+
+echo "📦 Installing Fedora-specific packages..."
+{{- range $packages.linuxFedora }}
+sudo dnf install -y {{ . }} || true
+{{- end }}
+
+{{- if eq .profile "work" }}
+echo "📦 Installing development tools (work profile)..."
+{{- range $packages.devTools }}
+sudo dnf install -y {{ . }} || true
+{{- end }}
+{{- end }}
+
+{{- else if eq .osid "linux-arch" }}
+
+echo "📦 Updating pacman..."
+sudo pacman -Syu --noconfirm
+
+echo "📦 Installing common packages..."
+{{- range $packages.common }}
+sudo pacman -S --noconfirm {{ . }} || true
+{{- end }}
+
+echo "📦 Installing Arch-specific packages..."
+{{- range $packages.linuxArch }}
+sudo pacman -S --noconfirm {{ . }} || true
+{{- end }}
+
+{{- if eq .profile "work" }}
+echo "📦 Installing development tools (work profile)..."
+{{- range $packages.devTools }}
+sudo pacman -S --noconfirm {{ . }} || true
+{{- end }}
+{{- end }}
+
+{{- end }}
+
+{{- end }}
+
+echo "✅ Package installation complete!"
