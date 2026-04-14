@@ -54,7 +54,12 @@ _brew_prefix="$(brew --prefix)"
 # Vi mode (zsh-vi-mode)
 # ═══════════════════════════════════════════════════════════════
 
-ZVM_ESCAPE_KEYTIMEOUT=0.03
+# Increase escape timeout for SSH to prevent bracketed paste issues
+if [[ -n "$SSH_CONNECTION" ]]; then
+  ZVM_ESCAPE_KEYTIMEOUT=0.5
+else
+  ZVM_ESCAPE_KEYTIMEOUT=0.03
+fi
 ZVM_LINE_INIT_MODE="i"
 
 {{- if lookPath "brew" }}
