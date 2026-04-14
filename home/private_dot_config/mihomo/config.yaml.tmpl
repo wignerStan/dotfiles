@@ -24,10 +24,17 @@ dns:
 proxies:
   - name: "Personal Proxy"
     type: shadowsocks
-    server: server.example.com
-    port: 443
-    cipher: aes-256-gcm
-    password: "password"
+{{- if hasKey . "proxy_server" }}
+    server: {{ .proxy_server | quote }}
+    port: {{ .proxy_port | default "443" }}
+    cipher: {{ .proxy_cipher | default "aes-256-gcm" }}
+    password: {{ .proxy_password | quote }}
+{{- else }}
+    server: {{ env "MIHOMO_PROXY_SERVER" | quote }}
+    port: {{ env "MIHOMO_PROXY_PORT" | default "443" }}
+    cipher: {{ env "MIHOMO_PROXY_CIPHER" | default "aes-256-gcm" }}
+    password: {{ env "MIHOMO_PROXY_PASSWORD" | quote }}
+{{- end }}
 
 proxy-groups:
   - name: "🚀 Proxy"

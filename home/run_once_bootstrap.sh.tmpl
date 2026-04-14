@@ -1,12 +1,12 @@
 #!/bin/bash
 
 # ═══════════════════════════════════════════════════════════════
-# Jacob's Multi-Machine Bootstrap v2
+# Jacob's Multi-Machine Bootstrap v3
 # ═══════════════════════════════════════════════════════════════
 
 set -euo pipefail
 
-echo "=== Starting Jacob's Dotfiles Bootstrap v2 ==="
+echo "=== Starting Jacob's Dotfiles Bootstrap ==="
 
 # 1. Mirror-aware Homebrew setup
 {{- if .use_china_mirrors }}
@@ -21,12 +21,10 @@ if ! command -v brew &> /dev/null; then
     /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 fi
 
-# 2. Package Installation
+# 2. Core packages (always installed)
 echo "Installing/Updating core packages..."
-packages=(
+core_packages=(
     zsh
-    fish
-    nushell
     tmux
     zellij
     starship
@@ -35,23 +33,35 @@ packages=(
     bat
     ripgrep
     fd
-    mihomo
     neovim
-    ghostty
-    
+    age
+
     # LSP & LazyVim dependencies
     npm
-    cargo
+    rust
     go
     stylua
     luarocks
     fzf
+)
+
+# Install packages individually so one missing doesn't block the rest
+for pkg in "${core_packages[@]}"; do
+    brew install "$pkg" 2>/dev/null || echo "Warning: failed to install $pkg, skipping"
+done
+
+# 3. Desktop-only packages
+{{- if not .is_headless }}
+echo "Installing desktop-only packages..."
+desktop_packages=(
+    fish
+    nushell
+    mihomo
+    ghostty
     kubecolor
 )
 
-brew install "${packages[@]}"
+brew install "${desktop_packages[@]}"
+{{- end }}
 
-# 3. Extra Setup
-# (Add any specific tool setup logic here, e.g. tpm for tmux)
-
-echo "=== Bootstrap v2 Complete ==="
+echo "=== Bootstrap Complete ==="

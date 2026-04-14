@@ -1,0 +1,26 @@
+{{- if .is_headless }}
+# GUI/desktop-only tools — skip on headless servers
+.config/ghostty/
+.config/mihomo/
+{{- end }}
+
+{{- if .is_hpc }}
+# Workstation-only tools — skip on HPC clusters
+.config/ghostty/
+.config/mihomo/
+.config/nushell/
+.config/fish/
+.config/zellij/
+.tmux.conf
+.oh-my-zsh/
+.iterm2_shell_integration.zsh
+
+# Workstation zsh configs — HPC uses container-data/zsh/ instead
+dot_zshenv.tmpl
+dot_zshrc.tmpl
+dot_zprofile
+private_dot_config/starship.toml
+{{- else }}
+# HPC container configs — skip on workstation
+container-data/
+{{- end }}

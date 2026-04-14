@@ -5,10 +5,28 @@
 {{- $personal := true -}}
 {{- $use_china_mirrors := true -}}
 
-{{- /* Detection */ -}}
+{{- /* Detection: ephemeral/container environments */ -}}
 {{- if or (env "CODESPACES") (env "REMOTE_CONTAINERS_IPC") (eq .chezmoi.username "root" "ubuntu") -}}
 {{-   $ephemeral = true -}}
 {{-   $headless = true -}}
+{{- end -}}
+
+{{- /* Detection: headless Linux (no display server, remote server) */ -}}
+{{- if and (eq .chezmoi.os "linux") (not (env "DISPLAY")) (not (env "WAYLAND_DISPLAY")) -}}
+{{-   $headless = true -}}
+{{- end -}}
+
+{{- /* Detection: HPC cluster (has apptainer/singularity on host) */ -}}
+{{- $hpc := false -}}
+{{- if or (lookPath "apptainer") (lookPath "singularity") -}}
+{{-   $hpc = true -}}
+{{- end -}}
+
+{{- /* Detection: age encryption identity available */ -}}
+{{- $age_identity := joinPath .chezmoi.homeDir ".config/chezmoi/age-key.txt" -}}
+{{- $has_age := false -}}
+{{- if stat $age_identity -}}
+{{-   $has_age = true -}}
 {{- end -}}
 
 {{- $hostname := .chezmoi.hostname -}}
@@ -16,22 +34,36 @@
 {{-   $hostname = output "scutil" "--get" "LocalHostName" | trim -}}
 {{- end -}}
 
-{{- /* Custom Prompts */ -}}
-{{- $github_user := "jacob" -}}
+{{- /* Custom Prompts — only prompt during interactive chezmoi init */ -}}
+{{- $github_user := "" -}}
+{{- $name := "" -}}
+{{- $email := "" -}}
 {{- if stdinIsATTY -}}
-{{-   $github_user = promptStringOnce . "github_user" "What is your GitHub username?" "jacob" -}}
+{{-   $github_user = promptStringOnce . "github_user" "What is your GitHub username?" "" -}}
+{{-   $name = promptStringOnce . "name" "What is your name?" "" -}}
+{{-   $email = promptStringOnce . "email" "What is your email?" "" -}}
 {{- end -}}
 
+{{ if $has_age }}
+encryption = "age"
+
+[age]
+    identity = {{ $age_identity | quote }}
+    recipient = "age1s5nfmrjdljyh2hz3nary72zm5478dyrrsudgph043hmgs7c8gy4sc3ys0c"
+{{ end }}
+
 [data]
-    name = "Jacob"
+    name = {{ $name | quote }}
+    email = {{ $email | quote }}
     github_user = {{ $github_user | quote }}
     hostname = {{ $hostname | quote }}
     is_ephemeral = {{ $ephemeral }}
     is_headless = {{ $headless }}
+    is_hpc = {{ $hpc }}
     is_work = {{ $work }}
     use_china_mirrors = {{ $use_china_mirrors }}
     arch = {{ .chezmoi.arch | quote }}
-    
+
     # Paths for modern tools
     ghostty_config = "~/.config/ghostty/config"
     nvim_config = "~/.config/nvim"

@@ -1,3 +1,5 @@
 # Chezmoi source directory .gitignore
-*.age
 *.asc
+
+# Plaintext secrets — use secrets.toml.age (encrypted) for git
+home/.chezmoidata/secrets.toml

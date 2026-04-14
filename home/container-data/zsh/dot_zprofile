@@ -1,0 +1,4 @@
+# ~/.zprofile — zsh login shell config for inside Apptainer container
+# Most setup lives in .zshenv (all shells) and .zshrc (interactive).
+# This file is intentionally minimal.
+# Managed by chezmoi (HPC profile)

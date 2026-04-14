@@ -1,0 +1,186 @@
+# ~/.zshenv — zsh environment for inside Apptainer container
+# Sourced for ALL zsh shells (interactive and non-interactive).
+# Container-only: Homebrew, nvm, bun already in %environment section of SIF.
+# This adds: XDG, mirrors, proxy, PATH, LD_LIBRARY_PATH, dev tool wrappers.
+# Managed by chezmoi (HPC profile)
+
+# Fix Apptainer's merged passwd: host entry has /bin/bash, rewrite to zsh.
+# sed -i fails on bind mounts (rename() → EBUSY), so capture+redirect.
+if [ -w /etc/passwd ] 2>/dev/null; then
+  _pw=$(sed "s|:$HOME:/bin/bash$|:$HOME:/usr/bin/zsh|" /etc/passwd 2>/dev/null) && \
+    [ -n "$_pw" ] && printf '%s\n' "$_pw" > /etc/passwd 2>/dev/null
+  unset _pw
+fi
+export SHELL=/usr/bin/zsh
+
+# Skip /etc/zsh/zshrc compinit — it runs before our fpath fix and uses
+# the host's polluted FPATH, producing "function definition file not found".
+skip_global_compinit=1
+
+# Fix fpath: host FPATH leaks CentOS 7 zsh 5.0.2 paths into the container.
+# Prepend container's zsh function dir so autoload finds the right functions.
+# DO NOT do a full fpath rebuild — compinit scanning 30+ dirs on Lustre
+# causes multi-second hangs. Instead, we skip compinit entirely in .zshrc
+# and just autoload the few functions we actually need.
+typeset -U fpath FPATH
+fpath=(/usr/share/zsh/functions/Completion /usr/share/zsh/functions/Misc $fpath)
+
+# Pre-load functions needed by .zshrc plugins (zoxide, starship) so they
+# don't trigger a full compinit scan.
+autoload -Uz add-zsh-hook
+autoload -Uz chpwd
+
+# Prevent PATH from accumulating duplicates
+typeset -U path PATH
+
+# ── XDG Base Directory ───────────────────────────────────────────
+export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
+export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+export XDG_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
+
+# ── Homebrew mirrors (defense-in-depth with %environment) ──────
+export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/brew.git"
+export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-core.git"
+export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles"
+export HOMEBREW_API_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles/api"
+
+# ── Proxy ─────────────────────────────────────────────────────
+export NO_PROXY="127.0.0.1,localhost,*.local"
+export no_proxy="$NO_PROXY"
+
+# ── Editor ────────────────────────────────────────────────────
+export EDITOR="${EDITOR:-vi}"
+
+# ── Telemetry & API ───────────────────────────────────────────
+export DISABLE_TELEMETRY="true"
+export DISABLE_COST_WARNINGS="true"
+
+# ── HuggingFace mirror ────────────────────────────────────────
+export HF_ENDPOINT=https://hf-mirror.com
+
+# ── LD_LIBRARY_PATH: system libs only ──────────────────────────
+# Homebrew binaries resolve their own libs via per-binary RPATH + Homebrew's
+# own ld.so (PT_INTERP). LD_LIBRARY_PATH must NOT contain any Homebrew path —
+# doing so overrides system binaries' library resolution, causing SSL failures,
+# version mismatches, and crashes (Incident #47, #55).
+# System lib paths are needed because Homebrew's ld.so doesn't search these by
+# default — Homebrew binaries needing libgcc_s.so.1 etc. find them here.
+export LD_LIBRARY_PATH="/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}"
+
+# ── PATH (appended last so all above env is available first) ──
+
+# Homebrew glibc ELF interpreter — bottles link against Homebrew's own glibc,
+# not the system's.  Create lib/ symlinks so the kernel can find the dynamic
+# linker.  glibc is keg-only, so opt/glibc points into Cellar (persistent data).
+# This must happen before the Cellar PATH entries below.
+_hb_glibc="/home/linuxbrew/.linuxbrew/opt/glibc/lib"
+if [[ -d "$_hb_glibc" ]]; then
+  mkdir -p /home/linuxbrew/.linuxbrew/lib
+  ln -sf "$_hb_glibc/ld-linux-x86-64.so.2" /home/linuxbrew/.linuxbrew/lib/ld-linux-x86-64.so.2
+  # ld.so may not exist in the keg (only ld-linux-x86-64.so.2 does).
+  # Homebrew binaries use /home/linuxbrew/.linuxbrew/lib/ld.so as PT_INTERP,
+  # so create it as a relative symlink to ld-linux-x86-64.so.2.
+  ln -sf ld-linux-x86-64.so.2 /home/linuxbrew/.linuxbrew/lib/ld.so
+  for _lib in libc.so.6 libutil.so.1 libpthread.so.0 libdl.so.2 librt.so.1 libm.so.6; do
+    [[ -f "$_hb_glibc/$_lib" ]] && ln -sf "$_hb_glibc/$_lib" "/home/linuxbrew/.linuxbrew/lib/$_lib"
+  done
+else
+  # No Homebrew glibc — fall back to system ld-linux so Homebrew binaries
+  # with PT_INTERP=/home/linuxbrew/.linuxbrew/lib/ld.so can still run.
+  mkdir -p /home/linuxbrew/.linuxbrew/lib
+  ln -sf /lib64/ld-linux-x86-64.so.2 /home/linuxbrew/.linuxbrew/lib/ld-linux-x86-64.so.2
+  ln -sf ld-linux-x86-64.so.2 /home/linuxbrew/.linuxbrew/lib/ld.so
+fi
+unset _hb_glibc _lib
+
+# Cellar formula bins — bin/ symlinks from brew link live in the overlay
+# and are lost on container restart.  Add each Cellar formula's bin/ directly.
+# This works because Cellar → persistent data (survives restarts).
+# NOTE: No LD_LIBRARY_PATH additions here — Homebrew binaries resolve libs via
+# per-binary RPATH → opt/*/lib/ (persisted). LD_LIBRARY_PATH is global and
+# would pollute system binary library resolution (Incident #55).
+for _hb_dir in /home/linuxbrew/.linuxbrew/Cellar/*/; do
+  _hb_dir="${_hb_dir%/}"  # strip trailing slash from glob
+  [[ ! -d "$_hb_dir" ]] && continue
+  _hb_ver=$(ls -1 "$_hb_dir" | sort -V | tail -1)
+  [[ -z "$_hb_ver" ]] && continue
+  [[ -d "$_hb_dir/$_hb_ver/bin" ]] && path+=("$_hb_dir/$_hb_ver/bin")
+done
+unset _hb_dir _hb_ver
+
+# Local user binaries (prepended to override system commands)
+path=($HOME/.local/bin /opt/container-bin $path)
+
+# Cargo
+[ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
+path+=("$HOME/go/bin")
+
+# pnpm
+export PNPM_HOME="$HOME/.local/share/pnpm"
+path+=("$PNPM_HOME")
+
+# Bun
+export BUN_INSTALL="$HOME/.bun"
+path+=("$BUN_INSTALL/bin")
+
+# Fail-safe: ensure PATH is exported regardless of how the shell was started
+export PATH
+
+# SLURM client (bind-mounted from host)
+if [ -d /opt/gridview/slurm ]; then
+  export SLURM_CONF="${SLURM_CONF:-}"
+  export LD_LIBRARY_PATH="/opt/gridview/slurm/lib/slurm:/opt/gridview/munge/lib:${LD_LIBRARY_PATH:-}"
+  path=("/opt/gridview/slurm/bin" $path)
+fi
+
+# HPC Environment Modules (bind-mounted from host via /public/software + /opt/hpc/software)
+# Host uses TCL environment-modules — compatible with container's module command.
+if [ -d "${MODULEPATH%%:*}" ]; then
+  export MODULEPATH="${MODULEPATH:-/opt/hpc/software/modules}"
+  if [ -f /etc/profile.d/modules.sh ]; then
+    . /etc/profile.d/modules.sh
+  fi
+fi
+
+# Restore Homebrew symlinks lost on --writable-tmpfs overlay discard.
+[ -f /opt/container-data/homebrew/.brew-links ] && . /opt/container-data/homebrew/.brew-links
+
+# ── command not found handler ──────────────────────────────────
+
+command_not_found_handler() {
+  echo "zsh: command not found: '$1'" >&2
+  return 127
+}
+
+# ═══════════════════════════════════════════════════════════════
+# Dev tool wrappers (modern replacements)
+# ═══════════════════════════════════════════════════════════════
+
+npm() {
+  pnpm "$@"
+  local ret=$?
+  if [[ $ret -ne 0 ]]; then
+    cat >&2 << 'EOF'
+  STOP USING NPM — use pnpm instead.
+
+  WHY: npm wastes disk with duplicate node_modules. pnpm uses content-addressable
+  storage — packages stored once, hard-linked everywhere. Just use pnpm directly.
+EOF
+  fi
+  return $ret
+}
+
+npx() {
+  bunx "$@"
+  local ret=$?
+  if [[ $ret -ne 0 ]]; then
+    cat >&2 << 'EOF'
+  STOP USING NPX — use bunx instead.
+
+  WHY: npx is slow and requires Node.js runtime. bunx uses Bun's optimized
+  runtime — faster startup and execution. Try: bunx --bun <pkg>
+EOF
+  fi
+  return $ret
+}

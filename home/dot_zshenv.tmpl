@@ -36,13 +36,15 @@ export HF_ENDPOINT=https://hf-mirror.com
 # ── Proxy ─────────────────────────────────────────────────────
 export NO_PROXY="127.0.0.1,192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,100.64.0.0/10,100.100.0.0/16,localhost,*.local,*.crashlytics.com"
 export no_proxy="$NO_PROXY"
-# export proxy_url="socks5h://127.0.0.1:7897"
-# export all_proxy=$proxy_url
-# export http_proxy=$proxy_url
-# export https_proxy=$proxy_url
-# export ALL_PROXY=$proxy_url
-# export HTTP_PROXY=$proxy_url
-# export HTTPS_PROXY=$proxy_url
+{{- if hasKey . "proxy_url" }}
+export proxy_url="{{ .proxy_url }}"
+export all_proxy=$proxy_url
+export http_proxy=$proxy_url
+export https_proxy=$proxy_url
+export ALL_PROXY=$proxy_url
+export HTTP_PROXY=$proxy_url
+export HTTPS_PROXY=$proxy_url
+{{- end }}
 
 # ---Display --------------------------------------------------
 #export DISPLAY=10.0.0.201:1

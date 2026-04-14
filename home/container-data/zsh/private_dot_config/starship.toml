@@ -1,0 +1,19 @@
+# Starship prompt config for inside Apptainer container
+# HPC home dirs on Lustre are huge — prevent scan timeouts.
+# Managed by chezmoi (HPC profile)
+
+scan_timeout = 10
+command_timeout = 3000
+
+[container]
+disabled = false
+
+[directory]
+truncation_length = 3
+truncate_to_repo = true
+
+[git_status]
+disabled = false
+
+[cmd_duration]
+min_time = 2000

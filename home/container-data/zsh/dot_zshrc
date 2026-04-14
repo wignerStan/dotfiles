@@ -1,0 +1,171 @@
+# ~/.zshrc — zsh interactive config for inside Apptainer container
+# zsh is only available inside the container (installed in SIF).
+# Managed by chezmoi (HPC profile)
+
+# ═══════════════════════════════════════════════════════════════
+# Completion — disabled (compinit scans fpath on Lustre = slow)
+# ═══════════════════════════════════════════════════════════════
+# Functions needed by plugins (add-zsh-hook, chpwd) are pre-loaded
+# in .zshenv. Tab completion sacrificed for fast shell startup.
+
+# ═══════════════════════════════════════════════════════════════
+# Plugins (via Homebrew — all optional, graceful degradation)
+# ═══════════════════════════════════════════════════════════════
+
+if [[ -n "$_brew_prefix" ]]; then
+    [[ -f "$_brew_prefix/share/zsh-autosuggestions/zsh-autosuggestions.zsh" ]] && \
+        source "$_brew_prefix/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
+    [[ -f "$_brew_prefix/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]] && \
+        source "$_brew_prefix/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+
+    # Fzf (fuzzy finder)
+    [[ -f "$_brew_prefix/opt/fzf/shell/key-bindings.zsh" ]] && \
+        source "$_brew_prefix/opt/fzf/shell/key-bindings.zsh"
+    [[ -f "$_brew_prefix/opt/fzf/shell/completion.zsh" ]] && \
+        source "$_brew_prefix/opt/fzf/shell/completion.zsh"
+
+    # History substring search (must load before zsh-vi-mode)
+    [[ -f "$_brew_prefix/share/zsh-history-substring-search/zsh-history-substring-search.zsh" ]] && \
+        source "$_brew_prefix/share/zsh-history-substring-search/zsh-history-substring-search.zsh"
+fi
+
+# ═══════════════════════════════════════════════════════════════
+# Vi mode
+# ═══════════════════════════════════════════════════════════════
+
+_zvm_loaded=0
+if [[ -n "$_brew_prefix" ]] && [[ -f "$_brew_prefix/share/zsh-vi-mode/zsh-vi-mode.plugin.zsh" ]]; then
+    ZVM_ESCAPE_KEYTIMEOUT=0.03
+    ZVM_LINE_INIT_MODE="i"
+    source "$_brew_prefix/share/zsh-vi-mode/zsh-vi-mode.plugin.zsh"
+    _zvm_loaded=1
+
+    function zvm_after_init() {
+        # Restore fzf bindings (zsh-vi-mode overrides them)
+        zvm_bindkey vicmd '^r' fzf-history-widget
+        zvm_bindkey viins '^r' fzf-history-widget
+        zvm_bindkey vicmd '^t' fzf-file-widget
+        zvm_bindkey viins '^t' fzf-file-widget
+        # History substring search on arrow keys (both modes)
+        zvm_bindkey vicmd '^[[A' history-substring-search-up
+        zvm_bindkey vicmd '^[[B' history-substring-search-down
+        zvm_bindkey viins '^[[A' history-substring-search-up
+        zvm_bindkey viins '^[[B' history-substring-search-down
+    }
+fi
+
+if [[ $_zvm_loaded -eq 0 ]]; then
+    # Fallback: basic vi mode when zsh-vi-mode is not installed
+    bindkey -v
+    export KEYTIMEOUT=1
+fi
+
+unset _brew_prefix _zvm_loaded
+
+# ═══════════════════════════════════════════════════════════════
+# History
+# ═══════════════════════════════════════════════════════════════
+
+HISTFILE=~/.zsh_history
+HISTSIZE=50000
+SAVEHIST=50000
+setopt SHARE_HISTORY
+setopt HIST_IGNORE_ALL_DUPS
+setopt HIST_SAVE_NO_DUPS
+
+# ═══════════════════════════════════════════════════════════════
+# Aliases
+# ═══════════════════════════════════════════════════════════════
+
+alias lg="lazygit" 2>/dev/null || true
+
+if command -v eza &>/dev/null; then
+    alias ls="eza --icons --git --group-directories-first"
+    alias ll="eza -l --icons --git --group-directories-first"
+    alias la="eza -a --icons --git --group-directories-first"
+fi
+
+if command -v bat &>/dev/null; then
+    alias cat="bat --plain"
+    alias catp="bat"
+fi
+
+# ═══════════════════════════════════════════════════════════════
+# CLI tools
+# ═══════════════════════════════════════════════════════════════
+
+# Zoxide (smarter cd)
+if command -v zoxide &>/dev/null; then
+    eval "$(zoxide init zsh)"
+fi
+
+# Bun completions
+[ -s "$HOME/.bun/_bun" ] && source "$HOME/.bun/_bun"
+
+# ═══════════════════════════════════════════════════════════════
+# Display
+# ═══════════════════════════════════════════════════════════════
+
+if command -v bat &>/dev/null; then
+    export BAT_THEME="Solarized (dark)"
+fi
+
+export LESS_TERMCAP_mb=$'\E[01;31m'
+export LESS_TERMCAP_md=$'\E[01;31m'
+export LESS_TERMCAP_me=$'\E[0m'
+export LESS_TERMCAP_so=$'\E[01;44;33m'
+export LESS_TERMCAP_se=$'\E[0m'
+export LESS_TERMCAP_us=$'\E[01;32m'
+export LESS_TERMCAP_ue=$'\E[0m'
+
+# ═══════════════════════════════════════════════════════════════
+# Prompt — Starship (skip in tmux — agent-oriented)
+# ═══════════════════════════════════════════════════════════════
+
+if [[ -z "$TMUX" ]]; then
+    if command -v starship &>/dev/null; then
+        eval "$(starship init zsh)"
+    else
+        PROMPT='%F{green}%n@%m%f:%F{blue}%~%f%# '
+    fi
+fi
+
+# ═══════════════════════════════════════════════════════════════
+# Git aliases (oh-my-zsh git plugin, if available)
+# ═══════════════════════════════════════════════════════════════
+
+if [[ -f ~/.oh-my-zsh/plugins/git/git.plugin.zsh ]]; then
+    autoload -Uz is-at-least
+
+    function __git_prompt_git() {
+      GIT_OPTIONAL_LOCKS=0 command git "$@"
+    }
+
+    function git_current_branch() {
+      local ref
+      ref=$(__git_prompt_git symbolic-ref --quiet HEAD 2> /dev/null)
+      local ret=$?
+      if [[ $ret != 0 ]]; then
+        [[ $ret == 128 ]] && return
+        ref=$(__git_prompt_git rev-parse --short HEAD 2> /dev/null) || return
+      fi
+      echo ${ref#refs/heads/}
+    }
+
+    source ~/.oh-my-zsh/plugins/git/git.plugin.zsh
+fi
+
+# ═══════════════════════════════════════════════════════════════
+# Proxy toggle (pdev only — LD_PRELOAD proxy shell)
+# ═══════════════════════════════════════════════════════════════
+
+if [[ -n "${LD_PRELOAD:-}" ]]; then
+    proxy-off() {
+        export PROXYCHAINS_DIRECT=1
+        echo "proxy OFF — connect() passthrough (direct mode)"
+    }
+    proxy-on() {
+        unset PROXYCHAINS_DIRECT
+        echo "proxy ON — LD_PRELOAD active (SOCKS5 via xray)"
+    }
+fi
