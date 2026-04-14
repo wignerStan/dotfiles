@@ -143,40 +143,45 @@ export LESS_TERMCAP_us=$'\E[01;32m'
 export LESS_TERMCAP_ue=$'\E[0m'
 
 # ═══════════════════════════════════════════════════════════════
-# Interactive-only (skip in tmux — agent-oriented)
+# Prompt — Starship
+# ═══════════════════════════════════════════════════════════════
+
+{{- if lookPath "starship" }}
+if command -v starship &>/dev/null; then
+    eval "$(starship init zsh)"
+fi
+{{- end }}
+
+# ═══════════════════════════════════════════════════════════════
+# Git aliases (from oh-my-zsh git plugin, standalone)
+# ═══════════════════════════════════════════════════════════════
+
+{{- if stat (joinPath .chezmoi.homeDir ".oh-my-zsh/plugins/git/git.plugin.zsh") }}
+autoload -Uz is-at-least
+
+function __git_prompt_git() {
+  GIT_OPTIONAL_LOCKS=0 command git "$@"
+}
+
+function git_current_branch() {
+  local ref
+  ref=$(__git_prompt_git symbolic-ref --quiet HEAD 2> /dev/null)
+  local ret=$?
+  if [[ $ret != 0 ]]; then
+    [[ $ret == 128 ]] && return
+    ref=$(__git_prompt_git rev-parse --short HEAD 2> /dev/null) || return
+  fi
+  echo ${ref#refs/heads/}
+}
+
+source ~/.oh-my-zsh/plugins/git/git.plugin.zsh
+{{- end }}
+
+# ═══════════════════════════════════════════════════════════════
+# Interactive-only (skip in tmux)
 # ═══════════════════════════════════════════════════════════════
 
 if [[ -z "$TMUX" ]]; then
-    # Prompt — Starship
-{{- if lookPath "starship" }}
-    if command -v starship &>/dev/null; then
-        eval "$(starship init zsh)"
-    fi
-{{- end }}
-
-    # Git aliases (from oh-my-zsh git plugin, standalone)
-{{- if stat (joinPath .chezmoi.homeDir ".oh-my-zsh/plugins/git/git.plugin.zsh") }}
-    autoload -Uz is-at-least
-
-    function __git_prompt_git() {
-      GIT_OPTIONAL_LOCKS=0 command git "$@"
-    }
-
-    function git_current_branch() {
-      local ref
-      ref=$(__git_prompt_git symbolic-ref --quiet HEAD 2> /dev/null)
-      local ret=$?
-      if [[ $ret != 0 ]]; then
-        [[ $ret == 128 ]] && return
-        ref=$(__git_prompt_git rev-parse --short HEAD 2> /dev/null) || return
-      fi
-      echo ${ref#refs/heads/}
-    }
-
-    source ~/.oh-my-zsh/plugins/git/git.plugin.zsh
-{{- end }}
-
-    # System info — Fastfetch (~30ms)
 {{- if lookPath "fastfetch" }}
     if command -v fastfetch &>/dev/null; then
         fastfetch
