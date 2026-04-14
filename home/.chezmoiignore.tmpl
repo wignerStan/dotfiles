@@ -12,14 +12,20 @@
 .config/nushell/
 .config/fish/
 .config/zellij/
+.config/starship.toml
+.config/yazi/
 .oh-my-zsh/
 .iterm2_shell_integration.zsh
 
 # Workstation zsh configs — HPC uses container-data/zsh/ instead
-dot_zshenv.tmpl
-dot_zshrc.tmpl
-dot_zprofile
-private_dot_config/starship.toml
+.zshenv
+.zshrc
+.zprofile
+
+# Workstation scripts — require Homebrew/GitHub access
+bootstrap.sh
+reload-configs.sh
+install-yazi-plugins.sh
 {{- else }}
 # HPC container configs — skip on workstation
 container-data/
