@@ -33,3 +33,8 @@ install-yazi-plugins.sh
 # HPC container configs — skip on workstation
 container-data/
 {{- end }}
+
+{{- if eq .chezmoi.os "darwin" }}
+# Byobu is Linux-only (depends on /usr/share/byobu/, /usr/lib/byobu/)
+.byobu/
+{{- end }}

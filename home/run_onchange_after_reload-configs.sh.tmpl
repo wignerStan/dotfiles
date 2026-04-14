@@ -3,11 +3,13 @@
 # Managed by Chezmoi (Auto-runs on change)
 echo "=== Jacob's Config Sync: Reloading Services ==="
 
+{{- if lookPath "brew" }}
 # Trigger Mihomo reload if it's running via brew services
 if brew services list | grep -q "mihomo" &>/dev/null; then
     echo "Reloading Mihomo (Proxy)..."
     brew services restart mihomo
 fi
+{{- end }}
 
 # Print instructions for other tools
 echo "Dotfiles applied successfully!"
