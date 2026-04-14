@@ -1,0 +1,14 @@
+# ═══════════════════════════════════════════════════════════════
+# byobu tmux overrides — applied when byobu is active
+# ═══════════════════════════════════════════════════════════════
+
+{{- if .is_hpc }}
+run-shell 'tmux set-option -g default-command "/bin/bash"'
+run-shell 'tmux set-option -g default-shell "/bin/bash"'
+{{- else if eq .chezmoi.os "darwin" }}
+run-shell 'tmux set-option -g default-command "$(brew --prefix)/bin/zsh"'
+run-shell 'tmux set-option -g default-shell "$(brew --prefix)/bin/zsh"'
+{{- else }}
+run-shell 'tmux set-option -g default-command "/bin/zsh"'
+run-shell 'tmux set-option -g default-shell "/bin/zsh"'
+{{- end }}
