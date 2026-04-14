@@ -1,4 +1,5 @@
 {{- $uid := output "id" "-u" | trim -}}
+{{- $tmux_tmp := or (env "TMUX_TMPDIR") (env "TMPDIR") "/tmp" -}}
 # =============================================================================
 # Tmux configuration (managed by chezmoi)
 # =============================================================================
@@ -29,63 +30,24 @@ set -g set-titles-string '#T'
 # ── Status bar (iTerm2 polls these in -CC mode) ────────────────
 # UseTmuxStatusBar=True in iTerm2 polls status-left/right.
 # Keep plain text — iTerm2 sanitizes #[...] color escapes.
-set -g status-left-length 40
-set -g status-right-length 80
-set -g status-left '#S:#I.#P'
-set -g status-right '%H:%M %m-%d'
-
-# ── Pane splitting (preserve cwd) ──────────────────────────────
-bind | split-window -h -c '#{pane_current_path}'
-bind - split-window -v -c '#{pane_current_path}'
-unbind '"'
-unbind %
-
-# ── Pane navigation ────────────────────────────────────────────
-bind h select-pane -L
-bind j select-pane -D
-bind k select-pane -U
-bind l select-pane -R
-
-# ── Pane resize ────────────────────────────────────────────────
-bind -r H resize-pane -L 5
-bind -r J resize-pane -D 5
-bind -r K resize-pane -U 5
-bind -r L resize-pane -R 5
-
-# ── Reload config ──────────────────────────────────────────────
-bind r source-file ~/.tmux.conf \; display-message 'tmux.conf reloaded'
-
-# ── Copy mode (vi-style) ──────────────────────────────────────
-setw -g mode-keys vi
-bind Escape copy-mode
-unbind p
-bind p paste-buffer
-bind-key -T copy-mode-vi v send-keys -X rectangle-toggle
-bind-key -T copy-mode-vi C-v send-keys -X rectangle-toggle
-bind-key -T copy-mode-vi Space send-keys -X begin-selection
-bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel "pbcopy"
-bind-key -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel "pbcopy"
-bind-key -T copy-mode-vi M-MouseDrag1Pane send-keys -X begin-selection \; send-keys -X rectangle-toggle
-bind-key -T copy-mode-vi M-MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel "pbcopy"
 
 {{- else if .is_hpc }}
 
 # =============================================================================
 # HPC — socket-separated router
-# Default socket: byobu config (Ctrl+A prefix, F-key bindings, status bar)
+# Default socket: byobu config (Ctrl+A prefix, F-key bindings)
 # CC socket:      Claude Code (bash, minimal, allow-passthrough)
 # =============================================================================
 
-# Always source byobu config for keybindings + status bar.
-# Cannot reliably use #{socket_path} in %if — HPC job schedulers (PBS/Slurm)
-# set TMPDIR per-job, moving the socket to $TMPDIR/tmux-$UID/default.
+# Default socket: source byobu config
+%if "#{==:#{socket_path},{{$tmux_tmp}}/tmux-{{$uid}}/default}"
 source-file ~/.byobu/.tmux.conf
+%endif
 
 # =============================================================================
-# CC socket: Claude Code sessions — override byobu defaults
-# Falls back to byobu config if %if fails (acceptable — CC just gets byobu UX)
+# CC socket: Claude Code sessions (bash shell, minimal tmux)
 # =============================================================================
-%if "#{==:#{socket_path},/tmp/tmux-{{$uid}}/cc}"
+%if "#{==:#{socket_path},{{$tmux_tmp}}/tmux-{{$uid}}/cc}"
 
 run-shell 'tmux set-option -g default-command "/bin/bash"'
 run-shell 'tmux set-option -g default-shell "/bin/bash"'
@@ -109,15 +71,17 @@ set -g aggressive-resize off
 # BG socket:      auto-respawn via pane-died
 # =============================================================================
 
-# Always source byobu config for default socket.
+# Default socket: source byobu config
+%if "#{==:#{socket_path},{{$tmux_tmp}}/tmux-{{$uid}}/default}"
 source-file ~/.byobu/.tmux.conf
+%endif
 
 # =============================================================================
 # CC socket only: rich status bar via #() shell commands
 # No TPM/plugins — pure shell commands that iTerm2 -CC can read from
 # status-left/status-right (status-format is NOT supported by -CC).
 # =============================================================================
-%if "#{==:#{socket_path},/tmp/tmux-{{$uid}}/cc}"
+%if "#{==:#{socket_path},{{$tmux_tmp}}/tmux-{{$uid}}/cc}"
 
 # iTerm2 -CC: incompatible with aggressive-resize and Nerd Font glyphs.
 set -g aggressive-resize off
@@ -141,7 +105,7 @@ set -g status-right "#(/home/jacob/.local/bin/tmux-cc-status) "
 # pane-died fires ONLY when remain-on-exit is on (tmux 3.2+).
 # After respawn, the pane-died option persists on the same pane object.
 # =============================================================================
-%if "#{==:#{socket_path},/tmp/tmux-{{$uid}}/bg}"
+%if "#{==:#{socket_path},{{$tmux_tmp}}/tmux-{{$uid}}/bg}"
 
 set -g remain-on-exit on
 
