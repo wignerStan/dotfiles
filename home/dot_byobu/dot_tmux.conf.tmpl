@@ -1,29 +1,139 @@
-# ═══════════════════════════════════════════════════════════════
-# byobu tmux config — all tmux defaults live here (managed by chezmoi)
-# ═══════════════════════════════════════════════════════════════
+# =============================================================================
+# Byobu/Tmux keybinding overrides
+# Source: /usr/share/byobu/keybindings/f-keys.tmux + community best practices
+# Refs:
+#   https://gist.github.com/relaxdiego/bda8694d38f4c635eee40d15bec3e73e
+#   https://www.reddit.com/r/tmux/comments/1di2zs0/roast_my_tmuxconf/
+#   https://www.smcclennon.com/posts/byobu-keyboard-shortcuts/
+# =============================================================================
 
-# ── Shell ──
-{{- if .is_hpc }}
-run-shell 'tmux set-option -g default-command "/bin/bash"'
-run-shell 'tmux set-option -g default-shell "/bin/bash"'
-{{- else if eq .chezmoi.os "darwin" }}
-run-shell 'tmux set-option -g default-command "$(brew --prefix)/bin/zsh"'
-run-shell 'tmux set-option -g default-shell "$(brew --prefix)/bin/zsh"'
-{{- else }}
-run-shell 'tmux set-option -g default-command "/bin/zsh"'
-run-shell 'tmux set-option -g default-shell "/bin/zsh"'
-{{- end }}
+# -- Set BYOBU_PREFIX if missing (self-healing) ------------------------------
+%if #{==:#{BYOBU_PREFIX},}
+  set-environment -g BYOBU_PREFIX "/usr"
+%endif
 
-# Core settings
-set -g prefix F12
-bind F12 send-prefix
-set-window-option -g xterm-keys on
-set -s escape-time 50
-set -g mouse on
-set -g allow-passthrough on
-set -s set-clipboard on
+# -- Clean slate: unbind all Shift+F-key combos (avoid stale bindings) ------
+unbind-key -n S-F1
+unbind-key -n S-F2
+unbind-key -n S-F3
+unbind-key -n S-F4
+unbind-key -n S-F5
+unbind-key -n S-F6
+unbind-key -n S-F7
+unbind-key -n S-F8
+unbind-key -n S-F9
+unbind-key -n S-F11
+unbind-key -n S-F12
 
-# Copy mode — vi-style
+# =============================================================================
+# Byobu standard F-key bindings (mirrors /usr/share/byobu/keybindings/f-keys.tmux)
+# =============================================================================
+# F1     — Byobu config       |  Shift+F1  — Help
+# F2     — New window          |  Ctrl+F2   — Split vertical (right)
+#                              |  Shift+F2  — Split horizontal (below)
+# F3     — Prev window         |  Shift+F3  — Prev pane
+# F4     — Next window         |  Shift+F4  — Next pane
+# F5     — Reload profile      |  Shift+F5  — Cycle status
+# F6     — Detach              |  Shift+F6  — Detach (no logout)
+# F7     — Copy mode           |  Shift+F7  — Printscreen
+# F8     — Rename window       |  Shift+F8  — Next layout
+# F9     — Byobu config        |  Shift+F9  — Send command to all panes
+# F12    — (freed)             |  Shift+F12 — Toggle F-key bindings
+
+bind-key -n F1      new-window -n config byobu-config
+bind-key -n S-F1    new-window -n help "sh -c 'less /usr/share/doc/byobu/help.tmux.txt'"
+
+bind-key -n F2      new-window -c "#{pane_current_path}" \; rename-window "-"
+bind-key -n C-F2    display-panes \; split-window -h -c "#{pane_current_path}"
+bind-key -n S-F2    display-panes \; split-window -v -c "#{pane_current_path}"
+bind-key -n C-S-F2  new-session \; rename-window "-"
+
+bind-key -n F3      previous-window
+bind-key -n F4      next-window
+bind-key -n M-Left  previous-window
+bind-key -n M-Right next-window
+bind-key -n M-Up    switch-client -p
+bind-key -n M-Down  switch-client -n
+
+bind-key -n S-F3    display-panes \; select-pane -t :.-
+bind-key -n S-F4    display-panes \; select-pane -t :.+
+bind-key -n S-Up    display-panes \; select-pane -U
+bind-key -n S-Down  display-panes \; select-pane -D
+bind-key -n S-Left  display-panes \; select-pane -L
+bind-key -n S-Right display-panes \; select-pane -R
+
+bind-key -n C-F3    display-panes \; swap-pane -s :. -t :.- \; select-pane -t :.-
+bind-key -n C-F4    display-panes \; swap-pane -s :. -t :.+ \; select-pane -t :.+
+bind-key -n C-S-F3  swap-window -t :-1 -d
+bind-key -n C-S-F4  swap-window -t :+1 -d
+
+bind-key -n M-S-Up    resize-pane -U
+bind-key -n M-S-Down  resize-pane -D
+bind-key -n M-S-Left  resize-pane -L
+bind-key -n M-S-Right resize-pane -R
+
+bind-key -n F5      source /usr/share/byobu/profiles/tmuxrc
+bind-key -n S-F5    new-window "/usr/lib/byobu/include/cycle-status" \; source /usr/share/byobu/profiles/tmuxrc
+
+# -- F6: Detach (with raw CSI fallback for Shift+F6) --------------------------
+bind-key -n F6      detach
+bind-key -n M-F6    run-shell '/usr/lib/byobu/include/tmux-detach-all-but-current-client'
+bind-key -n C-F6    kill-pane
+
+bind-key -n F7      copy-mode
+bind-key -n S-F7    capture-pane -S -32768 \; save-buffer "$BYOBU_RUN_DIR/printscreen" \; delete-buffer \; new-window -n "PRINTSCREEN" "$EDITOR $BYOBU_RUN_DIR/printscreen"
+bind-key -n M-NPage copy-mode \; send-keys NPage
+bind-key -n M-PPage copy-mode \; send-keys PPage
+
+bind-key -n F8      command-prompt -p "(rename-window) " "rename-window '%%'"
+bind-key -n C-F8    command-prompt -p "(rename-session) " "rename-session '%%'"
+bind-key -n S-F8    next-layout
+bind-key -n C-S-F8  command-prompt -p "Save byobu layout as:" "run-shell \"/usr/lib/byobu/include/save-layout '%%'\""
+
+bind-key -n F9      new-window -n config byobu-config
+bind-key -n S-F9    command-prompt -p "Send command to all panes:" "run-shell \"/usr/lib/byobu/include/tmux-send-command-to-all-panes '%%'\""
+bind-key -n C-F9    command-prompt -p "Send command to all windows:" "run-shell \"/usr/lib/byobu/include/tmux-send-command-to-all-windows '%%'\""
+bind-key -n M-F9    display-panes \; setw synchronize-panes
+
+bind-key -n M-F11   break-pane
+bind-key -n C-F11   join-pane -h -s :. -t :-1
+bind-key -n S-F11   resize-pane -Z
+
+bind-key -n S-F12   display-message "Byobu F-keys: DISABLED"
+
+# =============================================================================
+# Community-recommended enhancements
+# Refs:
+#   https://gist.github.com/relaxdiego/bda8694d38f4c635eee40d15bec3e73e
+#   https://www.reddit.com/r/tmux/comments/1di2zs0/roast_my_tmuxconf/
+# =============================================================================
+
+# -- Prefix: Ctrl+A (byobu/screen convention) ---------------------------------
+set -g prefix ^A
+set -gu prefix2
+bind a send-prefix
+bind C-a send-prefix
+
+# -- Pane navigation: vim home row --------------------------------------------
+bind h select-pane -L
+bind j select-pane -D
+bind k select-pane -U
+bind l select-pane -R
+
+# -- Pane resize: vim capital keys (repeatable) --------------------------------
+bind -r H resize-pane -L 5
+bind -r J resize-pane -D 5
+bind -r K resize-pane -U 5
+bind -r L resize-pane -R 5
+
+# -- Split panes (intuitive | and -) ------------------------------------------
+bind | split-window -h -c "#{pane_current_path}"
+bind - split-window -v -c "#{pane_current_path}"
+
+# -- Reload config -------------------------------------------------------------
+bind r source-file ~/.byobu/.tmux.conf \; display "Config reloaded!"
+
+# -- Copy mode: vi-style with OSC 52 clipboard (SSH copy/paste) -----------------
 setw -g mode-keys vi
 bind Escape copy-mode
 unbind p
@@ -36,23 +146,25 @@ bind-key -T copy-mode-vi TripleClick1Pane  select-pane \; send-keys -X select-li
 bind-key -T copy-mode-vi Enter             send-keys -X copy-pipe-and-cancel "base64 | tr -d '\\n' | xargs -0 printf '\\033]52;c;%s\\033\\\\'"
 bind-key -T copy-mode-vi C-j               send-keys -X copy-pipe-and-cancel "base64 | tr -d '\\n' | xargs -0 printf '\\033]52;c;%s\\033\\\\'"
 
-# Splits (intuitive | and -)
-bind | split-window -h -c "#{pane_current_path}"
-bind - split-window -v -c "#{pane_current_path}"
+# -- Enable xterm keys (needed for Shift/Ctrl+F-key support) -------------------
+set-window-option -g xterm-keys on
 
-# Synchronize panes toggle
+# -- SSH integration ------------------------------------------------------------
+set -g allow-passthrough on
+set -s set-clipboard on
+
+# -- Session resilience ---------------------------------------------------------
+set -g destroy-unattached off
+
+# -- Mouse support -------------------------------------------------------------
+set -g mouse on
+
+# -- Reduce escape time for faster key response --------------------------------
+set -s escape-time 50
+
+# -- Synchronize panes toggle --------------------------------------------------
 bind y set-window-option synchronize-panes
 
-# ── Pane navigation (Vim style) ──
-bind h select-pane -L
-bind j select-pane -D
-bind k select-pane -U
-bind l select-pane -R
-
-# ── Status bar ──
-set -g status-bg black
-set -g status-fg white
-set -g status-interval 5
-set -g status-left-length 30
-set -g status-left '#[fg=green](#S) #(whoami)'
-set -g status-right '#[fg=yellow]#(cut -d " " -f 1-3 /proc/loadavg) #[fg=white]%H:%M'
+# -- Unbind Meta-left/right so word jump works in shell ------------------------
+unbind-key -n M-Left
+unbind-key -n M-Right

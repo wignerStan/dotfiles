@@ -1,3 +1,4 @@
+{{- $uid := output "id" "-u" | trim -}}
 # =============================================================================
 # Tmux configuration (managed by chezmoi)
 # =============================================================================
@@ -31,8 +32,34 @@ set -g set-titles-string '#T'
 
 {{- else if .is_hpc }}
 
-# HPC — source byobu config (bash shell, managed by chezmoi)
+# =============================================================================
+# HPC — socket-separated router
+# Default socket: byobu config (Ctrl+A prefix, F-key bindings)
+# CC socket:      Claude Code (bash, minimal, allow-passthrough)
+# =============================================================================
+
+# Default socket: source byobu config
+%if "#{==:#{socket_path},/tmp/tmux-{{$uid}}/default}"
 source-file ~/.byobu/.tmux.conf
+%endif
+
+# =============================================================================
+# CC socket: Claude Code sessions (bash shell, minimal tmux)
+# =============================================================================
+%if "#{==:#{socket_path},/tmp/tmux-{{$uid}}/cc}"
+
+run-shell 'tmux set-option -g default-command "/bin/bash"'
+run-shell 'tmux set-option -g default-shell "/bin/bash"'
+set -g default-terminal "screen-256color"
+set -ga terminal-overrides ",*256col*:Tc"
+set -sg escape-time 0
+set -g allow-passthrough on
+set -s set-clipboard on
+set -g mouse on
+set -g history-limit 100000
+set -g aggressive-resize off
+
+%endif
 
 {{- else }}
 
@@ -40,10 +67,11 @@ source-file ~/.byobu/.tmux.conf
 # Tmux configuration — socket-separated router
 # Default socket: delegates to byobu config (single source of truth)
 # CC socket:      iTerm2 -CC status bar (no plugins)
+# BG socket:      auto-respawn via pane-died
 # =============================================================================
 
 # Default socket: source byobu config
-%if "#{==:#{socket_path},/tmp/tmux-1000/default}"
+%if "#{==:#{socket_path},/tmp/tmux-{{$uid}}/default}"
 source-file ~/.byobu/.tmux.conf
 %endif
 
@@ -52,7 +80,7 @@ source-file ~/.byobu/.tmux.conf
 # No TPM/plugins — pure shell commands that iTerm2 -CC can read from
 # status-left/status-right (status-format is NOT supported by -CC).
 # =============================================================================
-%if "#{==:#{socket_path},/tmp/tmux-1000/cc}"
+%if "#{==:#{socket_path},/tmp/tmux-{{$uid}}/cc}"
 
 # iTerm2 -CC: incompatible with aggressive-resize and Nerd Font glyphs.
 set -g aggressive-resize off
@@ -68,6 +96,25 @@ set -g status-left "#[fg=green,bold]#H #[fg=cyan]‹#S› "
 # Status right — server vitals via helper script (colored blocks)
 set -g status-right-length 200
 set -g status-right "#(/home/jacob/.local/bin/tmux-cc-status) "
+
+%endif
+
+# =============================================================================
+# BG socket only: auto-respawn via pane-died + remain-on-exit
+# pane-died fires ONLY when remain-on-exit is on (tmux 3.2+).
+# After respawn, the pane-died option persists on the same pane object.
+# =============================================================================
+%if "#{==:#{socket_path},/tmp/tmux-{{$uid}}/bg}"
+
+set -g remain-on-exit on
+
+# Set pane-died on every new pane so it auto-respawns when the command exits.
+# run-shell is needed because #{pane_id} doesn't expand directly in set-option
+# within the hook command string.
+set-hook -g after-new-session \
+  'run-shell "tmux set-option -p -t \"#{session_name}:#{window_index}.#{pane_index}\" pane-died \"respawn-pane -k\""'
+set-hook -g after-split-window \
+  'run-shell "tmux set-option -p -t \"#{session_name}:#{window_index}.#{pane_index}\" pane-died \"respawn-pane -k\""'
 
 %endif
 {{- end }}
