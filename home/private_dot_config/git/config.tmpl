@@ -38,6 +38,7 @@
     ui = auto
 [push]
     default = simple
+{{- if not .is_hpc }}
 [credential "https://github.com"]
     helper =
 {{- if eq .chezmoi.os "darwin" }}
@@ -51,6 +52,7 @@
     helper = !/opt/homebrew/bin/gh auth git-credential
 {{- else }}
     helper = !/home/linuxbrew/.linuxbrew/bin/gh auth git-credential
+{{- end }}
 {{- end }}
 [http]
     postBuffer = 524288000
