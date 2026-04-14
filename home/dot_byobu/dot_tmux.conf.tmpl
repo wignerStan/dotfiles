@@ -138,13 +138,26 @@ setw -g mode-keys vi
 bind Escape copy-mode
 unbind p
 bind p paste-buffer
-bind-key -T copy-mode-vi v send-keys -X begin-selection
+bind-key -T copy-mode-vi v send-keys -X rectangle-toggle
+bind-key -T copy-mode-vi C-v send-keys -X rectangle-toggle
+bind-key -T copy-mode-vi Space send-keys -X begin-selection
 bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel "base64 | tr -d '\\n' | xargs -0 printf '\\033]52;c;%s\\033\\\\'"
 bind-key -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel "base64 | tr -d '\\n' | xargs -0 printf '\\033]52;c;%s\\033\\\\'"
 bind-key -T copy-mode-vi DoubleClick1Pane  select-pane \; send-keys -X select-word \; run-shell -d 0.3 \; send-keys -X copy-pipe-and-cancel "base64 | tr -d '\\n' | xargs -0 printf '\\033]52;c;%s\\033\\\\'"
 bind-key -T copy-mode-vi TripleClick1Pane  select-pane \; send-keys -X select-line \; run-shell -d 0.3 \; send-keys -X copy-pipe-and-cancel "base64 | tr -d '\\n' | xargs -0 printf '\\033]52;c;%s\\033\\\\'"
 bind-key -T copy-mode-vi Enter             send-keys -X copy-pipe-and-cancel "base64 | tr -d '\\n' | xargs -0 printf '\\033]52;c;%s\\033\\\\'"
 bind-key -T copy-mode-vi C-j               send-keys -X copy-pipe-and-cancel "base64 | tr -d '\\n' | xargs -0 printf '\\033]52;c;%s\\033\\\\'"
+# Alt+drag: rectangle selection (v toggles between line/rectangle mode)
+bind-key -T copy-mode-vi M-MouseDrag1Pane send-keys -X begin-selection \; send-keys -X rectangle-toggle
+bind-key -T copy-mode-vi M-MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel "base64 | tr -d '\\n' | xargs -0 printf '\\033]52;c;%s\\033\\\\'"
+
+# -- Status bar (byobu-style, works without byobu launcher) --------------------
+set -g status-interval 2
+set -g status-left-length 256
+set -g status-right-length 256
+set -g status-left "#(byobu-status tmux_left) "
+set -g status-right " #(byobu-status tmux_right)"
+set -g status-style "bg=black,fg=white"
 
 # -- Enable xterm keys (needed for Shift/Ctrl+F-key support) -------------------
 set-window-option -g xterm-keys on
