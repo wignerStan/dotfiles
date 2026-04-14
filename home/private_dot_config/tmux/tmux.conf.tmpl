@@ -35,13 +35,13 @@ set -g set-titles-string '#T'
 
 # =============================================================================
 # HPC — socket-separated router
-# Default socket: byobu config (Ctrl+A prefix, F-key bindings)
+# Default socket: SSH/terminal integration via byobu config
 # CC socket:      Claude Code (bash, minimal, allow-passthrough)
 # =============================================================================
 
 # Default socket: source byobu config
 %if "#{==:#{socket_path},{{$tmux_tmp}}/tmux-{{$uid}}/default}"
-source-file ~/.byobu/.tmux.conf
+source-file ~/.config/byobu/.tmux.conf
 %endif
 
 # =============================================================================
@@ -66,14 +66,14 @@ set -g aggressive-resize off
 
 # =============================================================================
 # Tmux configuration — socket-separated router
-# Default socket: delegates to byobu config (single source of truth)
+# Default socket: SSH/terminal integration via byobu config
 # CC socket:      iTerm2 -CC status bar (no plugins)
 # BG socket:      auto-respawn via pane-died
 # =============================================================================
 
 # Default socket: source byobu config
 %if "#{==:#{socket_path},{{$tmux_tmp}}/tmux-{{$uid}}/default}"
-source-file ~/.byobu/.tmux.conf
+source-file ~/.config/byobu/.tmux.conf
 %endif
 
 # =============================================================================
