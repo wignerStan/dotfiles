@@ -145,17 +145,13 @@ export LESS_TERMCAP_ue=$'\E[0m'
 # ═══════════════════════════════════════════════════════════════
 # Prompt — Starship
 # ═══════════════════════════════════════════════════════════════
-
 {{- if lookPath "starship" }}
 if command -v starship &>/dev/null; then
     eval "$(starship init zsh)"
 fi
 {{- end }}
 
-# ═══════════════════════════════════════════════════════════════
 # Git aliases (from oh-my-zsh git plugin, standalone)
-# ═══════════════════════════════════════════════════════════════
-
 {{- if stat (joinPath .chezmoi.homeDir ".oh-my-zsh/plugins/git/git.plugin.zsh") }}
 autoload -Uz is-at-least
 
@@ -178,7 +174,7 @@ source ~/.oh-my-zsh/plugins/git/git.plugin.zsh
 {{- end }}
 
 # ═══════════════════════════════════════════════════════════════
-# Interactive-only (skip in tmux)
+# Fastfetch (skip in tmux)
 # ═══════════════════════════════════════════════════════════════
 
 if [[ -z "$TMUX" ]]; then
