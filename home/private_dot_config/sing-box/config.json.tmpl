@@ -1,0 +1,526 @@
+{{- if hasKey . "singbox_server" -}}
+{{- $singbox_dir := "" -}}
+{{- if eq .chezmoi.os "darwin" -}}
+{{-   $singbox_dir = "/opt/homebrew/etc/sing-box" -}}
+{{- else -}}
+{{-   $singbox_dir = "/etc/sing-box" -}}
+{{- end -}}
+{{- $tun_iface := "tun0" -}}
+{{- if eq .chezmoi.os "darwin" -}}
+{{-   $tun_iface = "utun100" -}}
+{{- end -}}
+{
+  "log": {
+    "level": "info",
+    "timestamp": true
+  },
+  "dns": {
+    "servers": [
+      {
+        "type": "fakeip",
+        "tag": "dns-fakeip",
+        "inet4_range": "198.18.0.0/15",
+        "inet6_range": "fc00::/18"
+      },
+      {
+        "type": "local"
+      },
+      {
+        "type": "https",
+        "tag": "dns-domestic",
+        "server": "223.5.5.5",
+        "server_port": 443
+      },
+      {
+        "type": "udp",
+        "tag": "dns-ustc",
+        "server": "202.38.64.18",
+        "server_port": 53
+      },
+      {
+        "type": "tailscale",
+        "tag": "dns-tailscale",
+        "endpoint": "ts-ep",
+        "accept_default_resolvers": true
+      },
+      {
+        "type": "https",
+        "tag": "dns-remote",
+        "server": "1.1.1.1",
+        "server_port": 443
+      }
+    ],
+    "rules": [
+      {
+        "domain_suffix": ".ustc.edu.cn",
+        "server": "dns-ustc"
+      },
+      {
+        "domain_suffix": [
+          ".lan",
+          ".local",
+          ".arpa",
+          ".msftconnecttest.com",
+          ".msftncsi.com",
+          "localhost.ptlogin2.qq.com",
+          "localhost.sec.qq.com",
+          "localhost.work.weixin.qq.com"
+        ],
+        "server": "local"
+      },
+      {
+        "domain_suffix": [
+          "openai.com",
+          "chatgpt.com",
+          "claude.ai",
+          "claude.com",
+          "anthropic.com",
+          "google.com",
+          "googleapis.com",
+          "gstatic.com",
+          "googleapis.cn",
+          "youtube.com",
+          "youtu.be",
+          "ytimg.com",
+          "gmail.com",
+          "blogger.com",
+          "blogspot.com",
+          "netflix.com",
+          "spotify.com",
+          "telegram.org",
+          "t.me",
+          "tiktok.com",
+          "github.com",
+          "githubusercontent.com",
+          "githubassets.com",
+          "bing.com",
+          "docker.com",
+          "docker.io",
+          "hub.docker.com",
+          "facebook.com",
+          "fb.com",
+          "fbcdn.net",
+          "instagram.com",
+          "twitter.com",
+          "x.com",
+          "wikipedia.org",
+          "wikimedia.org",
+          "reddit.com",
+          "discord.com",
+          "medium.com",
+          "stackoverflow.com",
+          "stackexchange.com",
+          "linkedin.com",
+          "dropbox.com",
+          "whatsapp.com",
+          "twitch.tv",
+          "imgur.com",
+          "archive.org",
+          "archive.today",
+          "huggingface.co",
+          "nytimes.com",
+          "bbc.com",
+          "reuters.com",
+          "bloomberg.com",
+          "v2rayse.com",
+          "xn--ngstr-lra8j.com",
+          "linux.do"
+        ],
+        "server": "dns-remote"
+      },
+      {
+        "rule_set": "geosite-cn",
+        "server": "dns-domestic"
+      },
+      {
+        "domain_suffix": ".ts.net",
+        "server": "dns-tailscale"
+      },
+      {
+        "domain_suffix": "linuxdo.org",
+        "server": "dns-domestic"
+      },
+      {
+        "query_type": [
+          "A",
+          "AAAA"
+        ],
+        "server": "dns-fakeip"
+      }
+    ],
+    "final": "dns-domestic",
+    "reverse_mapping": true,
+    "strategy": "ipv4_only",
+    "independent_cache": true
+  },
+  "endpoints": [
+    {
+      "type": "tailscale",
+      "tag": "ts-ep",
+      "state_directory": "{{ $singbox_dir }}/tailscale-state",
+      "accept_routes": true,
+      "system_interface": true
+    }
+  ],
+  "inbounds": [
+    {
+      "type": "tun",
+      "tag": "tun-in",
+      "interface_name": "{{ $tun_iface }}",
+      "mtu": 1500,
+      "address": [
+        "172.19.0.1/30",
+        "fdfe:dcba:9876::1/126"
+      ],
+      "auto_route": true,
+      "route_exclude_address": [
+        "0.0.0.0/8",
+        "10.0.0.0/8",
+        "100.64.0.0/10",
+        "100.100.0.0/16",
+        "127.0.0.0/8",
+        "169.254.0.0/16",
+        "172.16.0.0/12",
+        "192.0.0.0/24",
+        "192.0.2.0/24",
+        "192.88.99.0/24",
+        "192.168.0.0/16",
+        "203.0.113.0/24",
+        "224.0.0.0/4",
+        "240.0.0.0/4",
+        "255.255.255.255/32",
+        "::1/128",
+        "64:ff9b::/96",
+        "fc00::/7",
+        "fe80::/10",
+        "ff00::/8"
+      ],
+      "route_exclude_address_set": [
+        "geoip-cn",
+        "geosite-cn"
+      ],
+      "exclude_interface": "utun4",
+      "stack": "gvisor"
+    },
+    {
+      "type": "mixed",
+      "tag": "mixed-in",
+      "listen": "127.0.0.1",
+      "listen_port": 7897
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "vless",
+      "tag": "proxy",
+      "server": {{ .singbox_server | quote }},
+      "server_port": 443,
+      "uuid": {{ .singbox_uuid | quote }},
+      "flow": "xtls-rprx-vision",
+      "tls": {
+        "enabled": true,
+        "server_name": "www.cisco.com",
+        "utls": {
+          "enabled": true,
+          "fingerprint": "chrome"
+        },
+        "reality": {
+          "enabled": true,
+          "public_key": {{ .singbox_public_key | quote }}
+        }
+      }
+    },
+    {
+      "type": "direct",
+      "tag": "direct"
+    },
+    {
+      "type": "block",
+      "tag": "block"
+    }
+  ],
+  "route": {
+    "rules": [
+      {
+        "action": "sniff"
+      },
+      {
+        "protocol": "dns",
+        "action": "hijack-dns"
+      },
+      {
+        "ip_cidr": [
+          "100.64.0.0/10",
+          "fd7a:115c:a1e0::/48"
+        ],
+        "outbound": "direct"
+      },
+      {
+        "domain_suffix": ".ts.net",
+        "outbound": "direct"
+      },
+      {
+        "ip_cidr": [
+          "172.20.160.0/20",
+          "172.16.0.0/12"
+        ],
+        "outbound": "direct"
+      },
+      {
+        "ip_cidr": [
+          "114.214.211.0/24",
+          "202.38.0.0/16",
+          "210.45.0.0/16"
+        ],
+        "outbound": "direct"
+      },
+      {
+        "domain_suffix": "ustc.edu.cn",
+        "outbound": "direct"
+      },
+      {
+        "ip_cidr": "183.240.210.48/32",
+        "outbound": "direct"
+      },
+      {
+        "rule_set": "geosite-ads",
+        "action": "reject"
+      },
+      {
+        "rule_set": "geosite-openai",
+        "outbound": "proxy"
+      },
+      {
+        "rule_set": "geosite-google",
+        "outbound": "proxy"
+      },
+      {
+        "rule_set": "geosite-youtube",
+        "outbound": "proxy"
+      },
+      {
+        "rule_set": "geosite-netflix",
+        "outbound": "proxy"
+      },
+      {
+        "rule_set": "geosite-spotify",
+        "outbound": "proxy"
+      },
+      {
+        "rule_set": "geosite-telegram",
+        "outbound": "proxy"
+      },
+      {
+        "rule_set": "geosite-tiktok",
+        "outbound": "proxy"
+      },
+      {
+        "rule_set": "geosite-github",
+        "outbound": "proxy"
+      },
+      {
+        "domain_suffix": "bing.com",
+        "outbound": "proxy"
+      },
+      {
+        "domain_suffix": [
+          "docker.com",
+          "docker.io",
+          "hub.docker.com"
+        ],
+        "outbound": "proxy"
+      },
+      {
+        "domain": [
+          "v2rayse.com",
+          "googleapis.cn",
+          "gstatic.com",
+          "xn--ngstr-lra8j.com"
+        ],
+        "outbound": "proxy"
+      },
+      {
+        "domain_suffix": [
+          "microsoft.com",
+          "microsoftonline.com",
+          "live.com",
+          "skype.com",
+          "outlook.com",
+          "office.com",
+          "office.net",
+          "onedrive.com",
+          "onenote.com",
+          "sharepoint.com"
+        ],
+        "outbound": "direct"
+      },
+      {
+        "domain_suffix": [
+          "jetbrains.com",
+          "jetbrains.net",
+          "intellij.net",
+          "vscode-cdn.net",
+          "mozilla.org",
+          "firefox.com",
+          "getpocket.com",
+          "rust-lang.org",
+          "rustup.rs",
+          "static.rust-lang.org",
+          "linuxdo.org",
+          "appstorrent.ru"
+        ],
+        "outbound": "direct"
+      },
+      {
+        "domain_suffix": [
+          "aliyun.com",
+          "aliyuncs.com",
+          "tencentcloudcr.com",
+          "cr.aliyuncs.com"
+        ],
+        "outbound": "direct"
+      },
+      {
+        "domain_suffix": [
+          "azure.com",
+          "miromind.ai",
+          "context7.com",
+          "pairdrop.net",
+          "qwen.ai",
+          "deepwiki.org"
+        ],
+        "outbound": "direct"
+      },
+      {
+        "domain_keyword": [
+          "bohrium",
+          "jina"
+        ],
+        "outbound": "direct"
+      },
+      {
+        "rule_set": "geosite-apple",
+        "outbound": "direct"
+      },
+      {
+        "rule_set": [
+          "geosite-scholar-cn",
+          "geosite-scholar-!cn"
+        ],
+        "outbound": "direct"
+      },
+      {
+        "rule_set": "geosite-geolocation-!cn",
+        "outbound": "proxy"
+      },
+      {
+        "rule_set": "geosite-cn",
+        "outbound": "direct"
+      },
+      {
+        "ip_is_private": true,
+        "outbound": "direct"
+      },
+      {
+        "rule_set": "geoip-cn",
+        "outbound": "direct"
+      }
+    ],
+    "rule_set": [
+      {
+        "type": "local",
+        "tag": "geosite-openai",
+        "path": "{{ $singbox_dir }}/rulesets/geosite-openai.srs"
+      },
+      {
+        "type": "local",
+        "tag": "geosite-google",
+        "path": "{{ $singbox_dir }}/rulesets/geosite-google.srs"
+      },
+      {
+        "type": "local",
+        "tag": "geosite-youtube",
+        "path": "{{ $singbox_dir }}/rulesets/geosite-youtube.srs"
+      },
+      {
+        "type": "local",
+        "tag": "geosite-netflix",
+        "path": "{{ $singbox_dir }}/rulesets/geosite-netflix.srs"
+      },
+      {
+        "type": "local",
+        "tag": "geosite-spotify",
+        "path": "{{ $singbox_dir }}/rulesets/geosite-spotify.srs"
+      },
+      {
+        "type": "local",
+        "tag": "geosite-telegram",
+        "path": "{{ $singbox_dir }}/rulesets/geosite-telegram.srs"
+      },
+      {
+        "type": "local",
+        "tag": "geosite-tiktok",
+        "path": "{{ $singbox_dir }}/rulesets/geosite-tiktok.srs"
+      },
+      {
+        "type": "local",
+        "tag": "geosite-github",
+        "path": "{{ $singbox_dir }}/rulesets/geosite-github.srs"
+      },
+      {
+        "type": "local",
+        "tag": "geosite-ads",
+        "path": "{{ $singbox_dir }}/rulesets/geosite-category-ads-all.srs"
+      },
+      {
+        "type": "local",
+        "tag": "geosite-apple",
+        "path": "{{ $singbox_dir }}/rulesets/geosite-apple.srs"
+      },
+      {
+        "type": "local",
+        "tag": "geosite-scholar-cn",
+        "path": "{{ $singbox_dir }}/rulesets/geosite-category-scholar-cn.srs"
+      },
+      {
+        "type": "local",
+        "tag": "geosite-scholar-!cn",
+        "path": "{{ $singbox_dir }}/rulesets/geosite-category-scholar-!cn.srs"
+      },
+      {
+        "type": "local",
+        "tag": "geosite-geolocation-!cn",
+        "path": "{{ $singbox_dir }}/rulesets/geosite-geolocation-!cn.srs"
+      },
+      {
+        "type": "local",
+        "tag": "geosite-cn",
+        "path": "{{ $singbox_dir }}/rulesets/geosite-cn.srs"
+      },
+      {
+        "type": "local",
+        "tag": "geoip-cn",
+        "path": "{{ $singbox_dir }}/rulesets/geoip-cn.srs"
+      }
+    ],
+    "final": "proxy",
+    "auto_detect_interface": true,
+    "default_domain_resolver": "dns-domestic"
+  },
+  "experimental": {
+    "cache_file": {
+      "enabled": true,
+      "path": "cache.db",
+      "store_fakeip": true
+    },
+    "clash_api": {
+      "external_controller": "127.0.0.1:9091",
+      "external_ui": "{{ $singbox_dir }}/ui",
+      "external_ui_download_url": "https://github.com/MetaCubeX/metacubexd/releases/latest",
+      "external_ui_download_detour": "proxy",
+      "secret": {{ .singbox_api_secret | quote }},
+      "default_mode": "rule"
+    }
+  }
+}
+{{- end -}}

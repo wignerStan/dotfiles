@@ -36,12 +36,12 @@
 
 {{- /* Custom Prompts — only prompt during interactive chezmoi init */ -}}
 {{- $github_user := "" -}}
-{{- $name := "" -}}
-{{- $email := "" -}}
+{{- $name := "Jacob" -}}
+{{- $email := "240170694+wignerStan@users.noreply.github.com" -}}
 {{- if stdinIsATTY -}}
 {{-   $github_user = promptStringOnce . "github_user" "What is your GitHub username?" "" -}}
-{{-   $name = promptStringOnce . "name" "What is your name?" "" -}}
-{{-   $email = promptStringOnce . "email" "What is your email?" "" -}}
+{{-   $name = promptStringOnce . "name" "What is your name?" "Jacob" -}}
+{{-   $email = promptStringOnce . "email" "What is your email?" $email -}}
 {{- end -}}
 
 {{ if $has_age }}
@@ -57,13 +57,23 @@ encryption = "age"
     email = {{ $email | quote }}
     github_user = {{ $github_user | quote }}
     hostname = {{ $hostname | quote }}
+    primary_shell = "zsh"
     is_ephemeral = {{ $ephemeral }}
     is_headless = {{ $headless }}
     is_hpc = {{ $hpc }}
     is_work = {{ $work }}
     use_china_mirrors = {{ $use_china_mirrors }}
+    mamba_root = {{ joinPath .chezmoi.homeDir "mamba" | quote }}
     arch = {{ .chezmoi.arch | quote }}
 
     # Paths for modern tools
     ghostty_config = "~/.config/ghostty/config"
     nvim_config = "~/.config/nvim"
+
+{{- if lookPath "delta" }}
+[diff]
+    pager = "delta"
+{{- else if lookPath "bat" }}
+[diff]
+    pager = "bat --style=diff"
+{{- end }}
