@@ -1,14 +1,46 @@
 # =============================================================================
-# Tmux configuration — socket-separated router
-# Default socket: delegates to byobu config (single source of truth)
-# CC socket:      iTerm2 -CC status bar (no plugins)
+# Tmux configuration (managed by chezmoi)
 # =============================================================================
-{{- if .is_hpc }}
+{{- if eq .chezmoi.os "darwin" }}
+
+# ── Shell (non-login for agent compatibility) ──────────────────
+# default-command bypasses tmux's login-shell mechanism.
+# Result: .zshenv sources, .zprofile skipped.
+# .zshrc human-friendly stuff (fastfetch, starship, fzf, aliases)
+# is guarded by [[ -z "$TMUX" ]] so it only runs outside tmux.
+set -g default-command "/bin/zsh"
+
+# ── Terminal ────────────────────────────────────────────────────
+set -g default-terminal "screen-256color"
+set -ga terminal-overrides ",*256col*:Tc"
+set -sg escape-time 0
+
+# ── Core behavior ──────────────────────────────────────────────
+set -g history-limit 100000
+set -g mouse on
+set -g base-index 1
+setw -g pane-base-index 1
+
+# ── iTerm2 tmux integration: tab title display ─────────────────
+set -g set-titles on
+set -g set-titles-string '#T'
+
+# ── Status bar (iTerm2 polls these in -CC mode) ────────────────
+# UseTmuxStatusBar=True in iTerm2 polls status-left/right.
+# Keep plain text — iTerm2 sanitizes #[...] color escapes.
+
+{{- else if .is_hpc }}
 
 # HPC — source byobu config (bash shell, managed by chezmoi)
 source-file ~/.byobu/.tmux.conf
 
 {{- else }}
+
+# =============================================================================
+# Tmux configuration — socket-separated router
+# Default socket: delegates to byobu config (single source of truth)
+# CC socket:      iTerm2 -CC status bar (no plugins)
+# =============================================================================
 
 # Default socket: source byobu config
 %if "#{==:#{socket_path},/tmp/tmux-1000/default}"
