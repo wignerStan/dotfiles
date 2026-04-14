@@ -34,33 +34,15 @@ set -g set-titles-string '#T'
 {{- else if .is_hpc }}
 
 # =============================================================================
-# HPC — socket-separated router
-# Default socket: SSH/terminal integration via byobu config
-# CC socket:      Claude Code (bash, minimal, allow-passthrough)
+# HPC — always source terminal integration, CC socket detected at runtime
+# TMPDIR varies per PBS/Slurm job — socket paths not predictable at render time
 # =============================================================================
 
-# Default socket: source byobu config
-%if "#{==:#{socket_path},{{$tmux_tmp}}/tmux-{{$uid}}/default}"
+# Terminal integration (SSH, copy mode, mouse — works regardless of socket)
 source-file ~/.config/byobu/.tmux.conf
-%endif
 
-# =============================================================================
-# CC socket: Claude Code sessions (bash shell, minimal tmux)
-# =============================================================================
-%if "#{==:#{socket_path},{{$tmux_tmp}}/tmux-{{$uid}}/cc}"
-
-run-shell 'tmux set-option -g default-command "/bin/bash"'
-run-shell 'tmux set-option -g default-shell "/bin/bash"'
-set -g default-terminal "screen-256color"
-set -ga terminal-overrides ",*256col*:Tc"
-set -sg escape-time 0
-set -g allow-passthrough on
-set -s set-clipboard on
-set -g mouse on
-set -g history-limit 100000
-set -g aggressive-resize off
-
-%endif
+# CC socket: override shell to bash (detected by socket path basename)
+run-shell 'p=#{socket_path}; [ "${p##*/}" = "cc" ] && tmux set -g default-command /bin/bash && tmux set -g default-shell /bin/bash || true'
 
 {{- else }}
 
