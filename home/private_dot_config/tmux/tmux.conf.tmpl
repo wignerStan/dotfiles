@@ -34,15 +34,16 @@ set -g set-titles-string '#T'
 {{- else if .is_hpc }}
 
 # =============================================================================
-# HPC — always source terminal integration, CC socket detected at runtime
-# TMPDIR varies per PBS/Slurm job — socket paths not predictable at render time
+# HPC socket router — basename glob matching
+# TMPDIR varies per PBS/Slurm job — #{m:} matches regardless of prefix
 # =============================================================================
 
-# Terminal integration (SSH, copy mode, mouse — works regardless of socket)
 source-file ~/.config/byobu/.tmux.conf
 
-# CC socket: override shell to bash (detected by socket path basename)
-run-shell 'p=#{socket_path}; [ "${p##*/}" = "cc" ] && tmux set -g default-command /bin/bash && tmux set -g default-shell /bin/bash || true'
+%if "#{m:*/cc,#{socket_path}}"
+set -g default-command /bin/bash
+set -g default-shell /bin/bash
+%endif
 
 {{- else }}
 
