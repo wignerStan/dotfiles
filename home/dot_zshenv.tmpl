@@ -64,7 +64,7 @@ export API_TIMEOUT_MS="600000"
 export NANOBANANA_MODEL=gemini-3-pro-image-preview
 
 # ── Cargo ─────────────────────────────────────────────────────
-[[ -f "$HOME/.cargo/env" ]] && . "$HOME/.cargo/env"
+[[ -d "$HOME/.cargo" && -f "$HOME/.cargo/env" ]] && . "$HOME/.cargo/env"
 
 # ── Mamba (global Python base environment) ─────────────────
 # Provides a shared Python environment for commonly needed Python libraries.
@@ -113,18 +113,18 @@ path+=("$HOME/go/bin")
 
 # pnpm
 {{- if eq .chezmoi.os "darwin" }}
-export PNPM_HOME="$HOME/Library/pnpm"
+[[ -d "$HOME/Library/pnpm" ]] && export PNPM_HOME="$HOME/Library/pnpm"
 {{- else }}
-export PNPM_HOME="$HOME/.local/share/pnpm"
+[[ -d "$HOME/.local/share/pnpm" ]] && export PNPM_HOME="$HOME/.local/share/pnpm"
 {{- end }}
-path+=("$PNPM_HOME")
+[[ -d "$PNPM_HOME" ]] && path+=("$PNPM_HOME")
 
 # Antigravity
 [[ -d "$HOME/.antigravity/antigravity/bin" ]] && path+=$HOME/.antigravity/antigravity/bin
 
 # Bun
-export BUN_INSTALL="$HOME/.bun"
-path+=("$BUN_INSTALL/bin")
+[[ -d "$HOME/.bun" ]] && export BUN_INSTALL="$HOME/.bun"
+[[ -d "$HOME/.bun/bin" ]] && path+=("$BUN_INSTALL/bin")
 {{- if .use_china_mirrors }}
 export BUN_CONFIG_REGISTRY="https://registry.npmmirror.com"
 {{- end }}
