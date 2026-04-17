@@ -5,10 +5,6 @@
 {{- else -}}
 {{-   $singbox_dir = "/etc/sing-box" -}}
 {{- end -}}
-{{- $tun_iface := "tun0" -}}
-{{- if eq .chezmoi.os "darwin" -}}
-{{-   $tun_iface = "utun100" -}}
-{{- end -}}
 {
   "log": {
     "level": "info",
@@ -166,7 +162,7 @@
     {
       "type": "tun",
       "tag": "tun-in",
-      "interface_name": "{{ $tun_iface }}",
+      "interface_name": "utun100",
       "mtu": 1500,
       "address": [
         "172.19.0.1/30",
@@ -430,77 +426,92 @@
       {
         "type": "local",
         "tag": "geosite-openai",
-        "path": "{{ $singbox_dir }}/rulesets/geosite-openai.srs"
+        "format": "binary",
+        "path": "{{$singbox_dir}}/rulesets/geosite-openai.srs"
       },
       {
         "type": "local",
         "tag": "geosite-google",
-        "path": "{{ $singbox_dir }}/rulesets/geosite-google.srs"
+        "format": "binary",
+        "path": "{{$singbox_dir}}/rulesets/geosite-google.srs"
       },
       {
         "type": "local",
         "tag": "geosite-youtube",
-        "path": "{{ $singbox_dir }}/rulesets/geosite-youtube.srs"
+        "format": "binary",
+        "path": "{{$singbox_dir}}/rulesets/geosite-youtube.srs"
       },
       {
         "type": "local",
         "tag": "geosite-netflix",
-        "path": "{{ $singbox_dir }}/rulesets/geosite-netflix.srs"
+        "format": "binary",
+        "path": "{{$singbox_dir}}/rulesets/geosite-netflix.srs"
       },
       {
         "type": "local",
         "tag": "geosite-spotify",
-        "path": "{{ $singbox_dir }}/rulesets/geosite-spotify.srs"
+        "format": "binary",
+        "path": "{{$singbox_dir}}/rulesets/geosite-spotify.srs"
       },
       {
         "type": "local",
         "tag": "geosite-telegram",
-        "path": "{{ $singbox_dir }}/rulesets/geosite-telegram.srs"
+        "format": "binary",
+        "path": "{{$singbox_dir}}/rulesets/geosite-telegram.srs"
       },
       {
         "type": "local",
         "tag": "geosite-tiktok",
-        "path": "{{ $singbox_dir }}/rulesets/geosite-tiktok.srs"
+        "format": "binary",
+        "path": "{{$singbox_dir}}/rulesets/geosite-tiktok.srs"
       },
       {
         "type": "local",
         "tag": "geosite-github",
-        "path": "{{ $singbox_dir }}/rulesets/geosite-github.srs"
+        "format": "binary",
+        "path": "{{$singbox_dir}}/rulesets/geosite-github.srs"
       },
       {
         "type": "local",
         "tag": "geosite-ads",
-        "path": "{{ $singbox_dir }}/rulesets/geosite-category-ads-all.srs"
+        "format": "binary",
+        "path": "{{$singbox_dir}}/rulesets/geosite-category-ads-all.srs"
       },
       {
         "type": "local",
         "tag": "geosite-apple",
-        "path": "{{ $singbox_dir }}/rulesets/geosite-apple.srs"
+        "format": "binary",
+        "path": "{{$singbox_dir}}/rulesets/geosite-apple.srs"
       },
       {
         "type": "local",
         "tag": "geosite-scholar-cn",
-        "path": "{{ $singbox_dir }}/rulesets/geosite-category-scholar-cn.srs"
+        "format": "binary",
+        "path": "{{$singbox_dir}}/rulesets/geosite-category-scholar-cn.srs"
       },
       {
         "type": "local",
         "tag": "geosite-scholar-!cn",
-        "path": "{{ $singbox_dir }}/rulesets/geosite-category-scholar-!cn.srs"
+        "format": "binary",
+        "path": "{{$singbox_dir}}/rulesets/geosite-category-scholar-!cn.srs"
       },
       {
         "type": "local",
         "tag": "geosite-geolocation-!cn",
-        "path": "{{ $singbox_dir }}/rulesets/geosite-geolocation-!cn.srs"
+        "format": "binary",
+        "path": "{{$singbox_dir}}/rulesets/geosite-geolocation-!cn.srs"
       },
       {
         "type": "local",
         "tag": "geosite-cn",
-        "path": "{{ $singbox_dir }}/rulesets/geosite-cn.srs"
+        "format": "binary",
+        "path": "{{$singbox_dir}}/rulesets/geosite-cn.srs"
       },
       {
         "type": "local",
         "tag": "geoip-cn",
-        "path": "{{ $singbox_dir }}/rulesets/geoip-cn.srs"
+        "format": "binary",
+        "path": "{{$singbox_dir}}/rulesets/geoip-cn.srs"
       }
     ],
     "final": "proxy",
