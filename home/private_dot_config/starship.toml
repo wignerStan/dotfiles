@@ -3,14 +3,12 @@
 "$schema" = 'https://starship.rs/config-schema.json'
 
 format = """
-$os$username$directory$git_branch$git_status$nodejs$python$rust$golang$bun$time$line_break$character"""
+$username$directory$git_branch$git_status$nodejs$python$rust$golang$bun$time$line_break$character"""
 
 command_timeout = 1000
 
 [os]
-disabled = false
-format = "[$symbol]($style) "
-style = "bold white"
+disabled = true
 
 [os.symbols]
 Macos = ""
