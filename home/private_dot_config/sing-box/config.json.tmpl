@@ -133,7 +133,10 @@
         "server": "dns-tailscale"
       },
       {
-        "domain_suffix": "linuxdo.org",
+        "domain_suffix": [
+           "linuxdo.org",
+           "sharedchat.cc"
+        ],
         "server": "dns-domestic"
       },
       {
@@ -196,7 +199,7 @@
         "geosite-cn"
       ],
       "exclude_interface": "utun4",
-      "stack": "gvisor"
+      "stack": "mixed"
     },
     {
       "type": "mixed",
@@ -373,6 +376,13 @@
           "aliyuncs.com",
           "tencentcloudcr.com",
           "cr.aliyuncs.com"
+        ],
+        "outbound": "direct"
+      },
+      {
+        "domain_suffix": [
+          "fcapp.run",
+          "sharedchat.cc"
         ],
         "outbound": "direct"
       },
