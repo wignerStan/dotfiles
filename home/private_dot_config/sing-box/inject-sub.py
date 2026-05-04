@@ -434,14 +434,17 @@ def to_singbox_outbound(node):
 
 
 def fetch_subscription(url):
-    import urllib.request
-    import ssl
-    ctx = ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
-    req = urllib.request.Request(url, headers={"User-Agent": "ClashMetaForAndroid/2.10.1.Meta Mihomo/1.18"})
-    with urllib.request.urlopen(req, context=ctx, timeout=30) as resp:
-        return resp.read().decode("utf-8", errors="replace")
+    import subprocess
+    # Use --interface en0 to bypass TUN proxy when sing-box is running
+    r = subprocess.run(
+        ["curl", "--interface", "en0", "-sS", "-k", "--max-time", "30",
+         "-H", "User-Agent: ClashMetaForAndroid/2.10.1.Meta Mihomo/1.18",
+         url],
+        capture_output=True, text=True, timeout=60,
+    )
+    if r.returncode != 0:
+        raise RuntimeError(f"curl failed ({r.returncode}): {r.stderr.strip()}")
+    return r.stdout
 
 
 def parse_subscription(content):
