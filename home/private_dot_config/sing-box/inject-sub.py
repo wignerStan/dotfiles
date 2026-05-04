@@ -521,14 +521,17 @@ def inject(config, nodes):
     groups, region_tags, auto_nodes = build_groups(nodes)
 
     outbounds = config.get("outbounds", [])
+
+    # Remove VLESS outbound (personal proxy, not from subscription)
+    outbounds = [o for o in outbounds if o.get("tag") != "VLESS"]
+
     proxy_sel = next((o for o in outbounds if o.get("tag") == "proxy"), None)
-    vless_idx = next((i for i, o in enumerate(outbounds) if o.get("tag") == "VLESS"), None)
 
     # Insert auto urltest after proxy selector
     auto_ob = {
         "type": "urltest",
         "tag": "auto",
-        "outbounds": ["VLESS"] + auto_nodes,
+        "outbounds": auto_nodes,
         "url": "https://www.gstatic.com/generate_204",
         "interval": "5m",
     }
@@ -545,9 +548,10 @@ def inject(config, nodes):
     for ob in reversed(node_outbounds):
         outbounds.insert(direct_idx, ob)
 
-    # Update proxy selector
+    # Update proxy selector: auto as default
     if proxy_sel:
-        proxy_sel["outbounds"] = ["auto", "VLESS"] + region_tags
+        proxy_sel["outbounds"] = ["auto"] + region_tags
+        proxy_sel["default"] = "auto"
 
     config["outbounds"] = outbounds
     return config
