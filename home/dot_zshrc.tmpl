@@ -203,6 +203,9 @@ cx() {
 }
 
 cc() {
+    term=xterm-256color command claude  --settings ~/.claude/settings.org.json "$@"
+}
+cc2() {
     term=xterm-256color command claude --disallowedTools "Agent(Plan)" "$@"
 }
 
