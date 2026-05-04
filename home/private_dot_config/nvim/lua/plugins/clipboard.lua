@@ -56,23 +56,19 @@ return {
           },
           cache_enabled = true,
         }
-
-        -- Set immediately for --headless mode
-        vim.opt.clipboard = "unnamedplus"
-
-        -- Re-set after VeryLazy for TUI mode
-        -- LazyVim's init() saves clipboard="" and restores it on VeryLazy,
-        -- overriding our setting. The defer ensures we run after LazyVim's callback.
-        vim.api.nvim_create_autocmd("User", {
-          pattern = "VeryLazy",
-          once = true,
-          callback = function()
-            vim.defer_fn(function()
-              vim.opt.clipboard = "unnamedplus"
-            end, 100)
-          end,
-        })
       end
+
+      -- Ensure clipboard is always set (LazyVim resets it on VeryLazy)
+      vim.opt.clipboard = "unnamedplus"
+      vim.api.nvim_create_autocmd("User", {
+        pattern = "VeryLazy",
+        once = true,
+        callback = function()
+          vim.defer_fn(function()
+            vim.opt.clipboard = "unnamedplus"
+          end, 100)
+        end,
+      })
     end,
   },
 }
