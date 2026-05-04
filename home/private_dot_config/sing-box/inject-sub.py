@@ -63,30 +63,122 @@ def detect_region(name):
     return None
 
 
-def parse_anytls_links(text):
+def parse_uri_links(text):
     nodes = []
+    schemes = ("anytls://", "vmess://", "vless://", "trojan://", "ss://", "hysteria2://", "hy2://")
     for line in text.strip().splitlines():
         line = line.strip()
-        if not line.startswith("anytls://"):
+        matched = None
+        for s in schemes:
+            if line.startswith(s):
+                matched = s
+                break
+        if not matched:
             continue
+
         main, _, fragment = line.partition("#")
-        name = urllib.parse.unquote(fragment)
-        without_scheme = main[len("anytls://"):]
-        password, _, serverpart = without_scheme.partition("@")
-        server_port = serverpart.split("/")[0]
-        server, _, port = server_port.partition(":")
-        querypart = serverpart.split("?", 1)[-1] if "?" in serverpart else ""
-        params = dict(urllib.parse.parse_qsl(querypart))
-        sni = params.get("sni", server)
-        nodes.append({
-            "type": "anytls",
-            "name": name,
-            "server": server,
-            "port": int(port),
-            "password": password,
-            "sni": sni,
-            "insecure": params.get("allow_insecure", "0") == "1",
-        })
+        name = urllib.parse.unquote(fragment) or "unknown"
+        scheme = matched.rstrip("://")
+        body = main[len(matched):]
+
+        try:
+            if scheme == "vmess":
+                # vmess://base64json
+                decoded = base64.b64decode(body).decode("utf-8", errors="replace")
+                v = json.loads(decoded)
+                nodes.append({
+                    "type": "vmess", "name": v.get("ps", name),
+                    "server": v["add"], "port": int(v["port"]),
+                    "uuid": v["id"], "alter_id": v.get("aid", 0),
+                    "cipher": v.get("scy", "auto"),
+                    "tls": v.get("tls", "") == "tls",
+                    "sni": v.get("sni", ""), "insecure": v.get("allowInsecure", False),
+                    "network": v.get("net", ""),
+                    "ws_opts": {"path": v.get("path", "/"), "headers": v.get("host", {}).get("Host", "")} if v.get("net") == "ws" else None,
+                    "grpc_opts": {"grpc-service-name": v.get("path", "")} if v.get("net") == "grpc" else None,
+                })
+            elif scheme == "vless":
+                uuid, _, rest = body.partition("@")
+                server_port = rest.split("/")[0].split("?")[0]
+                server, _, port = server_port.rpartition(":")
+                querypart = rest.split("?", 1)[-1] if "?" in rest else ""
+                params = dict(urllib.parse.parse_qsl(querypart))
+                ptype = params.get("type", "")
+                nodes.append({
+                    "type": "vless", "name": name,
+                    "server": server, "port": int(port),
+                    "uuid": uuid, "flow": params.get("flow", ""),
+                    "tls": params.get("security", "") in ("tls", "reality"),
+                    "sni": params.get("sni", ""), "insecure": params.get("allowInsecure", "0") == "1",
+                    "network": ptype,
+                    "ws_opts": {"path": params.get("path", "/"), "headers": {"Host": params.get("host", "")}} if ptype == "ws" else None,
+                    "grpc_opts": {"grpc-service-name": params.get("serviceName", "")} if ptype == "grpc" else None,
+                    "reality_opts": {"public-key": params.get("pbk", ""), "short-id": params.get("sid", "")} if params.get("security") == "reality" else None,
+                    "client_fingerprint": params.get("fp", ""),
+                })
+            elif scheme == "trojan":
+                password, _, rest = body.partition("@")
+                server_port = rest.split("/")[0].split("?")[0]
+                server, _, port = server_port.rpartition(":")
+                querypart = rest.split("?", 1)[-1] if "?" in rest else ""
+                params = dict(urllib.parse.parse_qsl(querypart))
+                ptype = params.get("type", "")
+                nodes.append({
+                    "type": "trojan", "name": name,
+                    "server": server, "port": int(port),
+                    "password": password,
+                    "sni": params.get("sni", server), "insecure": params.get("allowInsecure", "0") == "1",
+                    "network": ptype,
+                    "ws_opts": {"path": params.get("path", "/"), "headers": {"Host": params.get("host", "")}} if ptype == "ws" else None,
+                    "grpc_opts": {"grpc-service-name": params.get("serviceName", "")} if ptype == "grpc" else None,
+                })
+            elif scheme == "ss":
+                # ss://base64(method:password)@server:port or ss://base64#name
+                if "@" in body:
+                    method_pwd, _, rest = body.partition("@")
+                    decoded = base64.b64decode(method_pwd + "==").decode("utf-8", errors="replace")
+                    method, _, password = decoded.partition(":")
+                    server_port = rest.split("/")[0].split("?")[0]
+                    server, _, port = server_port.rpartition(":")
+                else:
+                    decoded = base64.b64decode(body + "==").decode("utf-8", errors="replace")
+                    method, _, rest2 = decoded.partition(":")
+                    password, _, server_port = rest2.partition("@")
+                    server, _, port = server_port.rpartition(":")
+                nodes.append({
+                    "type": "ss", "name": name,
+                    "server": server, "port": int(port),
+                    "cipher": method, "password": password,
+                    "plugin": "", "plugin_opts": None,
+                })
+            elif scheme in ("hysteria2", "hy2"):
+                password, _, rest = body.partition("@")
+                server_port = rest.split("/")[0].split("?")[0]
+                server, _, port = server_port.rpartition(":")
+                querypart = rest.split("?", 1)[-1] if "?" in rest else ""
+                params = dict(urllib.parse.parse_qsl(querypart))
+                nodes.append({
+                    "type": "hysteria2", "name": name,
+                    "server": server, "port": int(port),
+                    "password": password,
+                    "sni": params.get("sni", server), "insecure": params.get("insecure", "0") == "1",
+                    "obfs": params.get("obfs"), "obfs_password": params.get("obfs-password"),
+                })
+            elif scheme == "anytls":
+                password, _, serverpart = body.partition("@")
+                server_port = serverpart.split("/")[0].split("?")[0]
+                server, _, port = server_port.rpartition(":")
+                querypart = serverpart.split("?", 1)[-1] if "?" in serverpart else ""
+                params = dict(urllib.parse.parse_qsl(querypart))
+                nodes.append({
+                    "type": "anytls", "name": name,
+                    "server": server, "port": int(port),
+                    "password": password,
+                    "sni": params.get("sni", server),
+                    "insecure": params.get("allow_insecure", "0") == "1",
+                })
+        except Exception:
+            continue
     return nodes
 
 
@@ -355,15 +447,7 @@ def fetch_subscription(url):
 def parse_subscription(content):
     content = content.strip()
 
-    # Try base64 decode
-    try:
-        decoded = base64.b64decode(content).decode("utf-8", errors="replace")
-        if "anytls://" in decoded or "vmess://" in decoded or "vless://" in decoded or "trojan://" in decoded:
-            content = decoded
-    except Exception:
-        pass
-
-    # Clash YAML
+    # Clash YAML (try first — handles both raw YAML and responses that start with mixed-port:)
     if yaml:
         try:
             data = yaml.safe_load(content)
@@ -372,8 +456,18 @@ def parse_subscription(content):
         except Exception:
             pass
 
-    # Plain links
-    return parse_anytls_links(content)
+    # Try base64 decode if content doesn't look like plain text links or YAML
+    schemes = ("anytls://", "vmess://", "vless://", "trojan://", "ss://", "hysteria2://", "hy2://")
+    if not any(content.lstrip().startswith(s) for s in schemes) and "mixed-port:" not in content[:200] and "proxies:" not in content[:500]:
+        try:
+            decoded = base64.b64decode(content, validate=True).decode("utf-8", errors="replace")
+            if any(s in decoded for s in schemes):
+                content = decoded
+        except Exception:
+            pass
+
+    # URI links
+    return parse_uri_links(content)
 
 
 def build_groups(nodes):
