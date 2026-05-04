@@ -117,8 +117,8 @@ path+=("$HOME/go/bin")
 {{- else }}
 [[ -d "$HOME/.local/share/pnpm" ]] && export PNPM_HOME="$HOME/.local/share/pnpm"
 {{- end }}
-[[ -d "$PNPM_HOME" ]] && path+=("$PNPM_HOME")
-
+<<<<<<< HEAD
+[[ -d "$PNPM_HOME/bin" ]] && path+=("/Users/jacob/Library/pnpm/bin")
 # Antigravity
 [[ -d "$HOME/.antigravity/antigravity/bin" ]] && path+=$HOME/.antigravity/antigravity/bin
 
