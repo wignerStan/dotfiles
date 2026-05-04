@@ -1,0 +1,512 @@
+#!/usr/bin/env python3
+"""Fetch subscription, convert proxy nodes to sing-box outbounds, inject into config.
+
+Supports:
+  - Clash YAML (proxies: list)
+  - Base64-encoded anytls:// links
+  - Plain anytls:// links
+
+Usage:
+  # Fetch from URL, inject into rendered template, output to file
+  chezmoi execute-template < config.json.tmpl | ./inject-sub.py -s URL -o config.json
+
+  # Android
+  chezmoi execute-template < config-android.json.tmpl | ./inject-sub.py -s URL -o config-android.json
+
+  # Read from local file
+  ./inject-sub.py -s sub.yaml -o config.json < base_config.json
+
+  # Pipe subscription content via stdin (config on file)
+  ./inject-sub.py -f sub.yaml -o config.json < base_config.json
+"""
+
+import argparse
+import base64
+import json
+import re
+import sys
+import urllib.parse
+from collections import defaultdict
+from pathlib import Path
+
+try:
+    import yaml
+except ImportError:
+    yaml = None
+
+REGION_MAP = {
+    "HK": ["香港", "HK", "Hong Kong"],
+    "TW": ["台湾", "🇹🇼", "Taiwan"],
+    "SG": ["新加坡", "🇸🇬", "Singapore"],
+    "KR": ["韩国", "🇰🇷", "Korea"],
+    "JP": ["日本", "🇯🇵", "Japan"],
+    "UK": ["英国", "🇬🇧", "United Kingdom"],
+    "US": ["美国", "🇺🇸", "United States"],
+    "DE": ["德国", "🇩🇪", "Germany"],
+    "FR": ["法国", "🇫🇷", "France"],
+    "AU": ["澳大利亚", "🇦🇺", "Australia"],
+    "CA": ["加拿大", "🇨🇦", "Canada"],
+    "RU": ["俄罗斯", "🇷🇺", "Russia"],
+    "IN": ["印度", "🇮🇳", "India"],
+    "TH": ["泰国", "🇹🇭", "Thailand"],
+    "MY": ["马来西亚", "🇲🇾", "Malaysia"],
+    "PH": ["菲律宾", "🇵🇭", "Philippines"],
+    "NL": ["荷兰", "🇳🇱", "Netherlands"],
+}
+
+
+def detect_region(name):
+    for region, keywords in REGION_MAP.items():
+        for kw in keywords:
+            if kw in name:
+                return region
+    return None
+
+
+def parse_anytls_links(text):
+    nodes = []
+    for line in text.strip().splitlines():
+        line = line.strip()
+        if not line.startswith("anytls://"):
+            continue
+        main, _, fragment = line.partition("#")
+        name = urllib.parse.unquote(fragment)
+        without_scheme = main[len("anytls://"):]
+        password, _, serverpart = without_scheme.partition("@")
+        server_port = serverpart.split("/")[0]
+        server, _, port = server_port.partition(":")
+        querypart = serverpart.split("?", 1)[-1] if "?" in serverpart else ""
+        params = dict(urllib.parse.parse_qsl(querypart))
+        sni = params.get("sni", server)
+        nodes.append({
+            "type": "anytls",
+            "name": name,
+            "server": server,
+            "port": int(port),
+            "password": password,
+            "sni": sni,
+            "insecure": params.get("allow_insecure", "0") == "1",
+        })
+    return nodes
+
+
+def parse_clash_proxies(proxies):
+    nodes = []
+    for p in proxies:
+        ptype = p.get("type", "")
+        name = p.get("name", "")
+
+        if ptype == "anytls":
+            nodes.append({
+                "type": "anytls",
+                "name": name,
+                "server": p["server"],
+                "port": p["port"],
+                "password": p["password"],
+                "sni": p.get("sni", p.get("server-name", p["server"])),
+                "insecure": p.get("skip-cert-verify", False),
+                "fingerprint": p.get("client-fingerprint", "chrome"),
+                "alpn": p.get("alpn"),
+            })
+        elif ptype == "vmess":
+            nodes.append({
+                "type": "vmess",
+                "name": name,
+                "server": p["server"],
+                "port": p["port"],
+                "uuid": p["uuid"],
+                "alter_id": p.get("alterId", 0),
+                "cipher": p.get("cipher", "auto"),
+                "tls": p.get("tls", False),
+                "sni": p.get("servername", ""),
+                "insecure": p.get("skip-cert-verify", False),
+                "network": p.get("network", ""),
+                "ws_opts": p.get("ws-opts"),
+                "h2_opts": p.get("h2-opts"),
+                "grpc_opts": p.get("grpc-opts"),
+            })
+        elif ptype == "vless":
+            nodes.append({
+                "type": "vless",
+                "name": name,
+                "server": p["server"],
+                "port": p["port"],
+                "uuid": p["uuid"],
+                "flow": p.get("flow", ""),
+                "tls": p.get("tls", False),
+                "sni": p.get("servername", ""),
+                "insecure": p.get("skip-cert-verify", False),
+                "network": p.get("network", ""),
+                "ws_opts": p.get("ws-opts"),
+                "grpc_opts": p.get("grpc-opts"),
+                "reality_opts": p.get("reality-opts"),
+                "client_fingerprint": p.get("client-fingerprint", ""),
+            })
+        elif ptype == "trojan":
+            nodes.append({
+                "type": "trojan",
+                "name": name,
+                "server": p["server"],
+                "port": p["port"],
+                "password": p["password"],
+                "sni": p.get("sni", ""),
+                "insecure": p.get("skip-cert-verify", False),
+                "network": p.get("network", ""),
+                "ws_opts": p.get("ws-opts"),
+                "grpc_opts": p.get("grpc-opts"),
+            })
+        elif ptype == "ss":
+            nodes.append({
+                "type": "ss",
+                "name": name,
+                "server": p["server"],
+                "port": p["port"],
+                "cipher": p["cipher"],
+                "password": p["password"],
+                "plugin": p.get("plugin", ""),
+                "plugin_opts": p.get("plugin-opts"),
+            })
+        elif ptype == "ssr":
+            nodes.append({
+                "type": "ssr",
+                "name": name,
+                "server": p["server"],
+                "port": p["port"],
+                "cipher": p["cipher"],
+                "password": p["password"],
+                "protocol": p.get("protocol", ""),
+                "protocol_param": p.get("protocol-param", ""),
+                "obfs": p.get("obfs", ""),
+                "obfs_param": p.get("obfs-param", ""),
+            })
+        elif ptype == "hysteria2" or ptype == "hy2":
+            nodes.append({
+                "type": "hysteria2",
+                "name": name,
+                "server": p["server"],
+                "port": p["port"],
+                "password": p.get("password", p.get("auth", "")),
+                "sni": p.get("sni", ""),
+                "insecure": p.get("skip-cert-verify", False),
+                "obfs": p.get("obfs"),
+                "obfs_password": p.get("obfs-password"),
+            })
+    return nodes
+
+
+def to_singbox_outbound(node):
+    ntype = node["type"]
+    tag = node["name"]
+
+    if ntype == "anytls":
+        ob = {
+            "type": "anytls",
+            "tag": tag,
+            "server": node["server"],
+            "server_port": node["port"],
+            "password": node["password"],
+            "min_idle_session": 2,
+            "tls": {
+                "enabled": True,
+                "server_name": node["sni"],
+                "insecure": node["insecure"],
+                "utls": {"enabled": True, "fingerprint": "chrome"},
+            },
+        }
+        return ob
+
+    if ntype == "vmess":
+        ob = {
+            "type": "vmess",
+            "tag": tag,
+            "server": node["server"],
+            "server_port": node["port"],
+            "uuid": node["uuid"],
+            "alter_id": node["alter_id"],
+            "security": node["cipher"],
+        }
+        if node["tls"]:
+            ob["tls"] = {
+                "enabled": True,
+                "server_name": node["sni"],
+                "insecure": node["insecure"],
+                "utls": {"enabled": True, "fingerprint": "chrome"},
+            }
+        if node["network"] == "ws" and node["ws_opts"]:
+            wo = node["ws_opts"]
+            transport = {"type": "ws"}
+            if "path" in wo:
+                transport["path"] = wo["path"]
+            if "headers" in wo:
+                transport["headers"] = wo["headers"]
+            ob["transport"] = transport
+        elif node["network"] == "grpc" and node["grpc_opts"]:
+            ob["transport"] = {"type": "grpc", "service_name": node["grpc_opts"].get("grpc-service-name", "")}
+        return ob
+
+    if ntype == "vless":
+        ob = {
+            "type": "vless",
+            "tag": tag,
+            "server": node["server"],
+            "server_port": node["port"],
+            "uuid": node["uuid"],
+        }
+        if node["flow"]:
+            ob["flow"] = node["flow"]
+        if node["tls"]:
+            ob["tls"] = {
+                "enabled": True,
+                "server_name": node["sni"],
+                "insecure": node["insecure"],
+                "utls": {"enabled": True, "fingerprint": node["client_fingerprint"] or "chrome"},
+            }
+        if node.get("reality_opts"):
+            ob.setdefault("tls", {})["reality"] = {
+                "enabled": True,
+                "public_key": node["reality_opts"].get("public-key", ""),
+                "short_id": node["reality_opts"].get("short-id", ""),
+            }
+        if node["network"] == "ws" and node["ws_opts"]:
+            wo = node["ws_opts"]
+            transport = {"type": "ws"}
+            if "path" in wo:
+                transport["path"] = wo["path"]
+            if "headers" in wo:
+                transport["headers"] = wo["headers"]
+            ob["transport"] = transport
+        elif node["network"] == "grpc" and node["grpc_opts"]:
+            ob["transport"] = {"type": "grpc", "service_name": node["grpc_opts"].get("grpc-service-name", "")}
+        return ob
+
+    if ntype == "trojan":
+        ob = {
+            "type": "trojan",
+            "tag": tag,
+            "server": node["server"],
+            "server_port": node["port"],
+            "password": node["password"],
+            "tls": {
+                "enabled": True,
+                "server_name": node["sni"],
+                "insecure": node["insecure"],
+                "utls": {"enabled": True, "fingerprint": "chrome"},
+            },
+        }
+        if node["network"] == "ws" and node["ws_opts"]:
+            wo = node["ws_opts"]
+            transport = {"type": "ws"}
+            if "path" in wo:
+                transport["path"] = wo["path"]
+            if "headers" in wo:
+                transport["headers"] = wo["headers"]
+            ob["transport"] = transport
+        elif node["network"] == "grpc" and node["grpc_opts"]:
+            ob["transport"] = {"type": "grpc", "service_name": node["grpc_opts"].get("grpc-service-name", "")}
+        return ob
+
+    if ntype == "ss":
+        ob = {
+            "type": "shadowsocks",
+            "tag": tag,
+            "server": node["server"],
+            "server_port": node["port"],
+            "method": node["cipher"],
+            "password": node["password"],
+        }
+        if node["plugin"] == "obfs" and node["plugin_opts"]:
+            opts = node["plugin_opts"]
+            ob["plugin"] = "obfs-local"
+            ob["plugin_opts"] = opts
+        return ob
+
+    if ntype == "hysteria2":
+        ob = {
+            "type": "hysteria2",
+            "tag": tag,
+            "server": node["server"],
+            "server_port": node["port"],
+            "password": node["password"],
+        }
+        if node["sni"]:
+            ob["tls"] = {
+                "enabled": True,
+                "server_name": node["sni"],
+                "insecure": node["insecure"],
+            }
+        if node.get("obfs"):
+            ob["obfs"] = {"type": node["obfs"], "password": node.get("obfs_password", "")}
+        return ob
+
+    return None
+
+
+def fetch_subscription(url):
+    import urllib.request
+    import ssl
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    req = urllib.request.Request(url, headers={"User-Agent": "ClashMetaForAndroid/2.10.1.Meta Mihomo/1.18"})
+    with urllib.request.urlopen(req, context=ctx, timeout=30) as resp:
+        return resp.read().decode("utf-8", errors="replace")
+
+
+def parse_subscription(content):
+    content = content.strip()
+
+    # Try base64 decode
+    try:
+        decoded = base64.b64decode(content).decode("utf-8", errors="replace")
+        if "anytls://" in decoded or "vmess://" in decoded or "vless://" in decoded or "trojan://" in decoded:
+            content = decoded
+    except Exception:
+        pass
+
+    # Clash YAML
+    if yaml:
+        try:
+            data = yaml.safe_load(content)
+            if isinstance(data, dict) and "proxies" in data:
+                return parse_clash_proxies(data["proxies"])
+        except Exception:
+            pass
+
+    # Plain links
+    return parse_anytls_links(content)
+
+
+def build_groups(nodes):
+    regions = defaultdict(list)
+    ungrouped = []
+    for n in nodes:
+        r = detect_region(n["name"])
+        if r:
+            regions[r].append(n)
+        else:
+            ungrouped.append(n)
+
+    outbounds = []
+    region_tags = []
+    auto_nodes = []
+
+    # Regional groups
+    for r in sorted(regions.keys()):
+        rnodes = regions[r]
+        rtags = [n["name"] for n in rnodes]
+        region_tags.append(r)
+        auto_nodes.append(rtags[0])
+
+        if len(rtags) > 1:
+            outbounds.append({"type": "selector", "tag": r,
+                              "outbounds": [f"{r}-auto"] + rtags, "default": f"{r}-auto"})
+            outbounds.append({"type": "urltest", "tag": f"{r}-auto",
+                              "outbounds": rtags,
+                              "url": "https://www.gstatic.com/generate_204", "interval": "5m"})
+        else:
+            outbounds.append({"type": "selector", "tag": r, "outbounds": rtags})
+
+    # Ungrouped
+    for n in ungrouped:
+        region_tags.append(n["name"])
+        auto_nodes.append(n["name"])
+
+    return outbounds, region_tags, auto_nodes
+
+
+def inject(config, nodes):
+    node_outbounds = []
+    for n in nodes:
+        ob = to_singbox_outbound(n)
+        if ob:
+            node_outbounds.append(ob)
+
+    if not node_outbounds:
+        return config
+
+    groups, region_tags, auto_nodes = build_groups(nodes)
+
+    outbounds = config.get("outbounds", [])
+    proxy_sel = next((o for o in outbounds if o.get("tag") == "proxy"), None)
+    vless_idx = next((i for i, o in enumerate(outbounds) if o.get("tag") == "VLESS"), None)
+
+    # Insert auto urltest after proxy selector
+    auto_ob = {
+        "type": "urltest",
+        "tag": "auto",
+        "outbounds": ["VLESS"] + auto_nodes,
+        "url": "https://www.gstatic.com/generate_204",
+        "interval": "5m",
+    }
+    insert_at = 1  # after proxy selector
+    outbounds.insert(insert_at, auto_ob)
+
+    # Insert regional groups after auto
+    for g in groups:
+        insert_at += 1
+        outbounds.insert(insert_at, g)
+
+    # Insert node outbounds before direct
+    direct_idx = next((i for i, o in enumerate(outbounds) if o.get("tag") == "direct"), len(outbounds))
+    for ob in reversed(node_outbounds):
+        outbounds.insert(direct_idx, ob)
+
+    # Update proxy selector
+    if proxy_sel:
+        proxy_sel["outbounds"] = ["auto", "VLESS"] + region_tags
+
+    config["outbounds"] = outbounds
+    return config
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Inject subscription nodes into sing-box config")
+    parser.add_argument("-s", "--sub", help="Subscription URL")
+    parser.add_argument("-f", "--file", help="Read subscription from file")
+    parser.add_argument("-o", "--output", help="Output file (default: stdout)")
+    args = parser.parse_args()
+
+    config = json.load(sys.stdin)
+
+    if not args.sub and not args.file:
+        # No subscription, output as-is
+        out = json.dumps(config, indent=2, ensure_ascii=False) + "\n"
+        if args.output:
+            Path(args.output).write_text(out)
+        else:
+            sys.stdout.write(out)
+        return
+
+    if args.file:
+        content = Path(args.file).read_text()
+    else:
+        print(f"fetching subscription...", file=sys.stderr)
+        content = fetch_subscription(args.sub)
+
+    nodes = parse_subscription(content)
+    info_keywords = ["预计", "等级", "官网", "失联", "客服", "流量", "到期", "重置", "套餐"]
+    nodes = [n for n in nodes if not any(kw in n["name"] for kw in info_keywords)]
+
+    if not nodes:
+        print("no proxy nodes found in subscription", file=sys.stderr)
+        out = json.dumps(config, indent=2, ensure_ascii=False) + "\n"
+        if args.output:
+            Path(args.output).write_text(out)
+        else:
+            sys.stdout.write(out)
+        return
+
+    print(f"found {len(nodes)} nodes", file=sys.stderr)
+    config = inject(config, nodes)
+    print(f"injected into config ({len(config['outbounds'])} outbounds)", file=sys.stderr)
+
+    out = json.dumps(config, indent=2, ensure_ascii=False) + "\n"
+    if args.output:
+        Path(args.output).write_text(out)
+        print(f"written to {args.output}", file=sys.stderr)
+    else:
+        sys.stdout.write(out)
+
+
+if __name__ == "__main__":
+    main()

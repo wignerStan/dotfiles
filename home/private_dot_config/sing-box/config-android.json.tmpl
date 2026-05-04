@@ -166,8 +166,14 @@
   ],
   "outbounds": [
     {
-      "type": "vless",
+      "type": "selector",
       "tag": "proxy",
+      "outbounds": ["VLESS"],
+      "default": "VLESS"
+    },
+    {
+      "type": "vless",
+      "tag": "VLESS",
       "server": {{ .singbox_server | quote }},
       "server_port": 443,
       "uuid": {{ .singbox_android_uuid | quote }},
