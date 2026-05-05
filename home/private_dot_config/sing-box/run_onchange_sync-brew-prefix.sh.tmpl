@@ -1,0 +1,38 @@
+#!/bin/bash
+# sync sing-box config from ~/.config/sing-box/ to brew prefix
+set -euo pipefail
+
+BREW_PREFIX="{{ .chezmoi.homeDir }}/.config/sing-box"
+{{- if lookPath "brew" }}
+BREW_ETC="$(brew --prefix)/etc/sing-box"
+{{- else }}
+BREW_ETC="/opt/homebrew/etc/sing-box"
+{{- end }}
+
+SRC="$BREW_PREFIX"
+DST="$BREW_ETC"
+
+if [ ! -d "$DST" ]; then
+    echo "sing-box: $DST does not exist, skipping sync"
+    exit 0
+fi
+
+# sync config files (not scripts, not rulesets)
+for f in config.json config-android.json; do
+    if [ -f "$SRC/$f" ]; then
+        if ! diff -q "$SRC/$f" "$DST/$f" &>/dev/null; then
+            cp "$SRC/$f" "$DST/$f"
+            echo "sing-box: synced $f -> $DST/"
+        fi
+    fi
+done
+
+# validate
+if command -v sing-box &>/dev/null && [ -f "$DST/config.json" ]; then
+    if sing-box check -c "$DST/config.json" 2>/dev/null; then
+        echo "sing-box: config valid"
+    else
+        echo "sing-box: WARNING config validation failed" >&2
+        exit 1
+    fi
+fi
