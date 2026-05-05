@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Fetch subscription, convert proxy nodes to sing-box outbounds, inject into config.
 
-Supports:
-  - Clash YAML (proxies: list)
-  - Base64-encoded anytls:// links
-  - Plain anytls:// links
+Auto-detects subscription format:
+  - Sing-box JSON (outbounds array or list of outbound objects)
+  - Clash/Mihomo YAML (proxies: list)
+  - SIP008 JSON (Shadowsocks servers array)
+  - Base64-encoded proxy URI links
+  - Plain proxy URI links (ss://, vmess://, vless://, trojan://, etc.)
 
 Usage:
   # Fetch from URL, inject into rendered template, output to file
@@ -290,6 +292,9 @@ def to_singbox_outbound(node):
     ntype = node["type"]
     tag = node["name"]
 
+    if ntype == "_raw_singbox":
+        return dict(node["_raw"])
+
     if ntype == "anytls":
         ob = {
             "type": "anytls",
@@ -447,30 +452,120 @@ def fetch_subscription(url):
     return r.stdout
 
 
+SINGBOX_PROXY_TYPES = frozenset({
+    "vless", "vmess", "trojan", "shadowsocks", "shadow-tls",
+    "hysteria", "hysteria2", "anytls", "tuic", "wireguard",
+    "naive", "http", "socks",
+})
+
+
+def parse_singbox_json(content):
+    """Parse sing-box native JSON: {"outbounds": [...]} or bare array of outbound objects."""
+    try:
+        data = json.loads(content)
+    except (json.JSONDecodeError, ValueError):
+        return None
+
+    outbounds = []
+    if isinstance(data, dict):
+        outbounds = data.get("outbounds", [])
+    elif isinstance(data, list):
+        outbounds = data
+
+    if not outbounds or not isinstance(outbounds[0], dict):
+        return None
+
+    # Validate: at least one entry must be a known sing-box proxy type
+    proxy_outbounds = [ob for ob in outbounds
+                       if isinstance(ob, dict) and ob.get("type") in SINGBOX_PROXY_TYPES]
+    if not proxy_outbounds:
+        return None
+
+    nodes = []
+    for ob in proxy_outbounds:
+        nodes.append({
+            "type": "_raw_singbox",
+            "name": ob.get("tag", ob.get("server", "unknown")),
+            "_raw": ob,
+        })
+    return nodes
+
+
+def parse_sip008(content):
+    """Parse SIP008 JSON: {"servers": [{server, server_port, method, password, ...}]}."""
+    try:
+        data = json.loads(content)
+    except (json.JSONDecodeError, ValueError):
+        return None
+
+    if not isinstance(data, dict):
+        return None
+    servers = data.get("servers", [])
+    if not servers or not isinstance(servers[0], dict):
+        return None
+
+    # Validate SIP008 fields
+    required = {"server", "method", "password"}
+    if not all(k in servers[0] for k in required):
+        return None
+
+    nodes = []
+    for s in servers:
+        nodes.append({
+            "type": "ss",
+            "name": s.get("remarks", s.get("server", "unknown")),
+            "server": s["server"],
+            "port": s.get("server_port", s.get("port", 0)),
+            "cipher": s["method"],
+            "password": s["password"],
+            "plugin": s.get("plugin", ""),
+            "plugin_opts": s.get("plugin_opts"),
+        })
+    return nodes
+
+
 def parse_subscription(content):
     content = content.strip()
 
-    # Clash YAML (try first — handles both raw YAML and responses that start with mixed-port:)
+    # 1. Sing-box JSON (fast, deterministic)
+    nodes = parse_singbox_json(content)
+    if nodes is not None:
+        print(f"detected format: sing-box JSON ({len(nodes)} nodes)", file=sys.stderr)
+        return nodes
+
+    # 2. SIP008 JSON (Shadowsocks standard)
+    nodes = parse_sip008(content)
+    if nodes is not None:
+        print(f"detected format: SIP008 JSON ({len(nodes)} nodes)", file=sys.stderr)
+        return nodes
+
+    # 3. Clash/Mihomo YAML
     if yaml:
         try:
             data = yaml.safe_load(content)
             if isinstance(data, dict) and "proxies" in data:
-                return parse_clash_proxies(data["proxies"])
+                nodes = parse_clash_proxies(data["proxies"])
+                print(f"detected format: Clash YAML ({len(nodes)} nodes)", file=sys.stderr)
+                return nodes
         except Exception:
             pass
 
-    # Try base64 decode if content doesn't look like plain text links or YAML
+    # 4. Base64 decode
     schemes = ("anytls://", "vmess://", "vless://", "trojan://", "ss://", "hysteria2://", "hy2://")
     if not any(content.lstrip().startswith(s) for s in schemes) and "mixed-port:" not in content[:200] and "proxies:" not in content[:500]:
         try:
             decoded = base64.b64decode(content, validate=True).decode("utf-8", errors="replace")
             if any(s in decoded for s in schemes):
+                print("detected format: base64-encoded URI links", file=sys.stderr)
                 content = decoded
         except Exception:
             pass
 
-    # URI links
-    return parse_uri_links(content)
+    # 5. Plain URI links
+    nodes = parse_uri_links(content)
+    if nodes:
+        print(f"detected format: URI links ({len(nodes)} nodes)", file=sys.stderr)
+    return nodes
 
 
 def build_groups(nodes):
