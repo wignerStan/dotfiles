@@ -712,12 +712,56 @@ def main():
     parser.add_argument("-s", "--sub", help="Subscription URL")
     parser.add_argument("-f", "--file", help="Read subscription from file")
     parser.add_argument("-o", "--output", help="Output file (default: stdout)")
+    parser.add_argument("-n", "--dry-run", action="store_true",
+                        help="Parse subscription only, print nodes as JSON. No config needed on stdin.")
     args = parser.parse_args()
 
+    # Dry-run: parse subscription and print nodes + sing-box outbounds
+    if args.dry_run:
+        if not args.sub and not args.file:
+            print("error: --dry-run requires -s URL or -f FILE", file=sys.stderr)
+            sys.exit(1)
+
+        if args.file:
+            content = Path(args.file).read_text()
+        else:
+            print("fetching subscription...", file=sys.stderr)
+            content = fetch_subscription(args.sub)
+
+        nodes = parse_subscription(content)
+        info_keywords = ["预计", "等级", "官网", "失联", "客服", "流量", "到期", "重置", "套餐"]
+        nodes = [n for n in nodes if not any(kw in n["name"] for kw in info_keywords)]
+
+        if not nodes:
+            print("no proxy nodes found", file=sys.stderr)
+            sys.exit(0)
+
+        # Print intermediate nodes
+        print(f"=== {len(nodes)} nodes ===", file=sys.stderr)
+        for n in nodes:
+            ob = to_singbox_outbound(n)
+            region = detect_region(n["name"])
+            tag = ob.get("tag", "?") if ob else "PARSE_FAILED"
+            otype = ob.get("type", "?") if ob else "?"
+            server = ob.get("server", "?") if ob else "?"
+            port = ob.get("server_port", "?") if ob else "?"
+            print(f"  {tag:40s} type={otype:14s} server={server}:{port} region={region}", file=sys.stderr)
+            if not ob:
+                print(f"    FAILED fields: {list(n.keys())}", file=sys.stderr)
+
+        # Print sing-box JSON outbounds
+        outbounds = []
+        for n in nodes:
+            ob = to_singbox_outbound(n)
+            if ob:
+                outbounds.append(ob)
+        print(json.dumps(outbounds, indent=2, ensure_ascii=False))
+        return
+
+    # Normal mode: read config from stdin, inject nodes
     config = json.load(sys.stdin)
 
     if not args.sub and not args.file:
-        # No subscription, output as-is
         out = json.dumps(config, indent=2, ensure_ascii=False) + "\n"
         if args.output:
             Path(args.output).write_text(out)
@@ -728,7 +772,7 @@ def main():
     if args.file:
         content = Path(args.file).read_text()
     else:
-        print(f"fetching subscription...", file=sys.stderr)
+        print("fetching subscription...", file=sys.stderr)
         content = fetch_subscription(args.sub)
 
     nodes = parse_subscription(content)
