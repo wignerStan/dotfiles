@@ -1,15 +1,13 @@
 #!/bin/bash
-# sync sing-box config from ~/.config/sing-box/ to brew prefix
+# sync sing-box config: render template -> inject subscription -> validate -> deploy
 set -euo pipefail
 
-BREW_PREFIX="{{ .chezmoi.homeDir }}/.config/sing-box"
 {{- if lookPath "brew" }}
 BREW_ETC="$(brew --prefix)/etc/sing-box"
 {{- else }}
 BREW_ETC="/opt/homebrew/etc/sing-box"
 {{- end }}
-
-SRC="$BREW_PREFIX"
+SRC="{{ .chezmoi.homeDir }}/.config/sing-box"
 DST="$BREW_ETC"
 
 if [ ! -d "$DST" ]; then
@@ -17,19 +15,28 @@ if [ ! -d "$DST" ]; then
     exit 0
 fi
 
-# sync config files (not scripts, not rulesets)
-for f in config.json config-android.json; do
+# sync base template configs first
+for f in config-android.json inject-sub.py update-rulesets.sh; do
     if [ -f "$SRC/$f" ]; then
-        if ! diff -q "$SRC/$f" "$DST/$f" &>/dev/null; then
-            cp "$SRC/$f" "$DST/$f"
-            echo "sing-box: synced $f -> $DST/"
-        fi
+        cp "$SRC/$f" "$DST/$f"
     fi
 done
 
+# macOS config: render template -> inject subscription -> deploy
+if [ -f "$SRC/inject-sub.py" ]; then
+    SUB_URL="{{ .singbox_sub_url | default "" }}"
+    if [ -n "$SUB_URL" ]; then
+        python3 "$SRC/inject-sub.py" -s "$SUB_URL" -o "$DST/config.json" < "$SRC/config.json"
+        echo "sing-box: injected subscription -> $DST/config.json"
+    else
+        cp "$SRC/config.json" "$DST/config.json"
+        echo "sing-box: synced config.json -> $DST/ (no sub url)"
+    fi
+fi
+
 # validate
 if command -v sing-box &>/dev/null && [ -f "$DST/config.json" ]; then
-    if sing-box check -c "$DST/config.json" 2>/dev/null; then
+    if sing-box check -c "$DST/config.json" 2>&1; then
         echo "sing-box: config valid"
     else
         echo "sing-box: WARNING config validation failed" >&2
