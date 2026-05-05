@@ -140,6 +140,10 @@
         "server": "dns-domestic"
       },
       {
+        "domain": "engage.cloudflareclient.com",
+        "server": "dns-remote"
+      },
+      {
         "query_type": [
           "A",
           "AAAA"
@@ -159,6 +163,27 @@
       "state_directory": "{{ $singbox_dir }}/tailscale-state",
       "accept_routes": true,
       "system_interface": true
+    },
+    {
+      "type": "wireguard",
+      "tag": "warp-ep",
+      "system": false,
+      "mtu": 1280,
+      "address": [
+        "172.16.0.2/32",
+        "{{ .singbox_warp_ipv6 }}/128"
+      ],
+      "private_key": {{ .singbox_warp_private_key | quote }},
+      "peers": [
+        {
+          "address": "engage.cloudflareclient.com",
+          "port": 2408,
+          "public_key": "bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=",
+          "allowed_ips": ["0.0.0.0/0", "::/0"],
+          "reserved": [{{ .singbox_warp_reserved_0 }}, {{ .singbox_warp_reserved_1 }}, {{ .singbox_warp_reserved_2 }}]
+        }
+      ],
+      "detour": "proxy"
     }
   ],
   "inbounds": [
@@ -212,8 +237,30 @@
     {
       "type": "selector",
       "tag": "proxy",
-      "outbounds": ["VLESS"],
+      "outbounds": ["auto-proxy", "VLESS", "VLESS-CDN"],
       "default": "VLESS"
+    },
+    {
+      "type": "urltest",
+      "tag": "auto-proxy",
+      "outbounds": ["VLESS", "VLESS-CDN"],
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": "3m",
+      "tolerance": 50
+    },
+    {
+      "type": "selector",
+      "tag": "ai-chain",
+      "outbounds": ["auto-ai", "warp-ep"],
+      "default": "auto-ai"
+    },
+    {
+      "type": "urltest",
+      "tag": "auto-ai",
+      "outbounds": ["warp-ep"],
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": "5m",
+      "tolerance": 100
     },
     {
       "type": "vless",
@@ -233,6 +280,25 @@
           "enabled": true,
           "public_key": {{ .singbox_public_key | quote }}
         }
+      }
+    },
+    {
+      "type": "vless",
+      "tag": "VLESS-CDN",
+      "server": {{ .singbox_cdn_host | quote }},
+      "server_port": {{ .singbox_cdn_port }},
+      "uuid": {{ .singbox_uuid | quote }},
+      "tls": {
+        "enabled": true,
+        "server_name": {{ .singbox_cdn_host | quote }},
+        "utls": {
+          "enabled": true,
+          "fingerprint": "chrome"
+        }
+      },
+      "transport": {
+        "type": "ws",
+        "path": {{ .singbox_cdn_path | quote }}
       }
     },
     {
@@ -292,8 +358,27 @@
         "action": "reject"
       },
       {
-        "rule_set": "geosite-openai",
-        "outbound": "proxy"
+        "domain_suffix": [
+          "gemini.google.com", "aistudio.google.com", "makersuite.google.com",
+          "copilot.microsoft.com",
+          "character.ai",
+          "huggingface.co",
+          "openrouter.ai",
+          "x.ai", "grok.com",
+          "mistral.ai",
+          "midjourney.com"
+        ],
+        "outbound": "ai-chain"
+      },
+      {
+        "rule_set": [
+          "geosite-openai",
+          "geosite-anthropic",
+          "geosite-perplexity",
+          "geosite-cursor",
+          "geosite-poe"
+        ],
+        "outbound": "ai-chain"
       },
       {
         "rule_set": "geosite-google",
@@ -321,10 +406,6 @@
       },
       {
         "rule_set": "geosite-github",
-        "outbound": "proxy"
-      },
-      {
-        "domain_suffix": "bing.com",
         "outbound": "proxy"
       },
       {
@@ -372,7 +453,8 @@
           "rustup.rs",
           "static.rust-lang.org",
           "linuxdo.org",
-          "appstorrent.ru"
+          "appstorrent.ru",
+          "deepseek.com"
         ],
         "outbound": "direct"
       },
@@ -444,6 +526,30 @@
         "tag": "geosite-openai",
         "format": "binary",
         "path": "{{$singbox_dir}}/rulesets/geosite-openai.srs"
+      },
+      {
+        "type": "local",
+        "tag": "geosite-anthropic",
+        "format": "binary",
+        "path": "{{$singbox_dir}}/rulesets/geosite-anthropic.srs"
+      },
+      {
+        "type": "local",
+        "tag": "geosite-perplexity",
+        "format": "binary",
+        "path": "{{$singbox_dir}}/rulesets/geosite-perplexity.srs"
+      },
+      {
+        "type": "local",
+        "tag": "geosite-cursor",
+        "format": "binary",
+        "path": "{{$singbox_dir}}/rulesets/geosite-cursor.srs"
+      },
+      {
+        "type": "local",
+        "tag": "geosite-poe",
+        "format": "binary",
+        "path": "{{$singbox_dir}}/rulesets/geosite-poe.srs"
       },
       {
         "type": "local",

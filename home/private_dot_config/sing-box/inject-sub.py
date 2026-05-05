@@ -511,7 +511,49 @@ def build_groups(nodes):
     return outbounds, region_tags, auto_nodes
 
 
-def inject(config, nodes):
+INFRA_TAGS = frozenset({
+    "VLESS", "VLESS-CDN", "proxy", "auto-proxy", "ai-chain", "auto-ai",
+    "warp-ep", "direct", "block",
+})
+
+
+def inject_macos(config, nodes):
+    """macOS: chain mode. Nodes get detour=proxy, injected into ai-chain selector + auto-ai urltest."""
+    node_outbounds = []
+    for n in nodes:
+        ob = to_singbox_outbound(n)
+        if ob:
+            ob["detour"] = "proxy"
+            node_outbounds.append(ob)
+
+    if not node_outbounds:
+        return config
+
+    outbounds = config.get("outbounds", [])
+    ai_chain = next((o for o in outbounds if o.get("tag") == "ai-chain"), None)
+    auto_ai = next((o for o in outbounds if o.get("tag") == "auto-ai"), None)
+
+    direct_idx = next(
+        (i for i, o in enumerate(outbounds) if o.get("tag") == "direct"),
+        len(outbounds),
+    )
+    for ob in reversed(node_outbounds):
+        outbounds.insert(direct_idx, ob)
+
+    tags = [ob["tag"] for ob in node_outbounds]
+
+    if ai_chain:
+        ai_chain["outbounds"] = ai_chain.get("outbounds", []) + tags
+
+    if auto_ai:
+        auto_ai["outbounds"] = auto_ai.get("outbounds", []) + tags
+
+    config["outbounds"] = outbounds
+    return config
+
+
+def inject_android(config, nodes):
+    """Android: original regional group mode. Nodes injected into proxy selector with regional groups."""
     node_outbounds = []
     for n in nodes:
         ob = to_singbox_outbound(n)
@@ -524,13 +566,10 @@ def inject(config, nodes):
     groups, region_tags, auto_nodes = build_groups(nodes)
 
     outbounds = config.get("outbounds", [])
-
-    # Remove VLESS outbound (personal proxy, not from subscription)
     outbounds = [o for o in outbounds if o.get("tag") != "VLESS"]
 
     proxy_sel = next((o for o in outbounds if o.get("tag") == "proxy"), None)
 
-    # Insert auto urltest after proxy selector
     auto_ob = {
         "type": "urltest",
         "tag": "auto",
@@ -538,26 +577,31 @@ def inject(config, nodes):
         "url": "https://www.gstatic.com/generate_204",
         "interval": "5m",
     }
-    insert_at = 1  # after proxy selector
+    insert_at = 1
     outbounds.insert(insert_at, auto_ob)
 
-    # Insert regional groups after auto
     for g in groups:
         insert_at += 1
         outbounds.insert(insert_at, g)
 
-    # Insert node outbounds before direct
     direct_idx = next((i for i, o in enumerate(outbounds) if o.get("tag") == "direct"), len(outbounds))
     for ob in reversed(node_outbounds):
         outbounds.insert(direct_idx, ob)
 
-    # Update proxy selector: auto as default
     if proxy_sel:
         proxy_sel["outbounds"] = ["auto"] + region_tags
         proxy_sel["default"] = "auto"
 
     config["outbounds"] = outbounds
     return config
+
+
+def inject(config, nodes):
+    outbounds = config.get("outbounds", [])
+    has_ai_chain = any(o.get("tag") == "ai-chain" for o in outbounds)
+    if has_ai_chain:
+        return inject_macos(config, nodes)
+    return inject_android(config, nodes)
 
 
 def main():
