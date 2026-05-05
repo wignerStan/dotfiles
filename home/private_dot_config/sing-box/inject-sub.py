@@ -518,7 +518,7 @@ INFRA_TAGS = frozenset({
 
 
 def inject_macos(config, nodes):
-    """macOS: chain mode. Nodes get detour=proxy, injected into ai-chain selector + auto-ai urltest."""
+    """macOS: chain mode. Nodes get detour=proxy, regional selectors aggregated as options in ai-chain."""
     node_outbounds = []
     for n in nodes:
         ob = to_singbox_outbound(n)
@@ -529,6 +529,8 @@ def inject_macos(config, nodes):
     if not node_outbounds:
         return config
 
+    groups, region_tags, auto_nodes = build_groups(nodes)
+
     outbounds = config.get("outbounds", [])
     ai_chain = next((o for o in outbounds if o.get("tag") == "ai-chain"), None)
     auto_ai = next((o for o in outbounds if o.get("tag") == "auto-ai"), None)
@@ -537,16 +539,22 @@ def inject_macos(config, nodes):
         (i for i, o in enumerate(outbounds) if o.get("tag") == "direct"),
         len(outbounds),
     )
+
     for ob in reversed(node_outbounds):
         outbounds.insert(direct_idx, ob)
 
-    tags = [ob["tag"] for ob in node_outbounds]
+    direct_idx = next(
+        (i for i, o in enumerate(outbounds) if o.get("tag") == "direct"),
+        len(outbounds),
+    )
+    for g in reversed(groups):
+        outbounds.insert(direct_idx, g)
 
     if ai_chain:
-        ai_chain["outbounds"] = ai_chain.get("outbounds", []) + tags
+        ai_chain["outbounds"] = ai_chain.get("outbounds", []) + region_tags
 
     if auto_ai:
-        auto_ai["outbounds"] = auto_ai.get("outbounds", []) + tags
+        auto_ai["outbounds"] = auto_ai.get("outbounds", []) + auto_nodes
 
     config["outbounds"] = outbounds
     return config
