@@ -109,7 +109,7 @@ command_not_found_handler() {
 # ── PATH (appended last so all above env is available first) ──
 
 # Go
-path+=("$HOME/go/bin")
+[[ -d "$HOME/go/bin" ]] && path+=("$HOME/go/bin")
 
 # pnpm
 {{- if eq .chezmoi.os "darwin" }}
@@ -117,7 +117,7 @@ path+=("$HOME/go/bin")
 {{- else }}
 [[ -d "$HOME/.local/share/pnpm" ]] && export PNPM_HOME="$HOME/.local/share/pnpm"
 {{- end }}
-[[ -d "$PNPM_HOME/bin" ]] && path+=("$PNPM_HOME/bin")
+[[ -n "$PNPM_HOME" ]] && path+=("$PNPM_HOME/bin")
 # Antigravity
 [[ -d "$HOME/.antigravity/antigravity/bin" ]] && path+=$HOME/.antigravity/antigravity/bin
 
