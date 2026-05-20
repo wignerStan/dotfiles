@@ -1,17 +1,7 @@
-{{- $git_name := "" -}}
-{{- $git_email := "" -}}
-{{- if hasKey . "git_name" -}}
-{{-   $git_name = .git_name -}}
-{{-   $git_email = .git_email -}}
-{{- else if and (ne .name "") (ne .email "") -}}
-{{-   $git_name = .name -}}
-{{-   $git_email = .email -}}
-{{- end -}}
-{{- if and (ne $git_name "") (ne $git_email "") }}
+
 [user]
-    name = {{ $git_name }}
-    email = {{ $git_email }}
-{{- end }}
+    name = Jacob
+    email = 24017069+wignerStan@users.noreply.github.com
 [init]
     defaultBranch = main
 [pull]
@@ -33,12 +23,10 @@
     path = {{ .chezmoi.homeDir }}/Academic/.gitconfig
 [core]
     autocrlf = false
-    excludesfile = {{ .chezmoi.homeDir }}/.gitignore_global
 [color]
     ui = auto
 [push]
     default = simple
-{{- if not .is_hpc }}
 [credential "https://github.com"]
     helper =
 {{- if eq .chezmoi.os "darwin" }}
@@ -53,8 +41,13 @@
 {{- else }}
     helper = !/home/linuxbrew/.linuxbrew/bin/gh auth git-credential
 {{- end }}
-{{- end }}
 [http]
     postBuffer = 524288000
 [safe]
     directory = *
+[credential "https://git.lug.ustc.edu.cn"]
+{{- if eq .chezmoi.os "darwin" }}
+    helper = !/opt/homebrew/bin/glab auth git-credential
+{{- else }}
+    helper = !/home/linuxbrew/.linuxbrew/bin/glab auth git-credential
+{{- end }}
