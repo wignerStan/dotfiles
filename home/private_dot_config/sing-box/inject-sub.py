@@ -440,9 +440,8 @@ def to_singbox_outbound(node):
 
 def fetch_subscription(url):
     import subprocess
-    # Use --interface en0 to bypass TUN proxy when sing-box is running
     r = subprocess.run(
-        ["curl", "--interface", "en0", "-sS", "-k", "--max-time", "30",
+        ["curl", "-sS", "-k", "--max-time", "30",
          "-H", "User-Agent: ClashMetaForAndroid/2.10.1.Meta Mihomo/1.18",
          url],
         capture_output=True, text=True, timeout=60,
@@ -613,12 +612,12 @@ INFRA_TAGS = frozenset({
 
 
 def inject_macos(config, nodes):
-    """macOS: chain mode. Nodes get detour=proxy, regional selectors aggregated as options in ai-chain."""
+    """macOS: subscription nodes connect directly (SS relays only accept CN IPs).
+    DNS + route rules ensure server domains resolve via real DNS and go direct."""
     node_outbounds = []
     for n in nodes:
         ob = to_singbox_outbound(n)
         if ob:
-            ob["detour"] = "proxy"
             node_outbounds.append(ob)
 
     if not node_outbounds:
@@ -628,7 +627,6 @@ def inject_macos(config, nodes):
 
     outbounds = config.get("outbounds", [])
     ai_chain = next((o for o in outbounds if o.get("tag") == "ai-chain"), None)
-    auto_ai = next((o for o in outbounds if o.get("tag") == "auto-ai"), None)
 
     direct_idx = next(
         (i for i, o in enumerate(outbounds) if o.get("tag") == "direct"),
@@ -645,13 +643,50 @@ def inject_macos(config, nodes):
     for g in reversed(groups):
         outbounds.insert(direct_idx, g)
 
-    if ai_chain:
-        ai_chain["outbounds"] = ai_chain.get("outbounds", []) + region_tags
+    # Create auto-ai urltest across all regional auto groups
+    auto_tags = [f"{r}-auto" for r in region_tags if any(
+        o.get("tag") == f"{r}-auto" for o in groups
+    )]
+    if auto_tags:
+        auto_ai_ob = {"type": "urltest", "tag": "auto-ai",
+                      "outbounds": auto_tags,
+                      "url": "https://www.gstatic.com/generate_204", "interval": "5m"}
+        direct_idx = next(
+            (i for i, o in enumerate(outbounds) if o.get("tag") == "direct"),
+            len(outbounds),
+        )
+        outbounds.insert(direct_idx, auto_ai_ob)
 
-    if auto_ai:
-        auto_ai["outbounds"] = auto_ai.get("outbounds", []) + auto_nodes
+    if ai_chain:
+        ai_chain["outbounds"] = ["warp-ep"] + (["auto-ai"] if auto_tags else []) + region_tags
 
     config["outbounds"] = outbounds
+
+    # Collect subscription server domains for DNS and route rules.
+    # These must bypass fakeip DNS and route through direct (not proxy).
+    sub_domains = set()
+    for ob in node_outbounds:
+        srv = ob.get("server", "")
+        parts = srv.split(".")
+        if len(parts) >= 2:
+            sub_domains.add(".".join(parts[-2:]))
+    if sub_domains:
+        dns_rules = config.get("dns", {}).get("rules", [])
+        dns_rules.insert(0, {
+            "domain_suffix": sorted(sub_domains),
+            "server": "dns-domestic",
+        })
+        config.setdefault("dns", {})["rules"] = dns_rules
+
+    # Add route rules for subscription server domains to go direct.
+    # Without this, the SS server connections route through proxy (VLESS) by default.
+    route_rules = config.get("route", {}).get("rules", [])
+    route_rules.insert(0, {
+        "domain_suffix": sorted(sub_domains),
+        "outbound": "direct",
+    })
+    config.setdefault("route", {})["rules"] = route_rules
+
     return config
 
 
@@ -712,56 +747,12 @@ def main():
     parser.add_argument("-s", "--sub", help="Subscription URL")
     parser.add_argument("-f", "--file", help="Read subscription from file")
     parser.add_argument("-o", "--output", help="Output file (default: stdout)")
-    parser.add_argument("-n", "--dry-run", action="store_true",
-                        help="Parse subscription only, print nodes as JSON. No config needed on stdin.")
     args = parser.parse_args()
 
-    # Dry-run: parse subscription and print nodes + sing-box outbounds
-    if args.dry_run:
-        if not args.sub and not args.file:
-            print("error: --dry-run requires -s URL or -f FILE", file=sys.stderr)
-            sys.exit(1)
-
-        if args.file:
-            content = Path(args.file).read_text()
-        else:
-            print("fetching subscription...", file=sys.stderr)
-            content = fetch_subscription(args.sub)
-
-        nodes = parse_subscription(content)
-        info_keywords = ["预计", "等级", "官网", "失联", "客服", "流量", "到期", "重置", "套餐"]
-        nodes = [n for n in nodes if not any(kw in n["name"] for kw in info_keywords)]
-
-        if not nodes:
-            print("no proxy nodes found", file=sys.stderr)
-            sys.exit(0)
-
-        # Print intermediate nodes
-        print(f"=== {len(nodes)} nodes ===", file=sys.stderr)
-        for n in nodes:
-            ob = to_singbox_outbound(n)
-            region = detect_region(n["name"])
-            tag = ob.get("tag", "?") if ob else "PARSE_FAILED"
-            otype = ob.get("type", "?") if ob else "?"
-            server = ob.get("server", "?") if ob else "?"
-            port = ob.get("server_port", "?") if ob else "?"
-            print(f"  {tag:40s} type={otype:14s} server={server}:{port} region={region}", file=sys.stderr)
-            if not ob:
-                print(f"    FAILED fields: {list(n.keys())}", file=sys.stderr)
-
-        # Print sing-box JSON outbounds
-        outbounds = []
-        for n in nodes:
-            ob = to_singbox_outbound(n)
-            if ob:
-                outbounds.append(ob)
-        print(json.dumps(outbounds, indent=2, ensure_ascii=False))
-        return
-
-    # Normal mode: read config from stdin, inject nodes
     config = json.load(sys.stdin)
 
     if not args.sub and not args.file:
+        # No subscription, output as-is
         out = json.dumps(config, indent=2, ensure_ascii=False) + "\n"
         if args.output:
             Path(args.output).write_text(out)
@@ -772,7 +763,7 @@ def main():
     if args.file:
         content = Path(args.file).read_text()
     else:
-        print("fetching subscription...", file=sys.stderr)
+        print(f"fetching subscription...", file=sys.stderr)
         content = fetch_subscription(args.sub)
 
     nodes = parse_subscription(content)
