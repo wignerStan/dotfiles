@@ -17,6 +17,9 @@ adjust-cell-height = 25%
 font-feature = calt, cv01, cv03, ss01, ss02, ss03
 font-thicken = false
 
+# ========== Clipboard ==========
+clipboard-paste-protection = false
+
 # ========== Visuals ==========
 background-opacity = 0.97
 window-padding-x = 8
