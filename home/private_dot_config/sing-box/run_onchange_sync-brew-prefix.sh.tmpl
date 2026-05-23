@@ -15,22 +15,23 @@ if [ ! -d "$DST" ]; then
     exit 0
 fi
 
-# sync base template configs first
-for f in config-android.json inject-sub.py update-rulesets.sh; do
+# sync helper scripts
+for f in inject-sub.py update-rulesets.sh; do
     if [ -f "$SRC/$f" ]; then
         cp "$SRC/$f" "$DST/$f"
     fi
 done
 
-# macOS config: render template -> inject subscription -> deploy
+# macOS config: render template source -> inject subscription -> deploy
+TMPL_SRC="{{ .chezmoi.sourceDir }}/private_dot_config/sing-box/config.json.tmpl"
 if [ -f "$SRC/inject-sub.py" ]; then
     SUB_URL="{{ .singbox_sub_url | default "" }}"
     if [ -n "$SUB_URL" ]; then
-        python3 "$SRC/inject-sub.py" -s "$SUB_URL" -o "$DST/config.json" < "$SRC/config.json"
-        echo "sing-box: injected subscription -> $DST/config.json"
+        chezmoi execute-template < "$TMPL_SRC" | python3 "$SRC/inject-sub.py" -s "$SUB_URL" -o "$DST/config.json"
+        echo "sing-box: rendered template + injected subscription -> $DST/config.json"
     else
-        cp "$SRC/config.json" "$DST/config.json"
-        echo "sing-box: synced config.json -> $DST/ (no sub url)"
+        chezmoi execute-template < "$TMPL_SRC" > "$DST/config.json"
+        echo "sing-box: rendered template -> $DST/config.json (no sub url)"
     fi
 fi
 
