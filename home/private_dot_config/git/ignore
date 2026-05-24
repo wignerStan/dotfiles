@@ -1,28 +1,42 @@
-# 操作系统文件
+# OS files
 .DS_Store
 Thumbs.db
 desktop.ini
+ehthumbs.db
+*.cab
+*.msi
+*.msix
+*.stackdump
 
-# 编辑器文件
+# Editor / IDE files
 **/.vscode/
 **/.idea/
 *.swp
 *~
+*.swo
+*#
+.project
+.classpath
+.settings/
 
+# Worktrees
 **/.worktrees/
 
-**/.venv/
-**/node_modules/
-**/target/
-
-
-# 环境文件
+# Environment files
 .env
 **/ENV/
 .env.*
+!.env.development
+!.env.template
+!.env.example
 
+# Template files (always allow)
+!*.example
+!*.template
+!*.dist
+!*.sample
 
-# AI助手配置文件
+# AI assistant config files
 **/.github/copilot-instructions.md
 **/.github/prompts/
 **/.github/agents/
@@ -41,23 +55,239 @@ desktop.ini
 **/.kilocodemodes
 **/.opencode
 **/.serena
-
 #.copilot
 #.continue
 #.codeium
 **/.codemachine
 **/.auto-claude
-# 第二阶段：明确允许模板文件
-!*.example
-!*.template
-!*.dist
-!*.sample
 
-
-
-#local file
+# Local files
 **/*local*
-
-
-
 **/.claude/settings.local.json
+
+# ============================================================
+# Language-specific patterns
+# ============================================================
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+*.eggs/
+dist/
+build/
+.eggs/
+*.manifest
+*.spec
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pytype/
+**/.venv/
+
+# --- Node.js / JavaScript / TypeScript ---
+**/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.npm
+.yarn
+.yarn-integrity
+.pnp.*
+.turbo/
+.nx/
+.next/
+.nuxt/
+.output/
+.vercel/
+.netlify/
+*.tsbuildinfo
+
+# --- Rust ---
+**/target/
+**/*.rs.bk
+Cargo.lock
+
+# --- Go ---
+*.exe
+*.exe~
+*.dll
+*.test
+*.out
+vendor/
+
+# --- Java / Kotlin / Gradle ---
+.gradle/
+build/
+!src/**/build/
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+.mvn/wrapper/maven-wrapper.jar
+
+# --- C / C++ ---
+*.o
+*.obj
+*.so
+*.so.*
+*.dylib
+*.lib
+*.a
+*.la
+*.lo
+*.out
+*.app
+*.i*86
+*.x86_64
+*.hex
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+
+# --- Ruby ---
+*.gem
+*.rbc
+/.config
+/coverage/
+/InstalledFiles
+/pkg/
+/spec/reports/
+/spec/examples.txt
+/test/tmp/
+/test/version_tmp/
+/tmp/
+.bundle/
+vendor/bundle/
+
+# --- Swift / iOS / macOS ---
+.build/
+Packages/
+Package.pins
+Package.resolved
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+*.xcworkspace/*
+!*.xcworkspace/contents.xcworkspacedata
+Pods/
+*.ipa
+*.dSYM.zip
+*.dSYM
+DerivedData/
+
+# --- .NET / C# ---
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+*.user
+*.suo
+*.cache
+*.nupkg
+*.snupkg
+**/[Pp]ackages/*
+
+# --- Dart / Flutter ---
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+*.jks
+
+# --- PHP ---
+/vendor/
+composer.phar
+composer.lock
+.phpunit.result.cache
+.php-cs-fixer.cache
+
+# --- Elixir / Erllang ---
+/_build/
+/cover/
+/deps/
+/doc/
+erl_crash.dump
+
+# --- Haskell ---
+dist-newstyle/
+.hie/
+*.hi
+*.o
+*.chi
+*.chs.h
+
+# --- Scala ---
+target/
+.bloop/
+.metals/
+.bsp/
+
+# ============================================================
+# Common tool patterns
+# ============================================================
+
+# Docker
+docker-compose.override.yml
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+*.tfplan
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+*.sql.gz
+
+# Logs
+*.log
+logs/
+
+# Archives
+*.zip
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+*.bz2
+*.xz
+
+# Coverage / Reports
+coverage/
+.nyc_output/
+htmlcov/
+*.lcov
+
+# Secrets (extra safety net)
+*_rsa
+*_ed25519
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
