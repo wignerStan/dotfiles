@@ -658,7 +658,7 @@ def inject_macos(config, nodes):
         outbounds.insert(direct_idx, auto_ai_ob)
 
     if ai_chain:
-        ai_chain["outbounds"] = ["warp-ep"] + (["auto-ai"] if auto_tags else []) + region_tags
+        ai_chain["outbounds"] = ["VLESS", "VLESS-CDN", "warp-ep"] + (["auto-ai"] if auto_tags else []) + region_tags
 
     config["outbounds"] = outbounds
 
