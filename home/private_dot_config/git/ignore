@@ -19,6 +19,9 @@ ehthumbs.db
 .classpath
 .settings/
 
+# FCIS project-local registration
+.fcis/
+
 # Worktrees
 **/.worktrees/
 
