@@ -278,7 +278,7 @@ def parse_clash_proxies(proxies):
                 "type": "hysteria2",
                 "name": name,
                 "server": p["server"],
-                "port": p["port"],
+                "port": p.get("port") or p.get("ports", 443),
                 "password": p.get("password", p.get("auth", "")),
                 "sni": p.get("sni", ""),
                 "insecure": p.get("skip-cert-verify", False),
@@ -551,7 +551,7 @@ def parse_subscription(content):
 
     # 4. Base64 decode
     schemes = ("anytls://", "vmess://", "vless://", "trojan://", "ss://", "hysteria2://", "hy2://")
-    if not any(content.lstrip().startswith(s) for s in schemes) and "mixed-port:" not in content[:200] and "proxies:" not in content[:500]:
+    if not any(content.lstrip().startswith(s) for s in schemes) and "mixed-port:" not in content[:200] and "proxies:" not in content[:5000]:
         try:
             decoded = base64.b64decode(content, validate=True).decode("utf-8", errors="replace")
             if any(s in decoded for s in schemes):
