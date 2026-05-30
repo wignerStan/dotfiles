@@ -274,11 +274,17 @@ def parse_clash_proxies(proxies):
                 "obfs_param": p.get("obfs-param", ""),
             })
         elif ptype == "hysteria2" or ptype == "hy2":
+            # Handle port ranges like "20200-20399" - extract first port
+            port_val = p.get("port") or p.get("ports", 443)
+            if isinstance(port_val, str) and "-" in str(port_val):
+                port_val = int(port_val.split("-")[0])
+            elif not isinstance(port_val, int):
+                port_val = 443
             nodes.append({
                 "type": "hysteria2",
                 "name": name,
                 "server": p["server"],
-                "port": p.get("port") or p.get("ports", 443),
+                "port": port_val,
                 "password": p.get("password", p.get("auth", "")),
                 "sni": p.get("sni", ""),
                 "insecure": p.get("skip-cert-verify", False),
