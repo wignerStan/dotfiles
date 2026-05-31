@@ -163,7 +163,8 @@
       "tag": "ts-ep",
       "state_directory": "{{ $singbox_dir }}/tailscale-state",
       "accept_routes": true,
-      "system_interface": true
+      "system_interface": true,
+      "system_interface_name": "utun101"
     },
     {
       "type": "wireguard",
@@ -227,8 +228,9 @@
     {
       "type": "mixed",
       "tag": "mixed-in",
-      "listen": "127.0.0.1",
-      "listen_port": 7897
+      "listen": "0.0.0.0",
+      "listen_port": 7897,
+      "bind_interface": "utun101"
     }
   ],
   "outbounds": [
