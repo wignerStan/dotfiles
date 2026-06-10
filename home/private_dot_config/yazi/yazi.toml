@@ -39,7 +39,7 @@ prepend_rules = [
 	{ mime = "video/*", use = [ "play" ] },
 	{ mime = "audio/*", use = [ "play" ] },
 	{ mime = "application/pdf", use = [ "open" ] },
-	{ name = "*/", use = [ "edit", "open" ] },
+	{ mime = "inode/directory", use = [ "open" ] },
 ]
 
 [tasks]
