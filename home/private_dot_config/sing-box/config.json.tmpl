@@ -231,6 +231,12 @@
       "listen": "0.0.0.0",
       "listen_port": 7897,
       "bind_interface": "utun101"
+    },
+    {
+      "type": "socks",
+      "tag": "socks-residential-in",
+      "listen": "127.0.0.1",
+      "listen_port": 7898
     }
   ],
   "outbounds": [
@@ -294,18 +300,39 @@
       }
     },
     {
-      "type": "direct",
-      "tag": "direct"
+      "type": "vless",
+      "tag": "residential",
+      "server": {{ .singbox_server | quote }},
+      "server_port": 443,
+      "uuid": {{ .singbox_residential_uuid | quote }},
+      "flow": "xtls-rprx-vision",
+      "tls": {
+        "enabled": true,
+        "server_name": "www.cisco.com",
+        "utls": {
+          "enabled": true,
+          "fingerprint": "chrome"
+        },
+        "reality": {
+          "enabled": true,
+          "public_key": {{ .singbox_public_key | quote }},
+          "short_id": {{ .singbox_residential_short_id | quote }}
+        }
+      }
     },
     {
-      "type": "block",
-      "tag": "block"
+      "type": "direct",
+      "tag": "direct"
     }
   ],
   "route": {
     "rules": [
       {
         "action": "sniff"
+      },
+      {
+        "inbound": "socks-residential-in",
+        "outbound": "residential"
       },
       {
         "protocol": "dns",
