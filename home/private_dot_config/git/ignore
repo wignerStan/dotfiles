@@ -25,6 +25,9 @@ ehthumbs.db
 # Worktrees
 **/.worktrees/
 
+# Internal/private-ish docs dirs and symlinks
+**/_docs
+
 # Environment files
 .env
 **/ENV/
@@ -199,7 +202,8 @@ Pods/
 DerivedData/
 
 # --- .NET / C# ---
-[Bb]in/
+# Root-only: avoids Rust src/bin/ but still ignores repo-root bin/ (e.g. script/dotfile bins)
+/[Bb]in/
 [Oo]bj/
 [Ll]og/
 [Ll]ogs/
@@ -294,3 +298,6 @@ htmlcov/
 *.pfx
 id_rsa*
 id_ed25519*
+# Qoder local files (private, not committed)
+AGENTS.local.md
+*.local.md
