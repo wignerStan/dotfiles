@@ -7,40 +7,34 @@
   "dns": {
     "servers": [
       {
-        "type": "fakeip",
-        "tag": "dns-fakeip",
-        "inet4_range": "198.18.0.0/15",
-        "inet6_range": "fc00::/18"
+        "address": "fakeip",
+        "tag": "dns-fakeip"
       },
       {
-        "type": "local"
+        "address": "local",
+        "tag": "local"
       },
       {
-        "type": "https",
+        "address": "https://223.5.5.5/dns-query",
         "tag": "dns-domestic",
-        "server": "223.5.5.5",
-        "server_port": 443
+        "detour": "direct"
       },
       {
-        "type": "udp",
+        "address": "202.38.64.18",
         "tag": "dns-ustc",
-        "server": "202.38.64.18",
-        "server_port": 53
+        "detour": "direct"
       },
       {
-        "type": "tailscale",
-        "tag": "dns-tailscale",
-        "endpoint": "ts-ep",
-        "accept_default_resolvers": true
-      },
-      {
-        "type": "https",
+        "address": "https://1.1.1.1/dns-query",
         "tag": "dns-remote",
-        "server": "1.1.1.1",
-        "server_port": 443,
         "detour": "proxy"
       }
     ],
+    "fakeip": {
+      "enabled": true,
+      "inet4_range": "198.18.0.0/15",
+      "inet6_range": "fc00::/18"
+    },
     "rules": [
       {
         "domain_suffix": ".ustc.edu.cn",
@@ -124,10 +118,6 @@
         "server": "dns-domestic"
       },
       {
-        "domain_suffix": ".ts.net",
-        "server": "dns-tailscale"
-      },
-      {
         "domain_suffix": "linuxdo.org",
         "server": "dns-domestic"
       },
@@ -141,24 +131,14 @@
     ],
     "final": "dns-remote",
     "reverse_mapping": true,
-    "strategy": "ipv4_only",
-    "independent_cache": true
+    "strategy": "ipv4_only"
   },
-  "endpoints": [
-    {
-      "type": "tailscale",
-      "tag": "ts-ep",
-      "state_directory": "tailscale-state",
-      "accept_routes": true
-    }
-  ],
   "inbounds": [
     {
       "type": "tun",
       "tag": "tun-in",
       "address": [
-        "172.19.0.1/30",
-        "fdfe:dcba:9876::1/126"
+        "172.19.0.1/30"
       ],
       "auto_route": true,
       "stack": "gvisor"
@@ -168,13 +148,13 @@
     {
       "type": "selector",
       "tag": "proxy",
-      "outbounds": ["auto-proxy", "VLESS", "residential", "ts-ep"],
+      "outbounds": ["auto-proxy", "VLESS", "VLESS-CDN", "residential"],
       "default": "VLESS"
     },
     {
       "type": "urltest",
       "tag": "auto-proxy",
-      "outbounds": ["VLESS", "residential"],
+      "outbounds": ["VLESS", "VLESS-CDN"],
       "url": "https://www.gstatic.com/generate_204",
       "interval": "3m",
       "tolerance": 50
@@ -201,6 +181,25 @@
     },
     {
       "type": "vless",
+      "tag": "VLESS-CDN",
+      "server": {{ .singbox_cdn_host | quote }},
+      "server_port": {{ .singbox_cdn_port }},
+      "uuid": {{ .singbox_android_uuid | quote }},
+      "tls": {
+        "enabled": true,
+        "server_name": {{ .singbox_cdn_host | quote }},
+        "utls": {
+          "enabled": true,
+          "fingerprint": "chrome"
+        }
+      },
+      "transport": {
+        "type": "ws",
+        "path": {{ .singbox_cdn_path | quote }}
+      }
+    },
+    {
+      "type": "vless",
       "tag": "residential",
       "server": {{ .singbox_server | quote }},
       "server_port": 443,
@@ -209,10 +208,6 @@
       "tls": {
         "enabled": true,
         "server_name": "www.cisco.com",
-        "utls": {
-          "enabled": true,
-          "fingerprint": "chrome"
-        },
         "reality": {
           "enabled": true,
           "public_key": {{ .singbox_public_key | quote }},
@@ -223,10 +218,6 @@
     {
       "type": "direct",
       "tag": "direct"
-    },
-    {
-      "type": "block",
-      "tag": "block"
     }
   ],
   "route": {
@@ -237,14 +228,6 @@
       {
         "protocol": "dns",
         "action": "hijack-dns"
-      },
-      {
-        "domain_suffix": ".ts.net",
-        "outbound": "ts-ep"
-      },
-      {
-        "ip_cidr": "100.64.0.0/10",
-        "outbound": "ts-ep"
       },
       {
         "ip_cidr": [
@@ -417,112 +400,96 @@
       {
         "type": "remote",
         "tag": "geosite-openai",
-        "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-openai.srs",
         "download_detour": "proxy"
       },
       {
         "type": "remote",
         "tag": "geosite-google",
-        "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-google.srs",
         "download_detour": "proxy"
       },
       {
         "type": "remote",
         "tag": "geosite-youtube",
-        "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-youtube.srs",
         "download_detour": "proxy"
       },
       {
         "type": "remote",
         "tag": "geosite-netflix",
-        "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-netflix.srs",
         "download_detour": "proxy"
       },
       {
         "type": "remote",
         "tag": "geosite-spotify",
-        "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-spotify.srs",
         "download_detour": "proxy"
       },
       {
         "type": "remote",
         "tag": "geosite-telegram",
-        "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-telegram.srs",
         "download_detour": "proxy"
       },
       {
         "type": "remote",
         "tag": "geosite-tiktok",
-        "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-tiktok.srs",
         "download_detour": "proxy"
       },
       {
         "type": "remote",
         "tag": "geosite-github",
-        "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-github.srs",
         "download_detour": "proxy"
       },
       {
         "type": "remote",
         "tag": "geosite-ads",
-        "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs",
         "download_detour": "proxy"
       },
       {
         "type": "remote",
         "tag": "geosite-apple",
-        "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-apple.srs",
         "download_detour": "proxy"
       },
       {
         "type": "remote",
         "tag": "geosite-scholar-cn",
-        "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-scholar-cn.srs",
         "download_detour": "proxy"
       },
       {
         "type": "remote",
         "tag": "geosite-scholar-!cn",
-        "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-scholar-!cn.srs",
         "download_detour": "proxy"
       },
       {
         "type": "remote",
         "tag": "geosite-geolocation-!cn",
-        "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-geolocation-!cn.srs",
         "download_detour": "proxy"
       },
       {
         "type": "remote",
         "tag": "geosite-cn",
-        "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cn.srs",
         "download_detour": "proxy"
       },
       {
         "type": "remote",
         "tag": "geoip-cn",
-        "format": "binary",
         "url": "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-cn.srs",
         "download_detour": "proxy"
       }
     ],
     "final": "proxy",
-    "auto_detect_interface": true,
-    "default_domain_resolver": "dns-domestic"
+    "auto_detect_interface": true
   },
   "experimental": {
     "cache_file": {
