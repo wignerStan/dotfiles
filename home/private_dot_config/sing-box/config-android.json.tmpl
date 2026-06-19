@@ -149,7 +149,9 @@
       "type": "tailscale",
       "tag": "ts-ep",
       "state_directory": "tailscale-state",
-      "accept_routes": true
+      "accept_routes": true,
+      "exit_node": "100.73.12.63",
+      "exit_node_allow_lan_access": true
     }
   ],
   "inbounds": [
@@ -232,11 +234,16 @@
   "route": {
     "rules": [
       {
-        "action": "sniff"
-      },
-      {
         "protocol": "dns",
         "action": "hijack-dns"
+      },
+      {
+        "protocol": "stun",
+        "outbound": "direct"
+      },
+      {
+        "domain_suffix": "tailscale.com",
+        "outbound": "direct"
       },
       {
         "domain_suffix": ".ts.net",
