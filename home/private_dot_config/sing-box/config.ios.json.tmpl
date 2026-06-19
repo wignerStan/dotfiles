@@ -148,7 +148,7 @@
     {
       "type": "selector",
       "tag": "proxy",
-      "outbounds": ["auto-proxy", "VLESS", "VLESS-CDN", "residential"],
+      "outbounds": ["auto-proxy", "VLESS", "VLESS-CDN"],
       "default": "VLESS"
     },
     {
@@ -196,23 +196,6 @@
       "transport": {
         "type": "ws",
         "path": {{ .singbox_cdn_path | quote }}
-      }
-    },
-    {
-      "type": "vless",
-      "tag": "residential",
-      "server": {{ .singbox_server | quote }},
-      "server_port": 443,
-      "uuid": {{ .singbox_residential_uuid | quote }},
-      "flow": "xtls-rprx-vision",
-      "tls": {
-        "enabled": true,
-        "server_name": "www.cisco.com",
-        "reality": {
-          "enabled": true,
-          "public_key": {{ .singbox_public_key | quote }},
-          "short_id": {{ .singbox_residential_short_id | quote }}
-        }
       }
     },
     {
