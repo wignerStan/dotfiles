@@ -7,34 +7,40 @@
   "dns": {
     "servers": [
       {
-        "address": "fakeip",
-        "tag": "dns-fakeip"
+        "type": "fakeip",
+        "tag": "dns-fakeip",
+        "inet4_range": "198.18.0.0/15",
+        "inet6_range": "fc00::/18"
       },
       {
-        "address": "local",
-        "tag": "local"
+        "type": "local"
       },
       {
-        "address": "https://223.5.5.5/dns-query",
+        "type": "https",
         "tag": "dns-domestic",
-        "detour": "direct"
+        "server": "223.5.5.5",
+        "server_port": 443
       },
       {
-        "address": "202.38.64.18",
+        "type": "udp",
         "tag": "dns-ustc",
-        "detour": "direct"
+        "server": "202.38.64.18",
+        "server_port": 53
       },
       {
-        "address": "https://1.1.1.1/dns-query",
+        "type": "tailscale",
+        "tag": "dns-tailscale",
+        "endpoint": "ts-ep",
+        "accept_default_resolvers": true
+      },
+      {
+        "type": "https",
         "tag": "dns-remote",
+        "server": "1.1.1.1",
+        "server_port": 443,
         "detour": "proxy"
       }
     ],
-    "fakeip": {
-      "enabled": true,
-      "inet4_range": "198.18.0.0/15",
-      "inet6_range": "fc00::/18"
-    },
     "rules": [
       {
         "domain_suffix": ".ustc.edu.cn",
@@ -118,6 +124,10 @@
         "server": "dns-domestic"
       },
       {
+        "domain_suffix": ".ts.net",
+        "server": "dns-tailscale"
+      },
+      {
         "domain_suffix": "linuxdo.org",
         "server": "dns-domestic"
       },
@@ -133,6 +143,14 @@
     "reverse_mapping": true,
     "strategy": "ipv4_only"
   },
+  "endpoints": [
+    {
+      "type": "tailscale",
+      "tag": "ts-ep",
+      "state_directory": "tailscale-state",
+      "accept_routes": true
+    }
+  ],
   "inbounds": [
     {
       "type": "tun",
@@ -148,7 +166,7 @@
     {
       "type": "selector",
       "tag": "proxy",
-      "outbounds": ["auto-proxy", "VLESS", "VLESS-CDN"],
+      "outbounds": ["auto-proxy", "VLESS", "VLESS-CDN", "ts-ep"],
       "default": "VLESS"
     },
     {
@@ -211,6 +229,17 @@
       {
         "protocol": "dns",
         "action": "hijack-dns"
+      },
+      {
+        "domain_suffix": ".ts.net",
+        "outbound": "ts-ep"
+      },
+      {
+        "ip_cidr": [
+          "100.64.0.0/10",
+          "fd7a:115c:a1e0::/48"
+        ],
+        "outbound": "ts-ep"
       },
       {
         "ip_cidr": [
@@ -487,7 +516,8 @@
       }
     ],
     "final": "proxy",
-    "auto_detect_interface": true
+    "auto_detect_interface": true,
+    "default_domain_resolver": "dns-domestic"
   },
   "experimental": {
     "cache_file": {
