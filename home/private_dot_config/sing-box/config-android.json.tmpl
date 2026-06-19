@@ -170,7 +170,7 @@
     {
       "type": "selector",
       "tag": "proxy",
-      "outbounds": ["auto-proxy", "VLESS", "residential", "ts-socks", "ts-http", "ts-ep"],
+      "outbounds": ["auto-proxy", "VLESS", "residential", "ts-socks", "ts-route", "ts-ep"],
       "default": "VLESS"
     },
     {
@@ -229,8 +229,8 @@
       "server_port": 10808
     },
     {
-      "type": "http",
-      "tag": "ts-http",
+      "type": "socks",
+      "tag": "ts-route",
       "server": "100.73.12.63",
       "server_port": 10809
     },
