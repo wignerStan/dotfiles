@@ -176,10 +176,16 @@
     {
       "type": "urltest",
       "tag": "auto-proxy",
-      "outbounds": ["VLESS", "residential"],
+      "outbounds": ["VLESS", "ts-ep"],
       "url": "https://www.gstatic.com/generate_204",
       "interval": "3m",
       "tolerance": 50
+    },
+    {
+      "type": "selector",
+      "tag": "ai-chain",
+      "outbounds": ["VLESS", "residential"],
+      "default": "VLESS"
     },
     {
       "type": "vless",
@@ -293,8 +299,17 @@
         "action": "reject"
       },
       {
+        "domain_suffix": [
+          "openai.com", "chatgpt.com", "claude.ai", "claude.com", "anthropic.com",
+          "gemini.google.com", "aistudio.google.com", "makersuite.google.com",
+          "copilot.microsoft.com", "character.ai", "huggingface.co", "openrouter.ai",
+          "x.ai", "grok.com", "mistral.ai", "midjourney.com"
+        ],
+        "outbound": "ai-chain"
+      },
+      {
         "rule_set": "geosite-openai",
-        "outbound": "proxy"
+        "outbound": "ai-chain"
       },
       {
         "rule_set": "geosite-google",
