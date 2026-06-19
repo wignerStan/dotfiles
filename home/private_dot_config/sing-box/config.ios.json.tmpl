@@ -182,7 +182,7 @@
       "tag": "VLESS",
       "server": {{ .singbox_server | quote }},
       "server_port": 443,
-      "uuid": {{ .singbox_android_uuid | quote }},
+      "uuid": {{ .singbox_ios_uuid | quote }},
       "flow": "xtls-rprx-vision",
       "tls": {
         "enabled": true,
@@ -202,7 +202,7 @@
       "tag": "VLESS-CDN",
       "server": {{ .singbox_cdn_host | quote }},
       "server_port": {{ .singbox_cdn_port }},
-      "uuid": {{ .singbox_android_uuid | quote }},
+      "uuid": {{ .singbox_ios_uuid | quote }},
       "tls": {
         "enabled": true,
         "server_name": {{ .singbox_cdn_host | quote }},
