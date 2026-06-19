@@ -1,0 +1,49 @@
+#!/bin/bash
+# Merge desired Homebrew trusted taps/formulae into ~/.config/homebrew/trust.json.
+#
+# Unlike a fully-tracked static file, this APPENDS (union) the managed entries to
+# whatever is already on disk, so locally-added taps (e.g. via `brew tap`) are
+# preserved rather than clobbered. Idempotent and only runs when this script changes.
+set -euo pipefail
+
+{{- if lookPath "brew" }}
+TRUST=~/.config/homebrew/trust.json
+mkdir -p "$(dirname "$TRUST")"
+
+# Managed entries: user/REPO taps and fully-qualified tap/formula trust records.
+MANAGED_TAPS=$(cat <<'EOF'
+wignerstan/singbox
+EOF
+)
+MANAGED_FORMULAE=$(cat <<'EOF'
+wignerstan/singbox/sing-box
+EOF
+)
+
+if ! command -v jq &>/dev/null; then
+    echo "homebrew/trust.json: jq not found, skipping merge" >&2
+    exit 0
+fi
+
+# Seed an empty trust.json if absent so the merge below always has input.
+if [ ! -f "$TRUST" ]; then
+    echo '{"trustedtaps":[],"trustedformulae":[]}' > "$TRUST"
+fi
+
+# Union managed entries into the existing arrays (order preserved, dups removed).
+tmp=$(mktemp)
+jq --slurpfile taps <(printf '%s\n' "$MANAGED_TAPS" | jq -R . | jq -s .) \
+   --slurpfile formulae <(printf '%s\n' "$MANAGED_FORMULAE" | jq -R . | jq -s .) '
+    (.trustedtaps // []) as $t |
+    (.trustedformulae // []) as $f |
+    {
+        trustedtaps:      ($t + $taps[0] | unique),
+        trustedformulae:  ($f + $formulae[0] | unique)
+    }
+' "$TRUST" > "$tmp"
+mv "$tmp" "$TRUST"
+
+echo "homebrew/trust.json: merged managed taps/formulae (additive)"
+{{- else }}
+echo "homebrew/trust.json: brew not installed, skipping"
+{{- end }}

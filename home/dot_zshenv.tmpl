@@ -124,6 +124,9 @@ command_not_found_handler() {
 # Bun
 [[ -d "$HOME/.bun" ]] && export BUN_INSTALL="$HOME/.bun"
 [[ -d "$HOME/.bun/bin" ]] && path+=("$BUN_INSTALL/bin")
+
+# Flutter
+[[ -d "$HOME/flutter/bin" ]] && path+=("$HOME/flutter/bin")
 {{- if .use_china_mirrors }}
 export BUN_CONFIG_REGISTRY="https://registry.npmmirror.com"
 {{- end }}
