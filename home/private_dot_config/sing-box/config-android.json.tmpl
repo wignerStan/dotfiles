@@ -170,7 +170,7 @@
     {
       "type": "selector",
       "tag": "proxy",
-      "outbounds": ["auto-proxy", "VLESS", "residential", "ts-ep"],
+      "outbounds": ["auto-proxy", "VLESS", "residential", "ts-socks", "ts-http", "ts-ep"],
       "default": "VLESS"
     },
     {
@@ -221,6 +221,18 @@
           "short_id": {{ .singbox_residential_short_id | quote }}
         }
       }
+    },
+    {
+      "type": "socks",
+      "tag": "ts-socks",
+      "server": "100.73.12.63",
+      "server_port": 10808
+    },
+    {
+      "type": "http",
+      "tag": "ts-http",
+      "server": "100.73.12.63",
+      "server_port": 10809
     },
     {
       "type": "direct",
