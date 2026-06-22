@@ -13,10 +13,16 @@ FPATH="$_brew_prefix/share/zsh-completions:$FPATH"
 FPATH="$_brew_prefix/share/zsh/site-functions:$FPATH"
 {{- end }}
 
+# Glob: on no match, pass the pattern through literally (bash/POSIX sh behavior)
+# instead of erroring. Lets e.g. `ls *.md` work in a dir with no .md files.
+setopt NO_NOMATCH
+
 autoload -Uz compinit
-setopt extended_glob  # (#q...) glob qualifiers (used below) require this option
-# Rebuild completion cache once per day; otherwise load the cached dump (-C)
-if [[ -n ${ZDOTDIR:-$HOME}/.zcompdump(#qN.mh+24) ]]; then
+# compinit -C loads the cached dump without re-binding every completion
+# (skips ~860 compdef calls + compdump + compaudit = ~220ms). Run the full
+# compinit only when the dump is missing (cold start); otherwise use -C.
+# After installing new completions, `rm ~/.zcompdump` to force a rebuild.
+if [[ ! -f ${ZDOTDIR:-$HOME}/.zcompdump ]]; then
     compinit
 else
     compinit -C
