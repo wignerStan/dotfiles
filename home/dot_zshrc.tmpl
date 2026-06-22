@@ -7,13 +7,16 @@
 # ═══════════════════════════════════════════════════════════════
 
 {{- if lookPath "brew" }}
-FPATH="$(brew --prefix)/share/zsh-completions:$FPATH"
-FPATH="$(brew --prefix)/share/zsh/site-functions:$FPATH"
+# Resolve brew prefix once — HOMEBREW_PREFIX is already exported (free); fall back to brew --prefix
+_brew_prefix="${HOMEBREW_PREFIX:-$(brew --prefix)}"
+FPATH="$_brew_prefix/share/zsh-completions:$FPATH"
+FPATH="$_brew_prefix/share/zsh/site-functions:$FPATH"
 {{- end }}
 
 autoload -Uz compinit
-# Rebuild completion cache once per day
-if [[ -n ${${ZDOTDIR:-$HOME}/.zcompdump}(#qN.mh+24) ]]; then
+setopt extended_glob  # (#q...) glob qualifiers (used below) require this option
+# Rebuild completion cache once per day; otherwise load the cached dump (-C)
+if [[ -n ${ZDOTDIR:-$HOME}/.zcompdump(#qN.mh+24) ]]; then
     compinit
 else
     compinit -C
@@ -37,7 +40,6 @@ zstyle ':completion:*:*:*:*:*' menu select
 # ═══════════════════════════════════════════════════════════════
 
 {{- if lookPath "brew" }}
-_brew_prefix="$(brew --prefix)"
 
 [[ -f $_brew_prefix/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]] && source $_brew_prefix/share/zsh-autosuggestions/zsh-autosuggestions.zsh
 [[ -f $_brew_prefix/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]] && source $_brew_prefix/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
