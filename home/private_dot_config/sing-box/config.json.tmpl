@@ -186,7 +186,29 @@
           "persistent_keepalive_interval": 25
         }
       ],
-      "detour": "proxy"
+      "detour": "VLESS-CDN"
+    },
+    {
+      "type": "wireguard",
+      "tag": "warp-direct-ep",
+      "system": false,
+      "mtu": 1280,
+      "address": [
+        "172.16.0.2/32",
+        "{{ .singbox_warp_ipv6 }}/128"
+      ],
+      "private_key": {{ .singbox_warp_private_key | quote }},
+      "peers": [
+        {
+          "address": "engage.cloudflareclient.com",
+          "port": 2408,
+          "public_key": "bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=",
+          "allowed_ips": ["0.0.0.0/0", "::/0"],
+          "reserved": [{{ .singbox_warp_reserved_0 }}, {{ .singbox_warp_reserved_1 }}, {{ .singbox_warp_reserved_2 }}],
+          "persistent_keepalive_interval": 25
+        }
+      ],
+      "detour": "VLESS"
     }
   ],
   "inbounds": [
@@ -262,10 +284,18 @@
       "tolerance": 50
     },
     {
+      "type": "urltest",
+      "tag": "auto-warp",
+      "outbounds": ["warp-ep", "warp-direct-ep"],
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": "3m",
+      "tolerance": 50
+    },
+    {
       "type": "selector",
       "tag": "ai-chain",
-      "outbounds": ["VLESS", "VLESS-CDN", "warp-ep", "residential"],
-      "default": "warp-ep"
+      "outbounds": ["auto-warp", "auto-proxy", "VLESS", "VLESS-CDN", "warp-ep", "residential"],
+      "default": "auto-warp"
     },
     {
       "type": "vless",
