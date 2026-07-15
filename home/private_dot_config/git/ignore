@@ -28,6 +28,9 @@ ehthumbs.db
 # Internal/private-ish docs dirs and symlinks
 **/_docs
 
+# Project-root archive dir
+/archieve/
+
 # Environment files
 .env
 **/ENV/
