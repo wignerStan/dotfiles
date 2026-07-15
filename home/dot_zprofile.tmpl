@@ -4,23 +4,19 @@
 # ~60ms fork tax on every non-interactive zsh invocation.
 # ═══════════════════════════════════════════════════════════════
 
-# ── Homebrew (static inline — PATH already set in .zshenv, just export vars)
+# ── Homebrew (static — PATH already set in .zshenv, just export vars)
 {{- if eq .chezmoi.os "darwin" }}
-export HOMEBREW_PREFIX="/opt/homebrew"
 export HOMEBREW_CELLAR="/opt/homebrew/Cellar"
 export HOMEBREW_REPOSITORY="/opt/homebrew"
 {{- else if eq .chezmoi.os "linux" }}
 if [[ -d "/home/linuxbrew/.linuxbrew" ]]; then
-    export HOMEBREW_PREFIX="/home/linuxbrew/.linuxbrew"
     export HOMEBREW_CELLAR="/home/linuxbrew/.linuxbrew/Cellar"
     export HOMEBREW_REPOSITORY="/home/linuxbrew/.linuxbrew/Homebrew"
 fi
 {{- end }}
 
-# ── Mamba (global Python base environment) ─────────────────
+# ── Mamba shell hook (MAMBA_EXE/MAMBA_ROOT_PREFIX/PATH set in .zshenv) ───
 {{- if lookPath "micromamba" }}
-export MAMBA_EXE="${HOMEBREW_PREFIX:-/home/linuxbrew/.linuxbrew}/opt/micromamba/bin/mamba"
-export MAMBA_ROOT_PREFIX="$HOME/mamba"
 __mamba_setup="$("$MAMBA_EXE" shell hook --shell zsh --root-prefix "$MAMBA_ROOT_PREFIX" 2> /dev/null)"
 if [ $? -eq 0 ]; then
     eval "$__mamba_setup"
@@ -28,7 +24,4 @@ else
     alias mamba="$MAMBA_EXE"
 fi
 unset __mamba_setup
-
-# Re-prepend mamba/bin so mamba's python wins over brew's python@3.x
-path=("$MAMBA_ROOT_PREFIX/bin" $path)
 {{- end }}
