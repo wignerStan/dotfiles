@@ -13,10 +13,9 @@ if [[ -d "/home/linuxbrew/.linuxbrew" ]]; then
 fi
 {{- end }}
 
-
 # ── Mamba (global Python base environment) ─────────────────
 {{- if lookPath "micromamba" }}
-export MAMBA_EXE='{{- if eq .chezmoi.os "darwin" -}}/opt/homebrew/opt/micromamba/bin/mamba{{- else -}}/home/linuxbrew/.linuxbrew/opt/micromamba/bin/mamba{{- end }}'
+export MAMBA_EXE="${HOMEBREW_PREFIX:-/home/linuxbrew/.linuxbrew}/opt/micromamba/bin/mamba"
 export MAMBA_ROOT_PREFIX="$HOME/mamba"
 __mamba_setup="$("$MAMBA_EXE" shell hook --shell zsh --root-prefix "$MAMBA_ROOT_PREFIX" 2> /dev/null)"
 if [ $? -eq 0 ]; then
@@ -26,4 +25,6 @@ else
 fi
 unset __mamba_setup
 
+# Re-prepend mamba/bin so mamba's python wins over brew's python@3.x
+path=("$MAMBA_ROOT_PREFIX/bin" $path)
 {{- end }}

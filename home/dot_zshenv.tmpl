@@ -62,7 +62,7 @@ export NANOBANANA_MODEL=gemini-3-pro-image-preview
 # ~30ms fork tax on every non-interactive zsh invocation.
 # MAMBA_EXE/MAMBA_ROOT_PREFIX still exported here for non-login shells.
 {{- if lookPath "micromamba" }}
-export MAMBA_EXE='{{- if eq .chezmoi.os "darwin" -}}/opt/homebrew/opt/micromamba/bin/mamba{{- else -}}/home/linuxbrew/.linuxbrew/opt/micromamba/bin/mamba{{- end }}'
+export MAMBA_EXE="${HOMEBREW_PREFIX:-/home/linuxbrew/.linuxbrew}/opt/micromamba/bin/mamba"
 export MAMBA_ROOT_PREFIX="$HOME/mamba"
 {{- end }}
 
