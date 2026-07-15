@@ -5,7 +5,8 @@ else if test -x /home/linuxbrew/.linuxbrew/bin/brew
     set -gx HOMEBREW_PREFIX /home/linuxbrew/.linuxbrew
 end
 
-if set -q HOMEBREW_PREFIX
+# brew shellenv forks ~28ms; only run for login shells
+if status is-login; and set -q HOMEBREW_PREFIX
     eval $HOMEBREW_PREFIX/bin/brew shellenv | source
 end
 
