@@ -62,6 +62,7 @@ encryption = "age"
     is_headless = {{ $headless }}
     is_hpc = {{ $hpc }}
     is_work = {{ $work }}
+    is_personal = {{ $personal }}
     use_china_mirrors = {{ $use_china_mirrors }}
     mamba_root = {{ joinPath .chezmoi.homeDir "mamba" | quote }}
     arch = {{ .chezmoi.arch | quote }}
