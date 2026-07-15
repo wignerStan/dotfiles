@@ -13,15 +13,6 @@ export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 export XDG_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
 
-# ── Homebrew ──────────────────────────────────────────────────
-{{- if eq .chezmoi.os "darwin" }}
-eval "$(/opt/homebrew/bin/brew shellenv)"
-{{- else if eq .chezmoi.os "linux" }}
-if [[ -d "/home/linuxbrew/.linuxbrew" ]]; then
-    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-fi
-{{- end }}
-
 {{- if .use_china_mirrors }}
 # ── Homebrew (China mirrors) ──────────────────────────────────
 export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.ustc.edu.cn/brew.git"
@@ -67,21 +58,12 @@ export NANOBANANA_MODEL=gemini-3-pro-image-preview
 [[ -d "$HOME/.cargo" && -f "$HOME/.cargo/env" ]] && . "$HOME/.cargo/env"
 
 # ── Mamba (global Python base environment) ─────────────────
-# Provides a shared Python environment for commonly needed Python libraries.
-# uv is used as the pip backend (see ~/.condarc: use_uv: true).
+# Shell hook + activate moved to .zprofile (login shells only) to avoid
+# ~30ms fork tax on every non-interactive zsh invocation.
+# MAMBA_EXE/MAMBA_ROOT_PREFIX still exported here for non-login shells.
 {{- if lookPath "micromamba" }}
 export MAMBA_EXE='{{- if eq .chezmoi.os "darwin" -}}/opt/homebrew/opt/micromamba/bin/mamba{{- else -}}/home/linuxbrew/.linuxbrew/opt/micromamba/bin/mamba{{- end }}'
 export MAMBA_ROOT_PREFIX="$HOME/mamba"
-__mamba_setup="$("$MAMBA_EXE" shell hook --shell zsh --root-prefix "$MAMBA_ROOT_PREFIX" 2> /dev/null)"
-if [ $? -eq 0 ]; then
-    eval "$__mamba_setup"
-else
-    alias mamba="$MAMBA_EXE"
-fi
-unset __mamba_setup
-
-# Activate mamba base (for non-login/non-interactive shells — e.g. agent tools)
-mamba activate base 2>/dev/null
 {{- end }}
 
 # ── Pixi (project Python environments) ──────────────────────

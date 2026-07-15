@@ -1,10 +1,29 @@
 # ═══════════════════════════════════════════════════════════════
-# some duplicate setting as it already exists in .zshenv but necessary and acceptable
-# Since .zshenv was loaded before /etc/zprofile path_helper and the path order will change
+# .zprofile — Login shells only (runs once per login session)
+# Heavy subshell initializations moved here from .zshenv to avoid
+# ~60ms fork tax on every non-interactive zsh invocation.
 # ═══════════════════════════════════════════════════════════════
-#eval "$(/opt/homebrew/bin/brew shellenv)"
-{{- if lookPath "micromamba" }}
-mamba activate base 2>/dev/null
+
+# ── Homebrew ──────────────────────────────────────────────────
+{{- if eq .chezmoi.os "darwin" }}
+eval "$(/opt/homebrew/bin/brew shellenv)"
+{{- else if eq .chezmoi.os "linux" }}
+if [[ -d "/home/linuxbrew/.linuxbrew" ]]; then
+    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+fi
 {{- end }}
 
 
+# ── Mamba (global Python base environment) ─────────────────
+{{- if lookPath "micromamba" }}
+export MAMBA_EXE='{{- if eq .chezmoi.os "darwin" -}}/opt/homebrew/opt/micromamba/bin/mamba{{- else -}}/home/linuxbrew/.linuxbrew/opt/micromamba/bin/mamba{{- end }}'
+export MAMBA_ROOT_PREFIX="$HOME/mamba"
+__mamba_setup="$("$MAMBA_EXE" shell hook --shell zsh --root-prefix "$MAMBA_ROOT_PREFIX" 2> /dev/null)"
+if [ $? -eq 0 ]; then
+    eval "$__mamba_setup"
+else
+    alias mamba="$MAMBA_EXE"
+fi
+unset __mamba_setup
+
+{{- end }}
