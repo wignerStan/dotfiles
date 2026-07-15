@@ -4,12 +4,16 @@
 # ~60ms fork tax on every non-interactive zsh invocation.
 # ═══════════════════════════════════════════════════════════════
 
-# ── Homebrew ──────────────────────────────────────────────────
+# ── Homebrew (static inline — PATH already set in .zshenv, just export vars)
 {{- if eq .chezmoi.os "darwin" }}
-eval "$(/opt/homebrew/bin/brew shellenv)"
+export HOMEBREW_PREFIX="/opt/homebrew"
+export HOMEBREW_CELLAR="/opt/homebrew/Cellar"
+export HOMEBREW_REPOSITORY="/opt/homebrew"
 {{- else if eq .chezmoi.os "linux" }}
 if [[ -d "/home/linuxbrew/.linuxbrew" ]]; then
-    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+    export HOMEBREW_PREFIX="/home/linuxbrew/.linuxbrew"
+    export HOMEBREW_CELLAR="/home/linuxbrew/.linuxbrew/Cellar"
+    export HOMEBREW_REPOSITORY="/home/linuxbrew/.linuxbrew/Homebrew"
 fi
 {{- end }}
 

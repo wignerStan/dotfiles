@@ -13,6 +13,17 @@ export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 export XDG_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
 
+# ── Homebrew (static PATH — no fork, needed before direnv/mamba hooks) ───
+{{- if eq .chezmoi.os "darwin" }}
+export HOMEBREW_PREFIX="/opt/homebrew"
+path=(/opt/homebrew/bin /opt/homebrew/sbin $path)
+{{- else if eq .chezmoi.os "linux" }}
+if [[ -d "/home/linuxbrew/.linuxbrew" ]]; then
+    export HOMEBREW_PREFIX="/home/linuxbrew/.linuxbrew"
+    path=(/home/linuxbrew/.linuxbrew/bin /home/linuxbrew/.linuxbrew/sbin $path)
+fi
+{{- end }}
+
 {{- if .use_china_mirrors }}
 # ── Homebrew (China mirrors) ──────────────────────────────────
 export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.ustc.edu.cn/brew.git"
@@ -64,6 +75,8 @@ export NANOBANANA_MODEL=gemini-3-pro-image-preview
 {{- if lookPath "micromamba" }}
 export MAMBA_EXE="${HOMEBREW_PREFIX:-/home/linuxbrew/.linuxbrew}/opt/micromamba/bin/mamba"
 export MAMBA_ROOT_PREFIX="$HOME/mamba"
+# Prepend mamba/bin so mamba's python wins over brew's python@3.x
+path=("$MAMBA_ROOT_PREFIX/bin" $path)
 {{- end }}
 
 # ── Pixi (project Python environments) ──────────────────────
@@ -76,7 +89,6 @@ path+=("${PIXI_HOME}/bin")
 {{- if lookPath "direnv" }}
 eval "$(direnv hook zsh)"
 _direnv_hook() { eval "$(direnv export zsh 2>/dev/null)"; }
-# Load direnv immediately for non-interactive shells (hooks don't fire there)
 eval "$(direnv export zsh 2>/dev/null)"
 {{- end }}
 
