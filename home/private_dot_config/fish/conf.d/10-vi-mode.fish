@@ -8,6 +8,12 @@ function fish_user_key_bindings
     # rebinding runs AFTER it and restores vi semantics in normal mode.
     bind -M default --erase '.' '!' '$' '*'
     bind -M default '$' end-of-line
+    # Readline-style line movement in both modes (matches bash/zsh muscle memory).
+    # NB: this overrides vi's ctrl-a number-increment in normal mode; use 0/$ for motions.
+    bind -M insert ctrl-a beginning-of-line
+    bind -M insert ctrl-e end-of-line
+    bind -M default ctrl-a beginning-of-line
+    bind -M default ctrl-e end-of-line
 end
 
 # Note: Don't force insert mode on every prompt - it breaks normal mode!
