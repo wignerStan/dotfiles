@@ -139,7 +139,7 @@ Cargo.lock
 *.dll
 *.test
 *.out
-vendor/
+# vendor/ omitted: Go commits vendored deps; globally ignoring breaks `go mod vendor`
 
 # --- Java / Kotlin / Gradle ---
 .gradle/
@@ -226,7 +226,7 @@ build/
 *.jks
 
 # --- PHP ---
-/vendor/
+# /vendor/ omitted: collides with Go root vendor/; Composer projects carry their own .gitignore
 composer.phar
 composer.lock
 .phpunit.result.cache
