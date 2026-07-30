@@ -21,5 +21,9 @@ set -gx NPM_CONFIG_PREFIX "$HOME/.npm-deadend"
 {{- if .develop }}
 abbr npm pnpm
 abbr npx bunx
+{{- end }}
+
+# conda → mamba wherever mamba is available (develop/work/personal desktop)
+{{- if lookPath "mamba" }}
 abbr conda mamba
 {{- end }}

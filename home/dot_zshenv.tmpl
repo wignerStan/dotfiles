@@ -197,7 +197,7 @@ EOF
   return $ret
 }
 {{- end }}
-{{- if and .develop (lookPath "mamba") }}
+{{- if and (or (or .develop (eq .profile "work")) (and (eq .profile "personal") (or (eq .chezmoi.os "darwin") (eq .chezmoi.os "windows")))) (lookPath "mamba") }}
 
 conda() {
   mamba "$@"
