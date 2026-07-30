@@ -30,7 +30,14 @@
 
 {{- /* Derived */ -}}
 {{- $ephemeral := or (eq $profile "vps") (eq $profile "hpc") -}}
-{{- $use_china_mirrors := true -}}
+
+{{- /* Geo location detection (timezone-based) */ -}}
+{{- $geo := "us" -}}
+{{- $tz := output "cat" "/etc/timezone" | trim -}}
+{{- if or (hasPrefix "Asia/" $tz) (hasPrefix "PRC" $tz) (hasPrefix "CTT" $tz) -}}
+{{-   $geo = "cn" -}}
+{{- end -}}
+{{- $use_china_mirrors := eq $geo "cn" -}}
 
 {{- /* Detection: age encryption identity available */ -}}
 {{- $age_identity := joinPath .chezmoi.homeDir ".config/chezmoi/age-key.txt" -}}
@@ -71,6 +78,7 @@ encryption = "age"
     is_ephemeral = {{ $ephemeral }}
     is_headless = {{ $headless }}
     use_china_mirrors = {{ $use_china_mirrors }}
+    geo = {{ $geo | quote }}
     profile = {{ $profile | quote }}
     develop = {{ $develop }}
     mamba_root = {{ joinPath .chezmoi.homeDir "mamba" | quote }}
