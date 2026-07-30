@@ -61,7 +61,7 @@ export API_TIMEOUT_MS="600000"
 export NANOBANANA_MODEL=gemini-3-pro-image-preview
 
 # ── Cargo (develop profile only) ──────────────────────────────
-{{- if has "develop" .profiles }}
+{{- if .develop }}
 [[ -d "$HOME/.cargo" && -f "$HOME/.cargo/env" ]] && . "$HOME/.cargo/env"
 {{- end }}
 
@@ -70,7 +70,7 @@ export NANOBANANA_MODEL=gemini-3-pro-image-preview
 # ~30ms fork tax on every non-interactive zsh invocation.
 # MAMBA_EXE/MAMBA_ROOT_PREFIX still exported here for non-login shells.
 # Gating: develop profile (any OS), or personal+Windows.
-{{- if or (or (has "develop" .profiles) (has "work" .profiles)) (and (has "personal" .profiles) (eq .chezmoi.os "windows")) }}
+{{- if or (or .develop (eq .profile "work")) (and (eq .profile "personal") (eq .chezmoi.os "windows")) }}
 export MAMBA_EXE="${HOMEBREW_PREFIX:-/home/linuxbrew/.linuxbrew}/opt/micromamba/bin/mamba"
 export MAMBA_ROOT_PREFIX="$HOME/mamba"
 # Prepend mamba/bin so mamba's python wins over brew's python@3.x
@@ -78,7 +78,7 @@ path=("$MAMBA_ROOT_PREFIX/bin" $path)
 {{- end }}
 
 # ── Pixi (project Python environments) ──────────────────────
-{{- if and (has "develop" .profiles) (lookPath "pixi") }}
+{{- if and .develop (lookPath "pixi") }}
 export PIXI_HOME="${HOME}/.pixi"
 path+=("${PIXI_HOME}/bin")
 {{- end }}
@@ -101,12 +101,12 @@ command_not_found_handler() {
 # ── PATH (appended last so all above env is available first) ──
 
 # Go (develop profile only)
-{{- if has "develop" .profiles }}
+{{- if .develop }}
 [[ -d "$HOME/go/bin" ]] && path+=("$HOME/go/bin")
 {{- end }}
 
 # ── Node/Rust/Mobile ecosystem (develop profile only) ─────────
-{{- if has "develop" .profiles }}
+{{- if .develop }}
 # pnpm
 {{- if eq .chezmoi.os "darwin" }}
 [[ -d "$HOME/Library/pnpm" ]] && export PNPM_HOME="$HOME/Library/pnpm"
@@ -134,10 +134,17 @@ path=($HOME/.local/bin $path)
 # Fail-safe: ensure PATH is exported regardless of how the shell was started
 export PATH
 
+# ── npm global install redirect (non-work profiles) ─────────────
+# npm -g writes to a dead-end dir not in PATH, effectively blocking global pollution.
+# work profile: no redirect (normal npm global behavior).
+{{- if not (eq .profile "work") }}
+export NPM_CONFIG_PREFIX="$HOME/.npm-deadend"
+{{- end }}
+
 # ═══════════════════════════════════════════════════════════════
 # Dev tool wrappers (modern replacements) — loaded last
 # ═══════════════════════════════════════════════════════════════
-{{- if and (has "develop" .profiles) (lookPath "pnpm") }}
+{{- if and .develop (lookPath "pnpm") }}
 
 npm() {
   pnpm "$@"
@@ -150,13 +157,6 @@ npm() {
 
 This wrapper exists to BREAK YOUR npm HABIT and teach you pnpm.
 
-WHY THIS WRAPPER EXISTS:
-──────────────────────────
-  • npm wastes disk space with duplicate node_modules across projects
-  • pnpm uses content-addressable storage - packages stored once, hard-linked everywhere
-  • pnpm is faster with strict dependency resolution (no phantom dependencies)
-  • This wrapper passes your command to pnpm so it still works
-
 Just use pnpm directly instead of npm.
 EOF
   fi
@@ -164,7 +164,7 @@ EOF
 }
 {{- end }}
 
-{{- if and (has "develop" .profiles) (lookPath "bun") }}
+{{- if and .develop (lookPath "bun") }}
 
 npx() {
   bunx "$@"
@@ -193,7 +193,7 @@ EOF
   return $ret
 }
 {{- end }}
-{{- if and (has "develop" .profiles) (lookPath "mamba") }}
+{{- if and .develop (lookPath "mamba") }}
 
 conda() {
   mamba "$@"

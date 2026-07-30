@@ -6,7 +6,7 @@ channels:
 use_uv: true
 # auto_activate_base: true for work (no brew privileges) and personal+Windows,
 # false for develop (uses brew python as base instead)
-{{- if or (has "work" .profiles) (and (has "personal" .profiles) (eq .chezmoi.os "windows")) }}
+{{- if or (eq .profile "work") (and (eq .profile "personal") (eq .chezmoi.os "windows")) }}
 auto_activate_base: true
 {{- else }}
 auto_activate_base: false
