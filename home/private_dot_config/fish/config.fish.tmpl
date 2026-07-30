@@ -29,6 +29,12 @@ function cx
     command codex --dangerously-bypass-approvals-and-sandbox $argv
 end
 
+function tm
+    TERM=xterm-256color command tmux $argv
+end
+
+{{- if .develop }}
+# ── Develop-only AI tool wrappers ──────────────────────────────
 function cc
     term=xterm-256color command claude --settings ~/.claude/settings.org.json $argv
 end
@@ -37,10 +43,7 @@ function cc2
     term=xterm-256color command claude --disallowedTools "Agent(Plan)" $argv
 end
 
-function tm
-    TERM=xterm-256color command tmux $argv
-end
-
 function oc
     OPENCODE_DISABLE_CLAUDE_CODE_SKILLS=1 command opencode $argv
 end
+{{- end }}

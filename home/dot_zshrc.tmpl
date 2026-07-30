@@ -202,6 +202,13 @@ cx() {
     command codex --dangerously-bypass-approvals-and-sandbox "$@"
 }
 
+# Tmux with compatible terminal
+tm() {
+    TERM=xterm-256color command tmux "$@"
+}
+
+{{- if .develop }}
+# ── Develop-only AI tool wrappers ──────────────────────────────
 cc() {
     term=xterm-256color command claude --settings ~/.claude/settings.org.json "$@"
 }
@@ -210,10 +217,7 @@ cc2() {
     term=xterm-256color command claude --disallowedTools "Agent(Plan)" "$@"
 }
 
-# Tmux with compatible terminal
-tm() {
-    TERM=xterm-256color command tmux "$@"
-}
 oc() {
     OPENCODE_DISABLE_CLAUDE_CODE_SKILLS=1 command opencode "$@"
 }
+{{- end }}
