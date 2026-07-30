@@ -1,0 +1,13 @@
+# Starship prompt
+{{- if lookPath "starship" }}
+if command -v starship >/dev/null
+    starship init fish | source
+end
+{{- end }}
+
+# Fastfetch (interactive shell only, not in tmux)
+{{- if and (lookPath "fastfetch") (not .is_headless) }}
+if status is-interactive; and test -z "$TMUX"; and command -v fastfetch >/dev/null
+    fastfetch
+end
+{{- end }}

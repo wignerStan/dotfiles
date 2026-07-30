@@ -1,0 +1,25 @@
+# ── CLI tool aliases (always available) ───────────────────────
+{{- if lookPath "lazygit" }}
+alias lg lazygit
+{{- end }}
+{{- if lookPath "eza" }}
+alias ls 'eza --icons --git --group-directories-first'
+alias ll 'eza -l --icons --git --group-directories-first'
+alias la 'eza -a --icons --git --group-directories-first'
+{{- end }}
+{{- if lookPath "bat" }}
+alias cat 'bat --plain'
+alias catp bat
+{{- end }}
+
+# ── npm global install redirect (non-work profiles) ────────────
+{{- if not (eq .profile "work") }}
+set -gx NPM_CONFIG_PREFIX "$HOME/.npm-deadend"
+{{- end }}
+
+# ── Develop profile abbreviations ─────────────────────────────
+{{- if .develop }}
+abbr npm pnpm
+abbr npx bunx
+abbr conda mamba
+{{- end }}

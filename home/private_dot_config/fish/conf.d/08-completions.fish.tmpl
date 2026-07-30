@@ -1,0 +1,22 @@
+# ── Completions ─────────────────────────────────────────────────
+{{- if .develop }}
+# Bun completions
+if test -f ~/.bun/completions/bun.fish
+    source ~/.bun/completions/bun.fish
+end
+{{- end }}
+
+# ── Command not found handler ───────────────────────────────────
+{{- if lookPath "brew" }}
+if command -q brew
+    function fish_command_not_found
+        set cmd $argv[1]
+        echo "fish: Unknown command '$cmd'" >&2
+        set brew_suggestion (brew missing-cmd $cmd 2>/dev/null)
+        if test -n "$brew_suggestion" -a $status -eq 0
+            echo "$brew_suggestion" >&2
+        end
+        return 127
+    end
+end
+{{- end }}
