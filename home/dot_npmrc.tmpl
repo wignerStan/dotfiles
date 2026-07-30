@@ -1,0 +1,8 @@
+# .npmrc — managed by chezmoi (develop profile only)
+{{- if .use_china_mirrors }}
+registry=https://registry.npmmirror.com
+{{- end }}
+{{- if not (eq .profile "work") }}
+# Redirect global installs to dead-end dir (not in PATH)
+prefix=${HOME}/.npm-deadend
+{{- end }}

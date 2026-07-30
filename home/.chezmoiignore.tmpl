@@ -38,3 +38,9 @@ install-yazi-plugins.sh
 {{- if ne .profile "hpc" }}
 container-data/
 {{- end }}
+
+# Node/Bun configs: develop profile only
+{{- if not .develop }}
+.npmrc
+.bunfig.toml
+{{- end }}

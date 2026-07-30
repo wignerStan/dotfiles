@@ -1,0 +1,8 @@
+# bunfig.toml — managed by chezmoi (develop profile only)
+{{- if .use_china_mirrors }}
+[install]
+registry = "https://registry.npmmirror.com"
+
+[install.mirrors]
+electron = "https://npmmirror.com/mirrors/electron/"
+{{- end }}
