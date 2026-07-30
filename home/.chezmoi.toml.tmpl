@@ -31,12 +31,17 @@
 {{- /* Derived */ -}}
 {{- $ephemeral := or (eq $profile "vps") (eq $profile "hpc") -}}
 
-{{- /* Geo location detection (timezone-based, cross-platform) */ -}}
+{{- /* Geo location detection (timezone-based, cross-platform: macOS/Linux/Windows) */ -}}
 {{- /* macOS has no /etc/timezone; readlink /etc/localtime works on macOS + Linux. */ -}}
-{{- /* Guard every shell-out with stat so a missing file can't crash rendering. */ -}}
+{{- /* Windows has neither — tzutil /g returns the English standard name. */ -}}
+{{- /* Guard every shell-out so a missing binary/file can't crash rendering. */ -}}
 {{- $geo := "us" -}}
 {{- $tz := "" -}}
-{{- if stat "/etc/localtime" -}}
+{{- if eq .chezmoi.os "windows" -}}
+{{-   if lookPath "tzutil" -}}
+{{-     $tz = output "tzutil" "/g" | trim -}}
+{{-   end -}}
+{{- else if stat "/etc/localtime" -}}
 {{-   $tz = output "readlink" "/etc/localtime" | trim -}}
 {{- else if stat "/etc/timezone" -}}
 {{-   $tz = output "cat" "/etc/timezone" | trim -}}
