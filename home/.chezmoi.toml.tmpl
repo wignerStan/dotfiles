@@ -31,10 +31,17 @@
 {{- /* Derived */ -}}
 {{- $ephemeral := or (eq $profile "vps") (eq $profile "hpc") -}}
 
-{{- /* Geo location detection (timezone-based) */ -}}
+{{- /* Geo location detection (timezone-based, cross-platform) */ -}}
+{{- /* macOS has no /etc/timezone; readlink /etc/localtime works on macOS + Linux. */ -}}
+{{- /* Guard every shell-out with stat so a missing file can't crash rendering. */ -}}
 {{- $geo := "us" -}}
-{{- $tz := output "cat" "/etc/timezone" | trim -}}
-{{- if or (hasPrefix "Asia/" $tz) (hasPrefix "PRC" $tz) (hasPrefix "CTT" $tz) -}}
+{{- $tz := "" -}}
+{{- if stat "/etc/localtime" -}}
+{{-   $tz = output "readlink" "/etc/localtime" | trim -}}
+{{- else if stat "/etc/timezone" -}}
+{{-   $tz = output "cat" "/etc/timezone" | trim -}}
+{{- end -}}
+{{- if or (contains "Asia" $tz) (contains "PRC" $tz) (contains "China" $tz) -}}
 {{-   $geo = "cn" -}}
 {{- end -}}
 {{- $use_china_mirrors := eq $geo "cn" -}}
