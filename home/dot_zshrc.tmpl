@@ -6,12 +6,16 @@
 # Completion system
 # ═══════════════════════════════════════════════════════════════
 
-{{- if lookPath "brew" }}
-# Resolve brew prefix once — HOMEBREW_PREFIX is already exported (free); fall back to brew --prefix
-_brew_prefix="${HOMEBREW_PREFIX:-$(brew --prefix)}"
-FPATH="$_brew_prefix/share/zsh-completions:$FPATH"
-FPATH="$_brew_prefix/share/zsh/site-functions:$FPATH"
-{{- end }}
+# Resolve brew prefix (HOMEBREW_PREFIX set in .zshenv; fall back to brew --prefix)
+if [[ -n "$HOMEBREW_PREFIX" ]]; then
+    _brew_prefix="$HOMEBREW_PREFIX"
+elif command -v brew &>/dev/null; then
+    _brew_prefix="$(brew --prefix)"
+fi
+if [[ -n "$_brew_prefix" ]]; then
+    FPATH="$_brew_prefix/share/zsh-completions:$FPATH"
+    FPATH="$_brew_prefix/share/zsh/site-functions:$FPATH"
+fi
 
 autoload -Uz compinit
 # compinit -C loads the cached dump without re-binding every completion
@@ -41,18 +45,17 @@ zstyle ':completion:*:*:*:*:*' menu select
 # Plugins (via Homebrew)
 # ═══════════════════════════════════════════════════════════════
 
-{{- if lookPath "brew" }}
+if [[ -n "$_brew_prefix" ]]; then
+    [[ -f $_brew_prefix/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]] && source $_brew_prefix/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+    [[ -f $_brew_prefix/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]] && source $_brew_prefix/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 
-[[ -f $_brew_prefix/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]] && source $_brew_prefix/share/zsh-autosuggestions/zsh-autosuggestions.zsh
-[[ -f $_brew_prefix/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]] && source $_brew_prefix/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+    # Fzf (fuzzy finder)
+    [[ -f $_brew_prefix/opt/fzf/shell/key-bindings.zsh ]] && source $_brew_prefix/opt/fzf/shell/key-bindings.zsh
+    [[ -f $_brew_prefix/opt/fzf/shell/completion.zsh ]] && source $_brew_prefix/opt/fzf/shell/completion.zsh
 
-# Fzf (fuzzy finder)
-[[ -f $_brew_prefix/opt/fzf/shell/key-bindings.zsh ]] && source $_brew_prefix/opt/fzf/shell/key-bindings.zsh
-[[ -f $_brew_prefix/opt/fzf/shell/completion.zsh ]] && source $_brew_prefix/opt/fzf/shell/completion.zsh
-
-# History substring search (must load before zsh-vi-mode)
-[[ -f $_brew_prefix/share/zsh-history-substring-search/zsh-history-substring-search.zsh ]] && source $_brew_prefix/share/zsh-history-substring-search/zsh-history-substring-search.zsh
-{{- end }}
+    # History substring search
+    [[ -f $_brew_prefix/share/zsh-history-substring-search/zsh-history-substring-search.zsh ]] && source $_brew_prefix/share/zsh-history-substring-search/zsh-history-substring-search.zsh
+fi
 
 # ═══════════════════════════════════════════════════════════════
 # Vi mode (native zsh bindkey -v)
@@ -112,9 +115,7 @@ alias catp="bat"
 # ═══════════════════════════════════════════════════════════════
 
 # Zoxide (smarter cd)
-{{- if lookPath "zoxide" }}
-eval "$(zoxide init zsh)"
-{{- end }}
+command -v zoxide &>/dev/null && eval "$(zoxide init zsh)"
 
 # Bun completions
 {{- if stat (joinPath .chezmoi.homeDir ".bun" "_bun") }}
@@ -150,11 +151,9 @@ export LESS_TERMCAP_ue=$'\E[0m'
 # ═══════════════════════════════════════════════════════════════
 # Prompt — Starship
 # ═══════════════════════════════════════════════════════════════
-{{- if lookPath "starship" }}
 if command -v starship &>/dev/null; then
     eval "$(starship init zsh)"
 fi
-{{- end }}
 
 # Git aliases (from oh-my-zsh git plugin, standalone)
 {{- if stat (joinPath .chezmoi.homeDir ".oh-my-zsh/plugins/git/git.plugin.zsh") }}
@@ -183,11 +182,9 @@ source ~/.oh-my-zsh/plugins/git/git.plugin.zsh
 # ═══════════════════════════════════════════════════════════════
 
 if [[ -z "$TMUX" ]]; then
-{{- if lookPath "fastfetch" }}
     if command -v fastfetch &>/dev/null; then
         fastfetch
     fi
-{{- end }}
 fi
 
 # iTerm2 Shell Integration
