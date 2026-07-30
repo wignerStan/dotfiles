@@ -8,11 +8,33 @@
 .config/byobu/
 {{- end }}
 
-# Headless: skip GUI/desktop tools
-{{- if .is_headless }}
+{{- if eq .profile "hpc" }}
+# HPC: skip workstation-only tools, use container-data/zsh instead
 .config/ghostty/
 .config/zellij/
 .config/yazi/
 .oh-my-zsh/
 .iterm2_shell_integration.zsh
+
+# Shell configs — HPC uses container-data/zsh/ instead
+.zshenv
+.zshrc
+.zprofile
+
+# Scripts — require Homebrew/GitHub access
+bootstrap.sh
+reload-configs.sh
+install-yazi-plugins.sh
+{{- else if .is_headless }}
+# Headless (non-HPC): skip GUI tools only
+.config/ghostty/
+.config/zellij/
+.config/yazi/
+.oh-my-zsh/
+.iterm2_shell_integration.zsh
+{{- end }}
+
+# container-data: only on HPC
+{{- if ne .profile "hpc" }}
+container-data/
 {{- end }}

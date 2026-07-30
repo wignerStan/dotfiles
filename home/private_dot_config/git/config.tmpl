@@ -28,7 +28,7 @@
     ui = auto
 [push]
     default = simple
-{{- if not (ne .profile "vps") }}
+{{- if or (eq .profile "vps") (eq .profile "hpc") }}
 [credential "https://github.com"]
     helper =
 {{- if eq .chezmoi.os "darwin" }}

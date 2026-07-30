@@ -5,6 +5,10 @@
 {{- if or (env "CODESPACES") (env "REMOTE_CONTAINERS_IPC") (eq .chezmoi.username "root" "ubuntu") -}}
 {{-   $profile = "vps" -}}
 {{- end -}}
+{{- /* HPC cluster (has apptainer/singularity on host) */ -}}
+{{- if or (lookPath "apptainer") (lookPath "singularity") -}}
+{{-   $profile = "hpc" -}}
+{{- end -}}
 
 {{- /* Axis 2: develop (composition layer — additive dev tooling) */ -}}
 {{- $develop := false -}}
@@ -14,7 +18,7 @@
 
 {{- /* Axis 3: headless (no real desktop session) */ -}}
 {{- $headless := false -}}
-{{- if eq $profile "vps" -}}
+{{- if or (eq $profile "vps") (eq $profile "hpc") -}}
 {{-   $headless = true -}}
 {{- else if eq .chezmoi.os "linux" -}}
 {{-   if not (or (env "DISPLAY") (env "WAYLAND_DISPLAY")) -}}
@@ -25,7 +29,7 @@
 {{- end -}}
 
 {{- /* Derived */ -}}
-{{- $ephemeral := eq $profile "vps" -}}
+{{- $ephemeral := or (eq $profile "vps") (eq $profile "hpc") -}}
 {{- $use_china_mirrors := true -}}
 
 {{- /* Detection: age encryption identity available */ -}}

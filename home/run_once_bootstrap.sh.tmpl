@@ -25,7 +25,7 @@ if ! command -v brew &> /dev/null; then
     fi
 fi
 
-{{- if or (eq .profile "work") (eq .profile "vps") }}
+{{- if or (or (eq .profile "work") (eq .profile "vps")) (eq .profile "hpc") }}
 # Work/VPS profile: no Homebrew. Probe for core tools and install
 # missing ones as static binaries from GitHub releases into ~/.local/bin.
 echo "{{ .profile | title }} profile: probing for core tools..."
