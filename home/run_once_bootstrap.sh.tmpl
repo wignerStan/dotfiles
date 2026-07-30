@@ -1,12 +1,12 @@
 #!/bin/bash
 
 # ═══════════════════════════════════════════════════════════════
-# Jacob's Multi-Machine Bootstrap v3
+# Jacob's Multi-Machine Bootstrap v4 — profile-aware
 # ═══════════════════════════════════════════════════════════════
 
 set -euo pipefail
 
-echo "=== Starting Jacob's Dotfiles Bootstrap ==="
+echo "=== Starting Jacob's Dotfiles Bootstrap (profile={{ .profile }} develop={{ .develop }}) ==="
 
 # 1. Mirror-aware Homebrew setup
 {{- if .use_china_mirrors }}
@@ -16,7 +16,7 @@ export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.ustc.edu.cn/homebrew-bottles"
 export HOMEBREW_API_DOMAIN="https://mirrors.ustc.edu.cn/homebrew-bottles/api"
 {{- end }}
 
-# Detect existing Homebrew installation (may not be in PATH yet for new users)
+# ── Homebrew detection (skip install on work — usually no sudo) ─
 if ! command -v brew &> /dev/null; then
     if [[ -x /home/linuxbrew/.linuxbrew/bin/brew ]]; then
         eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
@@ -25,17 +25,91 @@ if ! command -v brew &> /dev/null; then
     fi
 fi
 
+{{- if or (eq .profile "work") (eq .profile "vps") }}
+# Work/VPS profile: no Homebrew. Probe for core tools and install
+# missing ones as static binaries from GitHub releases into ~/.local/bin.
+echo "{{ .profile | title }} profile: probing for core tools..."
+mkdir -p "$HOME/.local/bin"
+
+# Helper: detect arch and OS for GitHub release downloads
+__get_arch() {
+    case "$(uname -m)" in
+        x86_64)  echo "x86_64" ;;
+        aarch64|arm64) echo "arm64" ;;
+        *) echo "$(uname -m)" ;;
+    esac
+}
+ARCH=$(__get_arch)
+OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+
+# Probe and install missing core tools from GitHub
+# starship (starship/starship)
+if ! command -v starship &>/dev/null; then
+    echo "Installing starship from GitHub..."
+    curl -fsSL "https://github.com/starship/starship/releases/latest/download/starship-${ARCH}-${OS}.gz"         | gunzip > "$HOME/.local/bin/starship" && chmod +x "$HOME/.local/bin/starship"
+fi
+
+# zoxide (ajitid/zoxide)
+if ! command -v zoxide &>/dev/null; then
+    echo "Installing zoxide from GitHub..."
+    curl -fsSL "https://github.com/ajitid/zoxide/releases/latest/download/zoxide-${ARCH}-${OS/-/_}.tar.gz"         | tar xz -C "$HOME/.local/bin" zoxide 2>/dev/null || echo "Warning: zoxide install failed, skipping"
+fi
+
+# eza (eza-community/eza)
+if ! command -v eza &>/dev/null; then
+    echo "Installing eza from GitHub..."
+    __eza_arch="x86_64"
+    [[ "$ARCH" == "arm64" ]] && __eza_arch="aarch64"
+    curl -fsSL "https://github.com/eza-community/eza/releases/latest/download/eza_${__eza_arch}-${OS}-gnu.tar.gz"         | tar xz -C "$HOME/.local/bin" eza 2>/dev/null || echo "Warning: eza install failed, skipping"
+fi
+
+# bat (sharkdp/bat)
+if ! command -v bat &>/dev/null; then
+    echo "Installing bat from GitHub..."
+    __bat_arch="$ARCH"
+    [[ "$ARCH" == "x86_64" ]] && __bat_arch="x86_64"
+    curl -fsSL "https://github.com/sharkdp/bat/releases/latest/download/bat-v$(curl -fsSL https://api.github.com/repos/sharkdp/bat/releases/latest | grep -oP '"tag_name": "v\K[^"]+')-${__bat_arch}-${OS}.tar.gz"         | tar xz --strip-components=1 -C "$HOME/.local/bin" "*/bat" 2>/dev/null || echo "Warning: bat install failed, skipping"
+fi
+
+# ripgrep (BurntSushi/ripgrep)
+if ! command -v rg &>/dev/null; then
+    echo "Installing ripgrep from GitHub..."
+    curl -fsSL "https://github.com/BurntSushi/ripgrep/releases/latest/download/ripgrep-$(curl -fsSL https://api.github.com/repos/BurntSushi/ripgrep/releases/latest | grep -oP '"tag_name": "\K[^"]+')-${ARCH}-${OS}.tar.gz"         | tar xz --strip-components=1 -C "$HOME/.local/bin" "*/rg" 2>/dev/null || echo "Warning: ripgrep install failed, skipping"
+fi
+
+# fd (sharkdp/fd)
+if ! command -v fd &>/dev/null; then
+    echo "Installing fd from GitHub..."
+    curl -fsSL "https://github.com/sharkdp/fd/releases/latest/download/fd-v$(curl -fsSL https://api.github.com/repos/sharkdp/fd/releases/latest | grep -oP '"tag_name": "v\K[^"]+')-${ARCH}-${OS}.tar.gz"         | tar xz --strip-components=1 -C "$HOME/.local/bin" "*/fd" 2>/dev/null || echo "Warning: fd install failed, skipping"
+fi
+
+# fzf (junegunn/fzf)
+if ! command -v fzf &>/dev/null; then
+    echo "Installing fzf from GitHub..."
+    curl -fsSL "https://github.com/junegunn/fzf/releases/latest/download/fzf-${ARCH}-${OS}.tar.gz"         | tar xz -C "$HOME/.local/bin" fzf 2>/dev/null || echo "Warning: fzf install failed, skipping"
+fi
+
+# fastfetch (fastfetch-cli/fastfetch)
+if ! command -v fastfetch &>/dev/null; then
+    echo "Installing fastfetch from GitHub..."
+    __ff_arch="x86_64"
+    [[ "$ARCH" == "arm64" ]] && __ff_arch="aarch64"
+    curl -fsSL "https://github.com/fastfetch-cli/fastfetch/releases/latest/download/fastfetch-${__ff_arch}-linux.tar.gz"         | tar xz --strip-components=2 -C "$HOME/.local/bin" "fastfetch/usr/bin/fastfetch" 2>/dev/null || echo "Warning: fastfetch install failed, skipping"
+fi
+
+echo "{{ .profile | title }} profile: core tool probe complete"
+{{- else }}
+# Install Homebrew if missing
 if ! command -v brew &> /dev/null; then
     echo "Homebrew not found. Installing..."
     /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 fi
 
-# 2. Core packages (always installed)
-echo "Installing/Updating core packages..."
+# ── Core packages (all profiles except work) ──────────────────
+echo "Installing core packages..."
 core_packages=(
     zsh
     tmux
-    zellij
     starship
     zoxide
     eza
@@ -44,22 +118,27 @@ core_packages=(
     fd
     neovim
     age
+    fastfetch
+    fzf
+)
 
-    # LSP & LazyVim dependencies
+{{- if .develop }}
+# ── Develop layer: full dev tooling ────────────────────────────
+core_packages+=(
+    zellij
     npm
     rust
     go
     stylua
     luarocks
-    fzf
 )
+{{- end }}
 
-# Install packages individually so one missing doesn't block the rest
 for pkg in "${core_packages[@]}"; do
     brew install "$pkg" 2>/dev/null || echo "Warning: failed to install $pkg, skipping"
 done
 
-# 3. macOS-only packages (sing-box TUN proxy, alternative shells, terminal)
+# ── macOS-only packages ───────────────────────────────────────
 {{- if eq .chezmoi.os "darwin" }}
 echo "Installing macOS-only packages..."
 macos_packages=(
@@ -68,8 +147,23 @@ macos_packages=(
     ghostty
     kubecolor
 )
-
 brew install "${macos_packages[@]}"
+{{- end }}
+
+# ── Global node tools via Homebrew (not npm/pnpm -g) ──────────
+{{- if .develop }}
+echo "Installing global node tools via Homebrew..."
+node_tools=(
+    typescript
+    ts-node
+    eslint
+    prettier
+)
+for pkg in "${node_tools[@]}"; do
+    brew install "$pkg" 2>/dev/null || echo "Warning: failed to install $pkg, skipping"
+done
+{{- end }}
+
 {{- end }}
 
 echo "=== Bootstrap Complete ==="
