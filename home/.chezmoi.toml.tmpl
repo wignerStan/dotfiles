@@ -1,29 +1,22 @@
-{{- /* Machine Configuration Logic */ -}}
-{{- $ephemeral := false -}}
-{{- $work := false -}}
-{{- $headless := false -}}
-{{- $personal := true -}}
-{{- $use_china_mirrors := true -}}
-{{- $profiles := list "personal" -}}
+{{- /* Machine Configuration Logic — three independent axes */ -}}
 
-{{- /* Layer: develop (additive — full dev tooling: node/rust/go/mobile) */ -}}
-{{- if eq .chezmoi.username "dev" -}}
-{{-   $profiles = append $profiles "develop" -}}
-{{- end -}}
-
-{{- /* Layer: work (additive — mamba with base activation, restricted privileges) */ -}}
-{{- if $work -}}
-{{-   $profiles = append $profiles "work" -}}
-{{- end -}}
-
-{{- /* Detection: ephemeral/container environments */ -}}
+{{- /* Axis 1: profile (primary identity — exactly one) */ -}}
+{{- $profile := "personal" -}}
 {{- if or (env "CODESPACES") (env "REMOTE_CONTAINERS_IPC") (eq .chezmoi.username "root" "ubuntu") -}}
-{{-   $ephemeral = true -}}
-{{-   $headless = true -}}
+{{-   $profile = "vps" -}}
 {{- end -}}
 
-{{- /* Detection: headless Linux: no desktop session (DISPLAY alone is unreliable, Xvfb sets it) */ -}}
-{{- if eq .chezmoi.os "linux" -}}
+{{- /* Axis 2: develop (composition layer — additive dev tooling) */ -}}
+{{- $develop := false -}}
+{{- if eq .chezmoi.username "dev" -}}
+{{-   $develop = true -}}
+{{- end -}}
+
+{{- /* Axis 3: headless (no real desktop session) */ -}}
+{{- $headless := false -}}
+{{- if eq $profile "vps" -}}
+{{-   $headless = true -}}
+{{- else if eq .chezmoi.os "linux" -}}
 {{-   if not (or (env "DISPLAY") (env "WAYLAND_DISPLAY")) -}}
 {{-     $headless = true -}}
 {{-   else if not (lookPath "gnome-session") -}}
@@ -31,11 +24,9 @@
 {{-   end -}}
 {{- end -}}
 
-{{- /* Detection: HPC cluster (has apptainer/singularity on host) */ -}}
-{{- $hpc := false -}}
-{{- if or (lookPath "apptainer") (lookPath "singularity") -}}
-{{-   $hpc = true -}}
-{{- end -}}
+{{- /* Derived */ -}}
+{{- $ephemeral := eq $profile "vps" -}}
+{{- $use_china_mirrors := true -}}
 
 {{- /* Detection: age encryption identity available */ -}}
 {{- $age_identity := joinPath .chezmoi.homeDir ".config/chezmoi/age-key.txt" -}}
@@ -75,11 +66,9 @@ encryption = "age"
     primary_shell = "zsh"
     is_ephemeral = {{ $ephemeral }}
     is_headless = {{ $headless }}
-    is_hpc = {{ $hpc }}
-    is_work = {{ $work }}
-    is_personal = {{ $personal }}
     use_china_mirrors = {{ $use_china_mirrors }}
-    profiles = {{ $profiles | toJson }}
+    profile = {{ $profile | quote }}
+    develop = {{ $develop }}
     mamba_root = {{ joinPath .chezmoi.homeDir "mamba" | quote }}
     arch = {{ .chezmoi.arch | quote }}
 

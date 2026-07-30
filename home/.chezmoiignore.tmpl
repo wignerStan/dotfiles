@@ -1,5 +1,5 @@
 # sing-box: personal desktop only (macOS/Windows — runs TUN proxy there)
-{{- if or (not (has "personal" .profiles)) (eq .chezmoi.os "linux") }}
+{{- if or (not (eq .profile "personal")) (eq .chezmoi.os "linux") }}
 .config/sing-box/
 {{- end }}
 
@@ -8,26 +8,11 @@
 .config/byobu/
 {{- end }}
 
-{{- if .is_hpc }}
-# Workstation-only tools — skip on HPC clusters
+# Headless: skip GUI/desktop tools
+{{- if .is_headless }}
+.config/ghostty/
 .config/zellij/
 .config/yazi/
 .oh-my-zsh/
 .iterm2_shell_integration.zsh
-
-# Shell tools — managed by deploy scripts, not chezmoi
-container-data/
-
-# Workstation zsh configs — HPC uses container-data/zsh/ instead
-.zshenv
-.zshrc
-.zprofile
-
-# Workstation scripts — require Homebrew/GitHub access
-bootstrap.sh
-reload-configs.sh
-install-yazi-plugins.sh
-{{- else }}
-# HPC container configs — skip on workstation
-container-data/
 {{- end }}
