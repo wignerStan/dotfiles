@@ -1,0 +1,15 @@
+channels:
+  - https://mirrors.ustc.edu.cn/anaconda/cloud/conda-forge
+  - https://mirrors.ustc.edu.cn/anaconda/pkgs/main
+  - https://mirrors.ustc.edu.cn/anaconda/pkgs/r
+  - conda-forge
+use_uv: true
+# auto_activate_base: true for work (no brew privileges) and personal+Windows,
+# false for develop (uses brew python as base instead)
+{{- if or (has "work" .profiles) (and (has "personal" .profiles) (eq .chezmoi.os "windows")) }}
+auto_activate_base: true
+{{- else }}
+auto_activate_base: false
+{{- end }}
+always_yes: true
+changeps1: false

@@ -1,18 +1,16 @@
-{{- if .is_headless }}
-# GUI/desktop-only tools — skip on headless servers
-.config/ghostty/
-.config/mihomo/
+# sing-box: personal desktop only (macOS/Windows — runs TUN proxy there)
+{{- if or (not (has "personal" .profiles)) (eq .chezmoi.os "linux") }}
 .config/sing-box/
+{{- end }}
+
+# Byobu: Linux-only
+{{- if not (eq .chezmoi.os "linux") }}
+.config/byobu/
 {{- end }}
 
 {{- if .is_hpc }}
 # Workstation-only tools — skip on HPC clusters
-.config/ghostty/
-.config/mihomo/
-.config/nushell/
-.config/fish/
 .config/zellij/
-.config/starship.toml
 .config/yazi/
 .oh-my-zsh/
 .iterm2_shell_integration.zsh
@@ -32,9 +30,4 @@ install-yazi-plugins.sh
 {{- else }}
 # HPC container configs — skip on workstation
 container-data/
-{{- end }}
-
-{{- if eq .chezmoi.os "darwin" }}
-# Byobu is Linux-only (depends on /usr/share/byobu/, /usr/lib/byobu/)
-.config/byobu/
 {{- end }}

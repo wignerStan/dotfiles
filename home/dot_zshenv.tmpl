@@ -7,6 +7,13 @@
 # Prevent PATH from accumulating duplicates
 typeset -U path PATH
 
+# ── Bash/POSIX sh compatibility ────────────────────────────────
+# Only align where zsh's defaults break bash scripts/agents.
+# Zsh improvements (safer defaults, better history, etc.) are kept.
+setopt SH_WORD_SPLIT       # Unquoted $var splits on IFS (bash default; breaks scripts without it)
+setopt NO_NOMATCH          # Failed glob passes literally instead of erroring (bash default)
+setopt INTERACTIVE_COMMENTS # Allow # comments in interactive shells (bash default)
+
 # ── XDG Base Directory ───────────────────────────────────────────
 export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
@@ -35,18 +42,6 @@ export HOMEBREW_API_DOMAIN="https://mirrors.ustc.edu.cn/homebrew-bottles/api"
 export HF_ENDPOINT=https://hf-mirror.com
 {{- end }}
 
-# ── Proxy ─────────────────────────────────────────────────────
-export NO_PROXY="127.0.0.1,192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,100.64.0.0/10,100.100.0.0/16,localhost,*.local,*.crashlytics.com"
-export no_proxy="$NO_PROXY"
-{{- if and (hasKey . "proxy_url") (not .is_headless) }}
-export proxy_url="{{ .proxy_url }}"
-export all_proxy=$proxy_url
-export http_proxy=$proxy_url
-export https_proxy=$proxy_url
-export ALL_PROXY=$proxy_url
-export HTTP_PROXY=$proxy_url
-export HTTPS_PROXY=$proxy_url
-{{- end }}
 
 # ---Display --------------------------------------------------
 #export DISPLAY=10.0.0.201:1
@@ -65,14 +60,17 @@ export API_TIMEOUT_MS="600000"
 # ── HuggingFace & Models ──────────────────────────────────────
 export NANOBANANA_MODEL=gemini-3-pro-image-preview
 
-# ── Cargo ─────────────────────────────────────────────────────
+# ── Cargo (develop profile only) ──────────────────────────────
+{{- if has "develop" .profiles }}
 [[ -d "$HOME/.cargo" && -f "$HOME/.cargo/env" ]] && . "$HOME/.cargo/env"
+{{- end }}
 
 # ── Mamba (global Python base environment) ─────────────────
 # Shell hook + activate moved to .zprofile (login shells only) to avoid
 # ~30ms fork tax on every non-interactive zsh invocation.
 # MAMBA_EXE/MAMBA_ROOT_PREFIX still exported here for non-login shells.
-{{- if lookPath "micromamba" }}
+# Gating: develop profile (any OS), or personal+Windows.
+{{- if or (or (has "develop" .profiles) (has "work" .profiles)) (and (has "personal" .profiles) (eq .chezmoi.os "windows")) }}
 export MAMBA_EXE="${HOMEBREW_PREFIX:-/home/linuxbrew/.linuxbrew}/opt/micromamba/bin/mamba"
 export MAMBA_ROOT_PREFIX="$HOME/mamba"
 # Prepend mamba/bin so mamba's python wins over brew's python@3.x
@@ -80,7 +78,7 @@ path=("$MAMBA_ROOT_PREFIX/bin" $path)
 {{- end }}
 
 # ── Pixi (project Python environments) ──────────────────────
-{{- if lookPath "pixi" }}
+{{- if and (has "develop" .profiles) (lookPath "pixi") }}
 export PIXI_HOME="${HOME}/.pixi"
 path+=("${PIXI_HOME}/bin")
 {{- end }}
@@ -102,9 +100,13 @@ command_not_found_handler() {
 
 # ── PATH (appended last so all above env is available first) ──
 
-# Go
+# Go (develop profile only)
+{{- if has "develop" .profiles }}
 [[ -d "$HOME/go/bin" ]] && path+=("$HOME/go/bin")
+{{- end }}
 
+# ── Node/Rust/Mobile ecosystem (develop profile only) ─────────
+{{- if has "develop" .profiles }}
 # pnpm
 {{- if eq .chezmoi.os "darwin" }}
 [[ -d "$HOME/Library/pnpm" ]] && export PNPM_HOME="$HOME/Library/pnpm"
@@ -124,6 +126,7 @@ command_not_found_handler() {
 {{- if .use_china_mirrors }}
 export BUN_CONFIG_REGISTRY="https://registry.npmmirror.com"
 {{- end }}
+{{- end }}
 
 # Local user binaries (prepended to override system commands)
 path=($HOME/.local/bin $path)
@@ -134,7 +137,7 @@ export PATH
 # ═══════════════════════════════════════════════════════════════
 # Dev tool wrappers (modern replacements) — loaded last
 # ═══════════════════════════════════════════════════════════════
-{{- if lookPath "pnpm" }}
+{{- if and (has "develop" .profiles) (lookPath "pnpm") }}
 
 npm() {
   pnpm "$@"
@@ -161,7 +164,7 @@ EOF
 }
 {{- end }}
 
-{{- if lookPath "bun" }}
+{{- if and (has "develop" .profiles) (lookPath "bun") }}
 
 npx() {
   bunx "$@"
@@ -190,77 +193,7 @@ EOF
   return $ret
 }
 {{- end }}
-
-{{- if lookPath "uv" }}
-
-pip() {
-  uv pip "$@"
-  local ret=$?
-  if [[ $ret -ne 0 ]]; then
-    cat >&2 << 'EOF'
-╔═══════════════════════════════════════════════════════════════════════════╗
-║                        🛑  STOP USING PIP  🛑                              ║
-╚═══════════════════════════════════════════════════════════════════════════╝
-
-This wrapper exists to BREAK YOUR pip HABIT and teach you uv.
-
-WHY THIS WRAPPER EXISTS:
-─────────────────────────
-  • pip is slow and doesn't have modern dependency resolution
-  • uv is 10-100x faster (written in Rust) with parallel downloads
-  • uv uses lock files for reproducible builds by default
-  • This wrapper passes your command to uv so it still works
-
-Just use uv directly instead of pip.
-
-═══════════════════════════════════════════════════════════════════════════
-  UV-SPECIFIC FEATURES (beyond pip replacement)
-═══════════════════════════════════════════════════════════════════════════
-
-  uv tool install <pkg>    # Install Python CLI tool globally (like pipx)
-  uvx <tool>               # Run tool in isolated env (like npx for Python)
-  uvx ruff check .         # Example: run ruff without installing
-  uv pip compile           # Compile requirements.in to lock file
-EOF
-  fi
-  return $ret
-}
-
-pip3() {
-  uv pip "$@"
-  local ret=$?
-  if [[ $ret -ne 0 ]]; then
-    cat >&2 << 'EOF'
-╔═══════════════════════════════════════════════════════════════════════════╗
-║                        🛑  STOP USING PIP3  🛑                             ║
-╚═══════════════════════════════════════════════════════════════════════════╝
-
-This wrapper exists to BREAK YOUR pip3 HABIT and teach you uv.
-
-WHY THIS WRAPPER EXISTS:
-─────────────────────────
-  • pip3 is slow and doesn't have modern dependency resolution
-  • uv is 10-100x faster (written in Rust) with parallel downloads
-  • uv uses lock files for reproducible builds by default
-  • This wrapper passes your command to uv so it still works
-
-Just use uv directly instead of pip3.
-
-═══════════════════════════════════════════════════════════════════════════
-  UV-SPECIFIC FEATURES (beyond pip replacement)
-═══════════════════════════════════════════════════════════════════════════
-
-  uv tool install <pkg>    # Install Python CLI tool globally (like pipx)
-  uvx <tool>               # Run tool in isolated env (like npx for Python)
-  uvx ruff check .         # Example: run ruff without installing
-  uv pip compile           # Compile requirements.in to lock file
-EOF
-  fi
-  return $ret
-}
-{{- end }}
-
-{{- if lookPath "mamba" }}
+{{- if and (has "develop" .profiles) (lookPath "mamba") }}
 
 conda() {
   mamba "$@"

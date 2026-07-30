@@ -1,0 +1,22 @@
+# ── Mamba / Micromamba ────────────────────────────────────────
+# Gating: develop profile (any OS), or personal+Windows.
+{{- if or (or (has "develop" .profiles) (has "work" .profiles)) (and (has "personal" .profiles) (eq .chezmoi.os "windows")) }}
+# Gate on the binary existing so non-Homebrew machines skip cleanly.
+set -gx MAMBA_EXE "$HOMEBREW_PREFIX/opt/micromamba/bin/mamba"
+set -gx MAMBA_ROOT_PREFIX ~/mamba
+
+# Shell hook + activate costs ~30ms of forks; only run for login shells.
+if status is-login
+    $MAMBA_EXE shell hook --shell fish --root-prefix $MAMBA_ROOT_PREFIX | source
+    set -gx MAMBA_NO_PROMPT 1
+    fish_add_path --move --prepend $MAMBA_ROOT_PREFIX/bin
+end
+{{- end }}
+
+# ── Pixi (project Python environments) ──────────────────────
+{{- if and (has "develop" .profiles) (lookPath "pixi") }}
+if type -q pixi
+    set -gx PIXI_HOME ~/.pixi
+    fish_add_path --move $PIXI_HOME/bin
+end
+{{- end }}

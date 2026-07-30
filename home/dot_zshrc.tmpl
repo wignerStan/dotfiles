@@ -13,10 +13,6 @@ FPATH="$_brew_prefix/share/zsh-completions:$FPATH"
 FPATH="$_brew_prefix/share/zsh/site-functions:$FPATH"
 {{- end }}
 
-# Glob: on no match, pass the pattern through literally (bash/POSIX sh behavior)
-# instead of erroring. Lets e.g. `ls *.md` work in a dir with no .md files.
-setopt NO_NOMATCH
-
 autoload -Uz compinit
 # compinit -C loads the cached dump without re-binding every completion
 # (skips ~860 compdef calls + compdump + compaudit = ~220ms). Run the full

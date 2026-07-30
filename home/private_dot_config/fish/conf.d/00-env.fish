@@ -22,10 +22,6 @@ set -gx HOMEBREW_CORE_GIT_REMOTE "https://mirrors.ustc.edu.cn/homebrew-core.git"
 set -gx HOMEBREW_BOTTLE_DOMAIN "https://mirrors.ustc.edu.cn/homebrew-bottles"
 set -gx HOMEBREW_API_DOMAIN "https://mirrors.ustc.edu.cn/homebrew-bottles/api"
 
-# ── Proxy ─────────────────────────────────────────────────────
-set -gx NO_PROXY "127.0.0.1,192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,100.64.0.0/10,100.100.0.0/16,localhost,*.local,*.crashlytics.com"
-set -gx no_proxy $NO_PROXY
-
 # ── Editor ────────────────────────────────────────────────────
 set -gx EDITOR nvim
 

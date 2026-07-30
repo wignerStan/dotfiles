@@ -4,6 +4,17 @@
 {{- $headless := false -}}
 {{- $personal := true -}}
 {{- $use_china_mirrors := true -}}
+{{- $profiles := list "personal" -}}
+
+{{- /* Layer: develop (additive — full dev tooling: node/rust/go/mobile) */ -}}
+{{- if eq .chezmoi.username "dev" -}}
+{{-   $profiles = append $profiles "develop" -}}
+{{- end -}}
+
+{{- /* Layer: work (additive — mamba with base activation, restricted privileges) */ -}}
+{{- if $work -}}
+{{-   $profiles = append $profiles "work" -}}
+{{- end -}}
 
 {{- /* Detection: ephemeral/container environments */ -}}
 {{- if or (env "CODESPACES") (env "REMOTE_CONTAINERS_IPC") (eq .chezmoi.username "root" "ubuntu") -}}
@@ -11,9 +22,13 @@
 {{-   $headless = true -}}
 {{- end -}}
 
-{{- /* Detection: headless Linux (no display server, remote server) */ -}}
-{{- if and (eq .chezmoi.os "linux") (not (env "DISPLAY")) (not (env "WAYLAND_DISPLAY")) -}}
-{{-   $headless = true -}}
+{{- /* Detection: headless Linux: no desktop session (DISPLAY alone is unreliable, Xvfb sets it) */ -}}
+{{- if eq .chezmoi.os "linux" -}}
+{{-   if not (or (env "DISPLAY") (env "WAYLAND_DISPLAY")) -}}
+{{-     $headless = true -}}
+{{-   else if not (lookPath "gnome-session") -}}
+{{-     $headless = true -}}
+{{-   end -}}
 {{- end -}}
 
 {{- /* Detection: HPC cluster (has apptainer/singularity on host) */ -}}
@@ -49,7 +64,7 @@ encryption = "age"
 
 [age]
     identity = {{ $age_identity | quote }}
-    recipient = "age1ng7rrd2ynrutdjx9j9y655lnh8w4rnpw4ld2km5pyszveq4n0gjs60gzkw"
+    recipient = "age1s5nfmrjdljyh2hz3nary72zm5478dyrrsudgph043hmgs7c8gy4sc3ys0c"
 {{ end }}
 
 [data]
@@ -64,6 +79,7 @@ encryption = "age"
     is_work = {{ $work }}
     is_personal = {{ $personal }}
     use_china_mirrors = {{ $use_china_mirrors }}
+    profiles = {{ $profiles | toJson }}
     mamba_root = {{ joinPath .chezmoi.homeDir "mamba" | quote }}
     arch = {{ .chezmoi.arch | quote }}
 
@@ -76,5 +92,5 @@ encryption = "age"
     pager = "delta"
 {{- else if lookPath "bat" }}
 [diff]
-    pager = "bat --style=diff"
+    pager = "bat --style=changes"
 {{- end }}

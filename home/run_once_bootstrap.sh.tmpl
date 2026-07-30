@@ -16,6 +16,15 @@ export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.ustc.edu.cn/homebrew-bottles"
 export HOMEBREW_API_DOMAIN="https://mirrors.ustc.edu.cn/homebrew-bottles/api"
 {{- end }}
 
+# Detect existing Homebrew installation (may not be in PATH yet for new users)
+if ! command -v brew &> /dev/null; then
+    if [[ -x /home/linuxbrew/.linuxbrew/bin/brew ]]; then
+        eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+    elif [[ -x /opt/homebrew/bin/brew ]]; then
+        eval "$(/opt/homebrew/bin/brew shellenv)"
+    fi
+fi
+
 if ! command -v brew &> /dev/null; then
     echo "Homebrew not found. Installing..."
     /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
@@ -50,18 +59,17 @@ for pkg in "${core_packages[@]}"; do
     brew install "$pkg" 2>/dev/null || echo "Warning: failed to install $pkg, skipping"
 done
 
-# 3. Desktop-only packages
-{{- if not .is_headless }}
-echo "Installing desktop-only packages..."
-desktop_packages=(
+# 3. macOS-only packages (sing-box TUN proxy, alternative shells, terminal)
+{{- if eq .chezmoi.os "darwin" }}
+echo "Installing macOS-only packages..."
+macos_packages=(
     fish
     nushell
-    mihomo
     ghostty
     kubecolor
 )
 
-brew install "${desktop_packages[@]}"
+brew install "${macos_packages[@]}"
 {{- end }}
 
 echo "=== Bootstrap Complete ==="
