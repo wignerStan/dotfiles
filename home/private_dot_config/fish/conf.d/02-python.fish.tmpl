@@ -1,6 +1,6 @@
 # ── Mamba / Micromamba ────────────────────────────────────────
-# Gating: develop profile (any OS), or personal+Windows.
-{{- if or (or .develop (eq .profile "work")) (and (eq .profile "personal") (eq .chezmoi.os "windows")) }}
+# Gating: develop profile (any OS), work, or personal desktop (macOS/Windows).
+{{- if or (or .develop (eq .profile "work")) (and (eq .profile "personal") (or (eq .chezmoi.os "darwin") (eq .chezmoi.os "windows"))) }}
 # Gate on the binary existing so non-Homebrew machines skip cleanly.
 # $HOMEBREW_PREFIX is set in 00-env.fish for all shells, so MAMBA_EXE is still
 # exported in non-login shells (matching .zshenv).

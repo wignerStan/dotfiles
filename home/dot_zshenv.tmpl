@@ -73,8 +73,8 @@ export NANOBANANA_MODEL=gemini-3-pro-image-preview
 # Shell hook + activate moved to .zprofile (login shells only) to avoid
 # ~30ms fork tax on every non-interactive zsh invocation.
 # MAMBA_EXE/MAMBA_ROOT_PREFIX still exported here for non-login shells.
-# Gating: develop profile (any OS), or personal+Windows.
-{{- if or (or .develop (eq .profile "work")) (and (eq .profile "personal") (eq .chezmoi.os "windows")) }}
+# Gating: develop profile (any OS), work, or personal desktop (macOS/Windows).
+{{- if or (or .develop (eq .profile "work")) (and (eq .profile "personal") (or (eq .chezmoi.os "darwin") (eq .chezmoi.os "windows"))) }}
 export MAMBA_EXE="${HOMEBREW_PREFIX:-/home/linuxbrew/.linuxbrew}/opt/micromamba/bin/mamba"
 export MAMBA_ROOT_PREFIX="$HOME/mamba"
 # Prepend mamba/bin so mamba's python wins over brew's python@3.x

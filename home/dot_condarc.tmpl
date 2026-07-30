@@ -4,9 +4,9 @@ channels:
   - https://mirrors.ustc.edu.cn/anaconda/pkgs/r
   - conda-forge
 use_uv: true
-# auto_activate_base: true for work (no brew privileges) and personal+Windows,
-# false for develop (uses brew python as base instead)
-{{- if or (eq .profile "work") (and (eq .profile "personal") (eq .chezmoi.os "windows")) }}
+# auto_activate_base: true for work (no brew privileges) and personal desktop
+# (macOS/Windows), false for develop (uses brew python as base instead)
+{{- if or (eq .profile "work") (and (eq .profile "personal") (or (eq .chezmoi.os "darwin") (eq .chezmoi.os "windows"))) }}
 auto_activate_base: true
 {{- else }}
 auto_activate_base: false
