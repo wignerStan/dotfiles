@@ -3,7 +3,7 @@
 "$schema" = 'https://starship.rs/config-schema.json'
 
 format = """
-$username$directory$git_branch$git_status$nodejs$python$rust$golang$bun$time$line_break$character"""
+$username$directory$git_branch$git_status$nodejs$time$line_break$character"""
 
 command_timeout = 1000
 

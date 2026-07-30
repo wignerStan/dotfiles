@@ -55,33 +55,29 @@ zstyle ':completion:*:*:*:*:*' menu select
 {{- end }}
 
 # ═══════════════════════════════════════════════════════════════
-# Vi mode (zsh-vi-mode)
+# Vi mode (native zsh bindkey -v)
+# Replaced zsh-vi-mode plugin: it corrupts cursor tracking with
+# starship promptsubst + TERM=xterm (ghostty).
 # ═══════════════════════════════════════════════════════════════
 
-# Increase escape timeout for SSH to prevent bracketed paste issues
-if [[ -n "$SSH_CONNECTION" ]]; then
-  ZVM_ESCAPE_KEYTIMEOUT=0.5
-else
-  ZVM_ESCAPE_KEYTIMEOUT=0.03
-fi
-ZVM_LINE_INIT_MODE="i"
+bindkey -v
+export KEYTIMEOUT=1
 
-{{- if lookPath "brew" }}
-[[ -f $_brew_prefix/share/zsh-vi-mode/zsh-vi-mode.plugin.zsh ]] && source $_brew_prefix/share/zsh-vi-mode/zsh-vi-mode.plugin.zsh
-{{- end }}
+# Start in insert mode
+function zle-line-init() { zle .reset-prompt; }
+zle -N zle-line-init
 
-function zvm_after_init() {
-  # Restore fzf bindings (zsh-vi-mode overrides them)
-  zvm_bindkey vicmd '^r' fzf-history-widget
-  zvm_bindkey viins '^r' fzf-history-widget
-  zvm_bindkey vicmd '^t' fzf-file-widget
-  zvm_bindkey viins '^t' fzf-file-widget
-  # History substring search on arrow keys (both modes)
-  zvm_bindkey vicmd '^[[A' history-substring-search-up
-  zvm_bindkey vicmd '^[[B' history-substring-search-down
-  zvm_bindkey viins '^[[A' history-substring-search-up
-  zvm_bindkey viins '^[[B' history-substring-search-down
-}
+# FZF bindings (both modes)
+bindkey -M vicmd '^r' fzf-history-widget
+bindkey -M viins '^r' fzf-history-widget
+bindkey -M vicmd '^t' fzf-file-widget
+bindkey -M viins '^t' fzf-file-widget
+
+# History substring search on arrow keys (both modes)
+bindkey -M vicmd '^[[A' history-substring-search-up
+bindkey -M vicmd '^[[B' history-substring-search-down
+bindkey -M viins '^[[A' history-substring-search-up
+bindkey -M viins '^[[B' history-substring-search-down
 
 unset _brew_prefix
 
