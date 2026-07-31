@@ -70,6 +70,12 @@ export KEYTIMEOUT=1
 function zle-line-init() { zle .reset-prompt; }
 zle -N zle-line-init
 
+# Readline-style line movement in both modes (matches bash/fish muscle memory)
+bindkey -M viins '^a' beginning-of-line
+bindkey -M viins '^e' end-of-line
+bindkey -M vicmd '^a' beginning-of-line
+bindkey -M vicmd '^e' end-of-line
+
 # FZF bindings (both modes)
 bindkey -M vicmd '^r' fzf-history-widget
 bindkey -M viins '^r' fzf-history-widget
