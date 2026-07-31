@@ -20,7 +20,7 @@ export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 export XDG_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
 
-# ── Homebrew (static PATH — no fork, needed before direnv/mamba hooks) ───
+# ── Homebrew (static PATH — no fork, needed before direnv hooks) ───
 {{- if eq .chezmoi.os "darwin" }}
 export HOMEBREW_PREFIX="/opt/homebrew"
 path=(/opt/homebrew/bin /opt/homebrew/sbin $path)
@@ -69,15 +69,10 @@ export NANOBANANA_MODEL=gemini-3-pro-image-preview
 [[ -d "$HOME/.cargo" && -f "$HOME/.cargo/env" ]] && . "$HOME/.cargo/env"
 {{- end }}
 
-# ── Mamba (global Python base environment) ─────────────────
-# Shell hook + activate moved to .zprofile (login shells only) to avoid
-# ~30ms fork tax on every non-interactive zsh invocation.
-# MAMBA_EXE/MAMBA_ROOT_PREFIX still exported here for non-login shells.
-# Gating: develop profile (any OS), work, or personal desktop (macOS/Windows).
 {{- if or (or .develop (eq .profile "work")) (and (eq .profile "personal") (or (eq .chezmoi.os "darwin") (eq .chezmoi.os "windows"))) }}
+# ── Mamba (global Python base environment) ─────────────────
 export MAMBA_EXE="${HOMEBREW_PREFIX:-/home/linuxbrew/.linuxbrew}/opt/micromamba/bin/mamba"
 export MAMBA_ROOT_PREFIX="$HOME/mamba"
-# Prepend mamba/bin so mamba's python wins over brew's python@3.x
 path=("$MAMBA_ROOT_PREFIX/bin" $path)
 {{- end }}
 
