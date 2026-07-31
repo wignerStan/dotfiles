@@ -138,13 +138,6 @@ path=($HOME/.local/bin $path)
 # Fail-safe: ensure PATH is exported regardless of how the shell was started
 export PATH
 
-# ── npm global install redirect (non-work profiles) ─────────────
-# npm -g writes to a dead-end dir not in PATH, effectively blocking global pollution.
-# work profile: no redirect (normal npm global behavior).
-{{- if not (eq .profile "work") }}
-export NPM_CONFIG_PREFIX="$HOME/.npm-deadend"
-{{- end }}
-
 # ═══════════════════════════════════════════════════════════════
 # Dev tool wrappers (modern replacements) — loaded last
 # ═══════════════════════════════════════════════════════════════
