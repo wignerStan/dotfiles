@@ -39,10 +39,9 @@ install-yazi-plugins.sh
 container-data/
 {{- end }}
 
-# Node/Bun/Go/Conda configs: develop profile only
+# Node/Bun/Go configs: develop profile only
 {{- if not .develop }}
 .npmrc
 .bunfig.toml
 .config/go/
-.condarc
 {{- end }}

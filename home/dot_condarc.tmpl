@@ -1,15 +1,22 @@
+# .condarc — managed by chezmoi (all profiles)
+{{- if .use_china_mirrors }}
 channels:
   - https://mirrors.ustc.edu.cn/anaconda/cloud/conda-forge
   - https://mirrors.ustc.edu.cn/anaconda/pkgs/main
   - https://mirrors.ustc.edu.cn/anaconda/pkgs/r
   - conda-forge
+{{- else }}
+channels:
+  - conda-forge
+{{- end }}
 use_uv: true
-# auto_activate_base: true for work (no brew privileges) and personal desktop
-# (macOS/Windows), false for develop (uses brew python as base instead)
+always_yes: true
+changeps1: false
+# auto_activate_base: true only when mamba is the primary Python (work, or
+# personal desktop on macOS/Windows without brew python). False for develop
+# and non-develop Linux/VPS (brew or system python is the base).
 {{- if or (eq .profile "work") (and (eq .profile "personal") (or (eq .chezmoi.os "darwin") (eq .chezmoi.os "windows"))) }}
 auto_activate_base: true
 {{- else }}
 auto_activate_base: false
 {{- end }}
-always_yes: true
-changeps1: false
