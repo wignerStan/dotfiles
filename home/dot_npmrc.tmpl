@@ -3,6 +3,6 @@
 registry=https://registry.npmmirror.com
 {{- end }}
 {{- if not (eq .profile "work") }}
-# Redirect global installs to dead-end dir (not in PATH)
-prefix=${HOME}/.npm-deadend
+# Redirect npm global installs to a read-only dir (blocks npm -g pollution)
+prefix=${HOME}/.npm-global-blocked
 {{- end }}
