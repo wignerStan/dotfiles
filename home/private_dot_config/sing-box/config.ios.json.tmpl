@@ -1,8 +1,8 @@
 {{- if hasKey . "singbox_server" -}}
 {{- /* Mobile (registered): schema version is a declared data flag, not host-detected.
-      Set singbox_new_schema=true in chezmoi data once the device runs sing-box >= 1.14. */ -}}
+      Set singbox_ios_new_schema=true in chezmoi data once the device runs sing-box >= 1.14. */ -}}
 {{- $newSchema := false -}}
-{{- if hasKey . "singbox_new_schema" -}}{{- $newSchema = .singbox_new_schema -}}{{- end -}}
+{{- if hasKey . "singbox_ios_new_schema" -}}{{- $newSchema = .singbox_ios_new_schema -}}{{- end -}}
 {
   "log": {
     "level": "info",
