@@ -264,6 +264,7 @@
       "tag": "VLESS-CDN",
       "server": {{ .singbox_cdn_host | quote }},
       "server_port": {{ .singbox_cdn_port }},
+      "domain_resolver": "dns-remote",
       "uuid": {{ .singbox_ios_uuid | quote }},
       "tls": {
         "enabled": true,
@@ -283,6 +284,7 @@
       "tag": "residential",
       "server": {{ .singbox_cdn_host | quote }},
       "server_port": {{ .singbox_cdn_port }},
+      "domain_resolver": "dns-remote",
       "uuid": {{ .singbox_residential_uuid | quote }},
       "tls": {
         "enabled": true,
