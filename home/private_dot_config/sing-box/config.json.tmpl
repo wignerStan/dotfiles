@@ -340,7 +340,6 @@
       "tag": "VLESS-CDN",
       "server": {{ .singbox_cdn_host | quote }},
       "server_port": {{ .singbox_cdn_port }},
-      "domain_resolver": "dns-remote",
       "uuid": {{ .singbox_uuid | quote }},
       "tls": {
         "enabled": true,
@@ -360,7 +359,6 @@
       "tag": "residential",
       "server": {{ .singbox_cdn_host | quote }},
       "server_port": {{ .singbox_cdn_port }},
-      "domain_resolver": "dns-remote",
       "uuid": {{ .singbox_residential_uuid | quote }},
       "tls": {
         "enabled": true,
@@ -775,7 +773,7 @@
     "final": "proxy",
     "auto_detect_interface": false,
     "default_interface": "en0",
-    "default_domain_resolver": "dns-domestic"{{- if $newSchema }},
+    "default_domain_resolver": "dns-remote"{{- if $newSchema }},
     "default_http_client": "rules-download"{{- end }}
   },
   "experimental": {
