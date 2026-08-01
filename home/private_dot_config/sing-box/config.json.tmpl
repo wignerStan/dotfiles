@@ -262,8 +262,7 @@
       "type": "mixed",
       "tag": "mixed-in",
       "listen": "0.0.0.0",
-      "listen_port": 7897,
-      "bind_interface": "utun101"
+      "listen_port": 7897
     },
     {
       "type": "mixed",
@@ -402,14 +401,16 @@
       "tag": "incus-proxy",
       "server": "100.73.12.63",
       "server_port": 10808,
-      "version": "5"
+      "version": "5",
+      "detour": "ts-ep"
     },
     {
       "type": "socks",
       "tag": "incus-residential",
       "server": "100.73.12.63",
       "server_port": 11081,
-      "version": "5"
+      "version": "5",
+      "detour": "ts-ep"
     },
     {
       "type": "direct",
