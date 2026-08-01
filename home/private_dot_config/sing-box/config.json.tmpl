@@ -172,9 +172,7 @@
       "state_directory": "{{ $singbox_dir }}/tailscale-state",
       "accept_routes": true,
       "system_interface": true,
-      "system_interface_name": "utun101",
-      "exit_node": "100.73.12.63",
-      "exit_node_allow_lan_access": true
+      "system_interface_name": "utun101"
     },
     {
       "type": "wireguard",
@@ -296,7 +294,7 @@
     {
       "type": "urltest",
       "tag": "auto-warp",
-      "outbounds": ["warp-ep", "warp-direct-ep", "ts-ep"],
+      "outbounds": ["warp-ep", "warp-direct-ep"],
       "url": "https://www.gstatic.com/generate_204",
       "interval": "3m",
       "tolerance": 100,
