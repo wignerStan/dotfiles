@@ -1,4 +1,8 @@
 {{- if hasKey . "singbox_server" -}}
+{{- /* Mobile (registered): schema version is a declared data flag, not host-detected.
+      Set singbox_new_schema=true in chezmoi data once the device runs sing-box >= 1.14. */ -}}
+{{- $newSchema := false -}}
+{{- if hasKey . "singbox_new_schema" -}}{{- $newSchema = .singbox_new_schema -}}{{- end -}}
 {
   "log": {
     "level": "info",
@@ -13,7 +17,8 @@
         "inet6_range": "fc00::/18"
       },
       {
-        "type": "local"
+        "type": "local",
+        "tag": "local"
       },
       {
         "type": "https",
@@ -141,8 +146,8 @@
     ],
     "final": "dns-remote",
     "reverse_mapping": true,
-    "strategy": "ipv4_only",
-    "independent_cache": true
+    "strategy": "ipv4_only"{{- if not $newSchema }},
+    "independent_cache": true{{- end }}
   },
   "endpoints": [
     {
@@ -248,8 +253,14 @@
       "type": "block",
       "tag": "block"
     }
+  ],{{ if $newSchema }}
+  "http_clients": [
+    {
+      "tag": "rules-download",
+      "detour": "proxy"
+    }
   ],
-  "route": {
+{{ end }}  "route": {
     "rules": [
       {
         "protocol": "dns",
@@ -556,7 +567,8 @@
     ],
     "final": "proxy",
     "auto_detect_interface": true,
-    "default_domain_resolver": "dns-domestic"
+    "default_domain_resolver": "dns-domestic"{{- if $newSchema }},
+    "default_http_client": "rules-download"{{- end }}
   },
   "experimental": {
     "cache_file": {

@@ -5,6 +5,13 @@
 {{- else -}}
 {{-   $singbox_dir = "/etc/sing-box" -}}
 {{- end -}}
+{{- /* Desktop: detect the actually-installed sing-box version. */ -}}
+{{- $sbVersionLine := "sing-box version 0.0.0" -}}
+{{- if lookPath "sing-box" -}}
+{{-   $sbVersionLine = first (splitList "\n" (output "sing-box" "version")) -}}
+{{- end -}}
+{{- $sbParts := split "." (trimPrefix "version " (regexFind "version [0-9]+\\.[0-9]+" $sbVersionLine)) -}}
+{{- $newSchema := ge (atoi $sbParts._1) 14 -}}
 {
   "log": {
     "level": "info",
@@ -19,7 +26,8 @@
         "inet6_range": "fc00::/18"
       },
       {
-        "type": "local"
+        "type": "local",
+        "tag": "local"
       },
       {
         "type": "https",
@@ -154,8 +162,8 @@
     ],
     "final": "dns-remote",
     "reverse_mapping": true,
-    "strategy": "ipv4_only",
-    "independent_cache": true
+    "strategy": "ipv4_only"{{- if not $newSchema }},
+    "independent_cache": true{{- end }}
   },
   "endpoints": [
     {
@@ -359,8 +367,14 @@
       "type": "direct",
       "tag": "direct"
     }
+  ],{{ if $newSchema }}
+  "http_clients": [
+    {
+      "tag": "rules-download",
+      "detour": "proxy"
+    }
   ],
-  "route": {
+{{ end }}  "route": {
     "rules": [
       {
         "action": "sniff"
@@ -712,7 +726,8 @@
     "final": "proxy",
     "auto_detect_interface": false,
     "default_interface": "en0",
-    "default_domain_resolver": "dns-domestic"
+    "default_domain_resolver": "dns-domestic"{{- if $newSchema }},
+    "default_http_client": "rules-download"{{- end }}
   },
   "experimental": {
     "cache_file": {
