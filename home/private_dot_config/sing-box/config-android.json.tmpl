@@ -243,7 +243,7 @@
     {
       "type": "urltest",
       "tag": "auto-residential",
-      "outbounds": ["residential", "incus-residential"],
+      "outbounds": ["residential", "residential-direct", "incus-residential"],
       "url": "https://www.gstatic.com/generate_204",
       "interval": "3m",
       "tolerance": 100,
@@ -252,7 +252,7 @@
     {
       "type": "selector",
       "tag": "ai-chain",
-      "outbounds": ["auto-warp", "auto-residential", "auto-proxy", "VLESS", "VLESS-CDN", "warp-ep", "residential", "incus-residential"],
+      "outbounds": ["auto-warp", "auto-residential", "auto-proxy"],
       "default": "auto-warp"
     },
     {
@@ -297,6 +297,25 @@
     {
       "type": "vless",
       "tag": "residential",
+      "server": {{ .singbox_cdn_host | quote }},
+      "server_port": {{ .singbox_cdn_port }},
+      "uuid": {{ .singbox_residential_uuid | quote }},
+      "tls": {
+        "enabled": true,
+        "server_name": {{ .singbox_cdn_host | quote }},
+        "utls": {
+          "enabled": true,
+          "fingerprint": "chrome"
+        }
+      },
+      "transport": {
+        "type": "ws",
+        "path": {{ .singbox_cdn_path | quote }}
+      }
+    },
+    {
+      "type": "vless",
+      "tag": "residential-direct",
       "server": {{ .singbox_server | quote }},
       "server_port": 443,
       "uuid": {{ .singbox_residential_uuid | quote }},

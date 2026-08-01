@@ -304,7 +304,7 @@
     {
       "type": "urltest",
       "tag": "auto-residential",
-      "outbounds": ["residential", "incus-residential"],
+      "outbounds": ["residential", "residential-direct", "incus-residential"],
       "url": "https://www.gstatic.com/generate_204",
       "interval": "3m",
       "tolerance": 100,
@@ -313,7 +313,7 @@
     {
       "type": "selector",
       "tag": "ai-chain",
-      "outbounds": ["auto-warp", "auto-residential", "auto-proxy", "VLESS", "VLESS-CDN", "warp-ep", "residential", "incus-residential"],
+      "outbounds": ["auto-warp", "auto-residential", "auto-proxy"],
       "default": "auto-warp"
     },
     {
@@ -372,6 +372,27 @@
       "transport": {
         "type": "ws",
         "path": {{ .singbox_cdn_path | quote }}
+      }
+    },
+    {
+      "type": "vless",
+      "tag": "residential-direct",
+      "server": {{ .singbox_server | quote }},
+      "server_port": 443,
+      "uuid": {{ .singbox_residential_uuid | quote }},
+      "flow": "xtls-rprx-vision",
+      "tls": {
+        "enabled": true,
+        "server_name": "www.cisco.com",
+        "utls": {
+          "enabled": true,
+          "fingerprint": "chrome"
+        },
+        "reality": {
+          "enabled": true,
+          "public_key": {{ .singbox_public_key | quote }},
+          "short_id": {{ .singbox_residential_short_id | quote }}
+        }
       }
     },
     {
