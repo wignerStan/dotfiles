@@ -175,22 +175,32 @@
     {
       "type": "selector",
       "tag": "proxy",
-      "outbounds": ["auto-proxy", "VLESS", "residential", "ts-socks", "ts-route", "ts-ep"],
+      "outbounds": ["auto-proxy", "VLESS", "residential", "incus-proxy", "incus-residential", "ts-ep"],
       "default": "VLESS"
     },
     {
       "type": "urltest",
       "tag": "auto-proxy",
-      "outbounds": ["VLESS", "ts-ep"],
+      "outbounds": ["VLESS", "incus-proxy"],
       "url": "https://www.gstatic.com/generate_204",
       "interval": "3m",
-      "tolerance": 50
+      "tolerance": 100,
+      "interrupt_exist_connections": false
+    },
+    {
+      "type": "urltest",
+      "tag": "auto-residential",
+      "outbounds": ["residential", "incus-residential"],
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": "3m",
+      "tolerance": 100,
+      "interrupt_exist_connections": false
     },
     {
       "type": "selector",
       "tag": "ai-chain",
-      "outbounds": ["VLESS", "residential"],
-      "default": "VLESS"
+      "outbounds": ["auto-residential", "auto-proxy", "VLESS", "residential", "incus-residential"],
+      "default": "auto-residential"
     },
     {
       "type": "vless",
@@ -235,15 +245,17 @@
     },
     {
       "type": "socks",
-      "tag": "ts-socks",
+      "tag": "incus-proxy",
       "server": "100.73.12.63",
-      "server_port": 10808
+      "server_port": 10808,
+      "version": "5"
     },
     {
       "type": "socks",
-      "tag": "ts-route",
+      "tag": "incus-residential",
       "server": "100.73.12.63",
-      "server_port": 10809
+      "server_port": 11081,
+      "version": "5"
     },
     {
       "type": "direct",

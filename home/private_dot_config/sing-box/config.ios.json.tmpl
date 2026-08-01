@@ -225,16 +225,17 @@
     {
       "type": "selector",
       "tag": "proxy",
-      "outbounds": ["auto-proxy", "VLESS", "VLESS-CDN"],
+      "outbounds": ["auto-proxy", "VLESS", "VLESS-CDN", "incus-proxy"],
       "default": "VLESS"
     },
     {
       "type": "urltest",
       "tag": "auto-proxy",
-      "outbounds": ["VLESS", "VLESS-CDN"],
+      "outbounds": ["VLESS", "VLESS-CDN", "incus-proxy"],
       "url": "https://www.gstatic.com/generate_204",
       "interval": "3m",
-      "tolerance": 50
+      "tolerance": 100,
+      "interrupt_exist_connections": false
     },
     {
       "type": "urltest",
@@ -242,12 +243,22 @@
       "outbounds": ["warp-ep", "warp-direct-ep"],
       "url": "https://www.gstatic.com/generate_204",
       "interval": "3m",
-      "tolerance": 50
+      "tolerance": 100,
+      "interrupt_exist_connections": false
+    },
+    {
+      "type": "urltest",
+      "tag": "auto-residential",
+      "outbounds": ["residential", "incus-residential"],
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": "3m",
+      "tolerance": 100,
+      "interrupt_exist_connections": false
     },
     {
       "type": "selector",
       "tag": "ai-chain",
-      "outbounds": ["auto-warp", "auto-proxy", "VLESS", "VLESS-CDN", "warp-ep", "residential"],
+      "outbounds": ["auto-warp", "auto-residential", "auto-proxy", "VLESS", "VLESS-CDN", "warp-ep", "residential", "incus-residential"],
       "default": "auto-warp"
     },
     {
@@ -307,6 +318,20 @@
         "type": "ws",
         "path": {{ .singbox_cdn_path | quote }}
       }
+    },
+    {
+      "type": "socks",
+      "tag": "incus-proxy",
+      "server": "100.73.12.63",
+      "server_port": 10808,
+      "version": "5"
+    },
+    {
+      "type": "socks",
+      "tag": "incus-residential",
+      "server": "100.73.12.63",
+      "server_port": 11081,
+      "version": "5"
     },
     {
       "type": "direct",
