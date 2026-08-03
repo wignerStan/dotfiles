@@ -427,6 +427,15 @@
         "action": "sniff"
       },
       {
+        "inbound": "tun-in",
+        "domain_suffix": ["mumuplayer.com", "mumuglobal.com", "mumu.easebar.com"],
+        "action": "route",
+        "outbound": "direct",
+        "override_address": "127.0.0.1",
+        "override_port": 8888
+      },
+      
+      {
         "inbound": "socks-residential-in",
         "outbound": "auto-residential"
       },

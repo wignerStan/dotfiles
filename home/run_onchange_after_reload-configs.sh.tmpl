@@ -8,3 +8,6 @@ echo "Dotfiles applied successfully!"
 echo "Please restart your shells to see changes (zsh, fish, nu)."
 echo "Starship and Sheldon will initialize automatically."
 echo "=== Sync Complete ==="
+
+# Disable App Nap for MuMuPlayer Pro (prevents background UI freeze)
+defaults write com.netease.mumu.nemux-global NSAppSleepDisabled -bool YES

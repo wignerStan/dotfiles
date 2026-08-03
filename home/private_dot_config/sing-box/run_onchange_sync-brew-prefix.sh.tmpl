@@ -16,7 +16,7 @@ if [ ! -d "$DST" ]; then
 fi
 
 # sync helper scripts
-for f in inject-sub.py update-rulesets.sh; do
+for f in inject-sub.py update-rulesets.sh mumu_hosts; do
     if [ -f "$SRC/$f" ]; then
         cp "$SRC/$f" "$DST/$f"
     fi
