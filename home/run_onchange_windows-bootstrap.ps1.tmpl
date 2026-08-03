@@ -41,6 +41,10 @@ if (Test-Cmd 'winget') {
 }
 
 # ── 2. scoop (fallback package manager, user-scoped, no admin) ────
+# Only on bare-metal Windows. Guest VMs use winget exclusively (scoop's
+# installer is blocked by the security manager on the UNC working dir that
+# chezmoi run_ scripts execute from, and the VM has no need for scoop).
+{{- if not .is_vm }}
 if (Test-Cmd 'scoop') {
     Write-Skip 'scoop'
 } else {
@@ -55,6 +59,7 @@ if (Test-Cmd 'scoop') {
         Write-Host "    scoop install failed: $($_.Exception.Message)" -ForegroundColor Yellow
     }
 }
+{{- end }}
 
 # Generic installer helper: try winget first, fall back to scoop.
 # Usage: Install-Tool -WingetId 'X.Y' -ScoopName 'x' -BinName 'x' -Label 'X'
