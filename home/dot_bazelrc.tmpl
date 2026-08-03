@@ -2,8 +2,9 @@
      The endpoint and worker image are NOT hardcoded here — they live in
      .chezmoidata/secrets.toml (buildbarn_endpoint, buildbarn_worker_image).
      Cross-platform: gated on the `profile` identity axis, so it applies on
-     any OS (darwin/linux) where profile == "personal". */ -}}
-{{- if eq .profile "personal" -}}
+     any OS (darwin/linux) where profile == "personal". Windows VM has no
+     bazel remote use, so skip there (and secrets.toml may not be present). */ -}}
+{{- if and (eq .profile "personal") (ne .chezmoi.os "windows") -}}
 # BuildBarn remote (k3s on the `incus` host, over Tailscale)
 # cache only: local execution + remote CAS/action cache (works for any project)
 build:remotecache --remote_cache=grpc://{{ .buildbarn_endpoint }}

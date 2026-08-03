@@ -1,0 +1,151 @@
+{{- /* Windows-only: renders empty on macOS/Linux, so chezmoi skips execution there. */ -}}
+{{- if eq .chezmoi.os "windows" -}}
+#powershell
+# ═══════════════════════════════════════════════════════════════
+# Jacob's Windows Bootstrap — winget-first, scoop-fallback
+# Idempotent (safe to re-run via run_onchange). profile={{ .profile }}
+# Principle: winget is the primary package manager; scoop is the
+# fallback for anything winget lacks. uv + micromamba come from winget.
+# ═══════════════════════════════════════════════════════════════
+# Managed by Chezmoi — runs on Windows only. Do not edit in place.
+
+$ErrorActionPreference = 'Stop'
+$ProgressPreference    = 'SilentlyContinue'
+
+function Write-Step($m){ Write-Host "==> $m" -ForegroundColor Cyan }
+function Write-Ok($m){    Write-Host "    ok: $m" -ForegroundColor Green }
+function Write-Skip($m){  Write-Host "    skip: $m (already present)" -ForegroundColor DarkGray }
+
+# Refresh PATH (winget/scoop write to Machine+User env; this session needs them now).
+function Update-EnvPath {
+    $env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')
+}
+Update-EnvPath
+
+function Test-Cmd($n) { return [bool](Get-Command $n -ErrorAction SilentlyContinue) }
+
+Write-Step "Starting Windows Bootstrap (profile={{ .profile }} geo={{ .geo }})"
+
+# ── 1. winget (primary package manager) ──────────────────────────
+# App Installer (winget) ships with Win11 and self-updates; we only ensure it's callable.
+if (Test-Cmd 'winget') {
+    Write-Skip 'winget'
+} else {
+    Write-Step "winget missing — registering App Installer from the Store (ms-windows-store:)"
+    try {
+        Start-Process 'ms-windows-store:' -ErrorAction SilentlyContinue
+        Write-Host "    Opened Microsoft Store to 'App Installer' — install it, then re-run chezmoi." -ForegroundColor Yellow
+    } catch {
+        Write-Host "    Could not open Store automatically. Install 'App Installer' from the Store." -ForegroundColor Yellow
+    }
+}
+
+# ── 2. scoop (fallback package manager, user-scoped, no admin) ────
+if (Test-Cmd 'scoop') {
+    Write-Skip 'scoop'
+} else {
+    Write-Step "Installing scoop (fallback package manager)..."
+    try {
+        # scoop's official installer
+        Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -ErrorAction SilentlyContinue
+        Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
+        Update-EnvPath
+        if (Test-Cmd 'scoop') { Write-Ok 'scoop installed' } else { Write-Host "    scoop install did not land on PATH (restart shell)" -ForegroundColor Yellow }
+    } catch {
+        Write-Host "    scoop install failed: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+}
+
+# Generic installer helper: try winget first, fall back to scoop.
+# Usage: Install-Tool -WingetId 'X.Y' -ScoopName 'x' -BinName 'x' -Label 'X'
+function Install-Tool {
+    param(
+        [string]$WingetId,
+        [string]$ScoopName,
+        [string]$BinName,
+        [string]$Label
+    )
+    if (Test-Cmd $BinName) { Write-Skip $Label; return $true }
+
+    # winget first
+    if (Test-Cmd 'winget') {
+        Write-Step "$Label — winget install $WingetId"
+        & winget install --id $WingetId -e --source winget `
+            --accept-source-agreements --accept-package-agreements `
+            --disable-interactivity --silent 2>&1 |
+            ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray } ; $code = $LASTEXITCODE
+        Update-EnvPath
+        if (Test-Cmd $BinName) { Write-Ok "$Label via winget"; return $true }
+    }
+
+    # scoop fallback
+    if (Test-Cmd 'scoop') {
+        Write-Step "$Label — fallback: scoop install $ScoopName"
+        & scoop install $ScoopName 2>&1 |
+            ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+        Update-EnvPath
+        if (Test-Cmd $BinName) { Write-Ok "$Label via scoop"; return $true }
+    }
+
+    Write-Host "    FAILED to install $Label (no working winget/scoop result)" -ForegroundColor Red
+    return $false
+}
+
+# ── 3. uv (Astral — fast Python/Rust package mgr). winget: astral-sh.uv ──
+{{- if .use_china_mirrors }}
+$env:UV_DEFAULT_INDEX = 'https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple'
+{{- end }}
+Install-Tool -WingetId 'astral-sh.uv' -ScoopName 'uv' -BinName 'uv' -Label 'uv'
+
+# ── 4. micromamba (mamba). winget: Mamba.Micromamba ──────────────
+# mamba_root is set by chezmoi config ({{ .mamba_root }}); ensure root + base exist.
+$mambaRoot = '{{ .mambaRoot }}'
+[Environment]::SetEnvironmentVariable('MAMBA_ROOT_PREFIX', $mambaRoot, 'User')
+$env:MAMBA_ROOT_PREFIX = $mambaRoot
+if (-not (Test-Path $mambaRoot)) { New-Item -ItemType Directory -Force -Path $mambaRoot | Out-Null }
+
+$mmOk = Install-Tool -WingetId 'Mamba.Micromamba' -ScoopName 'micromamba' -BinName 'micromamba' -Label 'micromamba'
+
+# micromamba shell init (powershell) + ensure a base env with python exists
+if ($mmOk -and (Test-Cmd 'micromamba')) {
+    Update-EnvPath
+    try {
+        & micromamba shell init -s powershell -r $mambaRoot 2>&1 | Out-Null
+        # base env with a python — single source of Python on the box
+        if (-not (& micromamba env list 2>$null | Select-String -Quiet '\bbase\b')) {
+            Write-Step "Creating mamba base env (python via conda-forge)"
+            & micromamba create -y -n base -c conda-forge python 2>&1 |
+                ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+        }
+        Write-Ok 'micromamba base env ready'
+    } catch {
+        Write-Host "    micromamba env init warning: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+}
+
+# ── 5. pywinauto (GUI automation — into mamba base python) ───────
+# Only when micromamba base python is available.
+if ($mmOk -and (Test-Cmd 'micromamba')) {
+    try {
+        $have = & micromamba run -n base python -c "import pywinauto" 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Skip 'pywinauto'
+        } else {
+            Write-Step "Installing pywinauto into mamba base python"
+            {{- if .use_china_mirrors }}
+            & micromamba run -n base python -m pip install -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple pywinauto 2>&1 |
+                ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+            {{- else }}
+            & micromamba run -n base python -m pip install pywinauto 2>&1 |
+                ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+            {{- end }}
+            Write-Ok 'pywinauto installed (mamba base)'
+        }
+    } catch {
+        Write-Host "    pywinauto install warning: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+}
+
+Write-Step "Windows Bootstrap Complete"
+Write-Host "    Restart PowerShell to pick up new PATH entries (winget/scoop/uv/micromamba)." -ForegroundColor Yellow
+{{- end -}}

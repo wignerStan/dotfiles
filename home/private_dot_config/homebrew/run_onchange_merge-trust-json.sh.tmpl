@@ -1,3 +1,5 @@
+{{- /* Homebrew is macOS/Linux only — render empty on Windows so chezmoi skips execution. */ -}}
+{{- if ne .chezmoi.os "windows" -}}
 #!/bin/bash
 # Merge desired Homebrew trusted taps/formulae into ~/.config/homebrew/trust.json.
 #
@@ -44,6 +46,9 @@ jq --slurpfile taps <(printf '%s\n' "$MANAGED_TAPS" | jq -R . | jq -s .) \
 mv "$tmp" "$TRUST"
 
 echo "homebrew/trust.json: merged managed taps/formulae (additive)"
+{{- else if eq .chezmoi.os "windows" -}}
+{{- /* no-op on windows */ -}}
 {{- else }}
 echo "homebrew/trust.json: brew not installed, skipping"
 {{- end }}
+{{- end -}}
