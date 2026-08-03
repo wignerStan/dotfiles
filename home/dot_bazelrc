@@ -1,0 +1,13 @@
+# ── BuildBarn remote (k3s on the `incus` host, reachable over Tailscale) ────
+# Frontend (bb-storage) on 172.16.0.210:8980 — plaintext gRPC, no auth.
+# Reachable directly: the incus node advertises the 172.16.0.0/24 subnet.
+
+# cache only: local execution + remote CAS/action cache (works for any project)
+build:remotecache --remote_cache=grpc://172.16.0.210:8980
+
+# full remote execution: actions run on the Linux (siso-chromium) worker.
+# BuildBarn needs an exact platform match, hence both properties.
+build:remote --config=remotecache
+build:remote --remote_executor=grpc://172.16.0.210:8980
+build:remote --remote_default_exec_properties=OSFamily=Linux
+build:remote --remote_default_exec_properties=container-image=docker://gcr.io/chops-public-images-prod/rbe/siso-chromium/linux
