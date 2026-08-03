@@ -1,0 +1,17 @@
+{{- /* BuildBarn remote cache/execution for personal dev machines.
+     The endpoint and worker image are NOT hardcoded here — they live in
+     .chezmoidata/secrets.toml (buildbarn_endpoint, buildbarn_worker_image).
+     Cross-platform: gated on the `profile` identity axis, so it applies on
+     any OS (darwin/linux) where profile == "personal". */ -}}
+{{- if eq .profile "personal" -}}
+# BuildBarn remote (k3s on the `incus` host, over Tailscale)
+# cache only: local execution + remote CAS/action cache (works for any project)
+build:remotecache --remote_cache=grpc://{{ .buildbarn_endpoint }}
+# full remote execution on the Linux worker (BuildBarn needs an exact platform match)
+build:remote --config=remotecache
+build:remote --remote_executor=grpc://{{ .buildbarn_endpoint }}
+build:remote --remote_default_exec_properties=OSFamily=Linux
+build:remote --remote_default_exec_properties=container-image=docker://{{ .buildbarn_worker_image }}
+{{- else -}}
+# BuildBarn remote config skipped (profile={{ .profile }})
+{{- end -}}
