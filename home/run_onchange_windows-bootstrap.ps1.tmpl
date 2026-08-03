@@ -99,7 +99,7 @@ Install-Tool -WingetId 'astral-sh.uv' -ScoopName 'uv' -BinName 'uv' -Label 'uv'
 
 # ── 4. micromamba (mamba). winget: Mamba.Micromamba ──────────────
 # mamba_root is set by chezmoi config ({{ .mamba_root }}); ensure root + base exist.
-$mambaRoot = '{{ .mambaRoot }}'
+$mambaRoot = '{{ .mamba_root }}'
 [Environment]::SetEnvironmentVariable('MAMBA_ROOT_PREFIX', $mambaRoot, 'User')
 $env:MAMBA_ROOT_PREFIX = $mambaRoot
 if (-not (Test-Path $mambaRoot)) { New-Item -ItemType Directory -Force -Path $mambaRoot | Out-Null }
