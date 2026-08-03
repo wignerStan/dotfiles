@@ -1,3 +1,4 @@
+{{- if and (eq .chezmoi.os "darwin") (not .is_vm) -}}
 #!/bin/bash
 
 # Managed by Chezmoi (Auto-runs on change)
@@ -11,3 +12,4 @@ echo "=== Sync Complete ==="
 
 # Disable App Nap for MuMuPlayer Pro (prevents background UI freeze)
 defaults write com.netease.mumu.nemux-global NSAppSleepDisabled -bool YES
+{{- end -}}

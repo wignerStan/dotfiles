@@ -1,3 +1,5 @@
+{{- /* Unix-only bootstrap (Homebrew). Windows uses run_onchange_windows-bootstrap.ps1. */ -}}
+{{- if not .is_vm -}}
 #!/bin/bash
 
 # ═══════════════════════════════════════════════════════════════
@@ -181,3 +183,4 @@ done
 {{- end }}
 
 echo "=== Bootstrap Complete ==="
+{{- end -}}

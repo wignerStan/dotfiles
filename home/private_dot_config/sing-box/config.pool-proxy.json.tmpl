@@ -1,0 +1,70 @@
+{{- if hasKey . "singbox_server" -}}
+{
+  "log": {
+    "level": "warn",
+    "timestamp": true
+  },
+  "inbounds": [
+    {
+      "type": "socks",
+      "tag": "socks-in",
+      "listen": "127.0.0.1",
+      "listen_port": 10812,
+      "udp_timeout": 300
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "selector",
+      "tag": "proxy",
+      "outbounds": ["pool-vless", "direct"],
+      "default": "pool-vless"
+    },
+    {
+      "type": "socks",
+      "tag": "pool-vless",
+      "server": "100.95.98.56",
+      "server_port": 10810,
+      "version": "5",
+      "detour": "VLESS"
+    },
+    {
+      "type": "vless",
+      "tag": "VLESS",
+      "server": {{ .singbox_server | quote }},
+      "server_port": 443,
+      "uuid": {{ .singbox_uuid | quote }},
+      "flow": "xtls-rprx-vision",
+      "tls": {
+        "enabled": true,
+        "server_name": "www.cisco.com",
+        "utls": {
+          "enabled": true,
+          "fingerprint": "chrome"
+        },
+        "reality": {
+          "enabled": true,
+          "public_key": {{ .singbox_public_key | quote }}
+        }
+      }
+    },
+    {
+      "type": "direct",
+      "tag": "direct"
+    }
+  ],
+  "route": {
+    "rules": [
+      {
+        "action": "sniff"
+      },
+      {
+        "protocol": "dns",
+        "action": "hijack-dns"
+      }
+    ],
+    "final": "proxy",
+    "auto_detect_interface": true
+  }
+}
+{{- end -}}

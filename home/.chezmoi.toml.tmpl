@@ -28,6 +28,26 @@
 {{-   end -}}
 {{- end -}}
 
+{{- /* Axis 4: is_vm — guest VM (Parallels/VMware/VirtualBox/QEMU), not bare metal.
+     Used to apply a simplified profile: skip host-specific daemons (sing-box TUN
+     proxy, Homebrew trust sync, etc.) that have no meaning or won't run in a guest. */ -}}
+{{- $is_vm := false -}}
+{{- if eq .chezmoi.os "windows" -}}
+{{-   if lookPath "powershell" -}}
+{{-     $model := output "powershell" "-NoProfile" "-Command" "(Get-CimInstance Win32_ComputerSystem).Model" | trim -}}
+{{-     if or (contains "Parallels" $model) (contains "VMware" $model) (contains "VirtualBox" $model) -}}
+{{-       $is_vm = true -}}
+{{-     end -}}
+{{-   end -}}
+{{- else if eq .chezmoi.os "linux" -}}
+{{-   if stat "/sys/class/dmi/id/product_name" -}}
+{{-     $pn := output "cat" "/sys/class/dmi/id/product_name" | trim -}}
+{{-     if or (contains "Parallels" $pn) (contains "VMware" $pn) (contains "VirtualBox" $pn) (contains "QEMU" $pn) (contains "KVM" $pn) -}}
+{{-       $is_vm = true -}}
+{{-     end -}}
+{{-   end -}}
+{{- end -}}
+
 {{- /* Derived */ -}}
 {{- $ephemeral := or (eq $profile "vps") (eq $profile "hpc") -}}
 
@@ -89,6 +109,7 @@ encryption = "age"
     primary_shell = "zsh"
     is_ephemeral = {{ $ephemeral }}
     is_headless = {{ $headless }}
+    is_vm = {{ $is_vm }}
     use_china_mirrors = {{ $use_china_mirrors }}
     geo = {{ $geo | quote }}
     profile = {{ $profile | quote }}

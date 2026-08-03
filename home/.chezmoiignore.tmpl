@@ -1,6 +1,19 @@
-# sing-box: personal desktop only (macOS/Windows — runs TUN proxy there)
-{{- if or (not (eq .profile "personal")) (eq .chezmoi.os "linux") }}
+# sing-box: personal desktop only (macOS/Windows — runs TUN proxy there).
+# Also skip in guest VMs: the TUN proxy runs on the Mac host, not the VM
+# (the VM rides the host's network), and the Homebrew/sing-box run_*.sh scripts
+# can't fork/exec on Windows.
+{{- if or (not (eq .profile "personal")) (eq .chezmoi.os "linux") .is_vm }}
 .config/sing-box/
+{{- end }}
+
+{{- if .is_vm }}
+# VM: skip host-only daemons / Homebrew integration entirely
+.config/homebrew/
+.config/zellij/
+.config/yazi/
+.config/ghostty/
+.oh-my-zsh/
+.iterm2_shell_integration.zsh
 {{- end }}
 
 # Byobu: Linux-only
