@@ -7,12 +7,22 @@
 {{- end }}
 
 {{- if .is_vm }}
-# VM: skip host-only daemons / Homebrew integration entirely
+# VM: skip host-only daemons, Unix shells, and Homebrew integration entirely.
+# The VM is Windows-only (apps with no Mac version); it rides the host Mac's
+# TUN proxy and uses PowerShell. Unix-shell templates (fish/zsh/tmux/sing-box)
+# call Unix-only commands (id, brew) and have no meaning in the guest.
 .config/homebrew/
+.config/sing-box/
 .config/zellij/
 .config/yazi/
 .config/ghostty/
+.config/tmux/
+.config/fish/
+.config/nushell/
 .oh-my-zsh/
+.zshrc
+.zshenv
+.zprofile
 .iterm2_shell_integration.zsh
 {{- end }}
 
