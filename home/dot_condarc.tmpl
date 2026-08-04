@@ -12,9 +12,8 @@ channels:
 use_uv: true
 always_yes: true
 changeps1: false
-# auto_activate_base: true only when mamba is the primary Python (work, or
-# personal desktop on macOS/Windows without brew python). False for develop
-# and non-develop Linux/VPS (brew or system python is the base).
+# auto_activate_base: true only when mamba is available (work, or
+# personal desktop on macOS/Windows). False everywhere else.
 {{- if or (eq .profile "work") (and (eq .profile "personal") (or (eq .chezmoi.os "darwin") (eq .chezmoi.os "windows"))) }}
 auto_activate_base: true
 {{- else }}

@@ -1,6 +1,6 @@
 # ── Mamba / Micromamba ────────────────────────────────────────
-# Gating: develop profile (any OS), work, or personal desktop (macOS/Windows).
-{{- if or (or .develop (eq .profile "work")) (and (eq .profile "personal") (or (eq .chezmoi.os "darwin") (eq .chezmoi.os "windows"))) }}
+# Gating: work, or personal desktop (macOS/Windows).
+{{- if or (eq .profile "work") (and (eq .profile "personal") (or (eq .chezmoi.os "darwin") (eq .chezmoi.os "windows"))) }}
 # Gate on the binary existing so non-Homebrew machines skip cleanly.
 # $HOMEBREW_PREFIX is set in 00-env.fish for all shells, so MAMBA_EXE is still
 # exported in non-login shells (matching .zshenv).
@@ -18,9 +18,11 @@ end
 {{- end }}
 
 # ── Pixi (project Python environments) ──────────────────────
-{{- if and .develop (lookPath "pixi") }}
+{{- if .develop }}
 if type -q pixi
     set -gx PIXI_HOME ~/.pixi
     fish_add_path --move $PIXI_HOME/bin
+    # Share PyPI wheel cache with uv
+    set -gx PIXI_CACHE_PYPI_WHEELS_DIR ~/.cache/uv
 end
 {{- end }}

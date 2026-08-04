@@ -69,7 +69,7 @@ export NANOBANANA_MODEL=gemini-3-pro-image-preview
 [[ -d "$HOME/.cargo" && -f "$HOME/.cargo/env" ]] && . "$HOME/.cargo/env"
 {{- end }}
 
-{{- if or (or .develop (eq .profile "work")) (and (eq .profile "personal") (or (eq .chezmoi.os "darwin") (eq .chezmoi.os "windows"))) }}
+{{- if or (eq .profile "work") (and (eq .profile "personal") (or (eq .chezmoi.os "darwin") (eq .chezmoi.os "windows"))) }}
 # ── Mamba (global Python base environment) ─────────────────
 export MAMBA_EXE="${HOMEBREW_PREFIX:-/home/linuxbrew/.linuxbrew}/opt/micromamba/bin/mamba"
 export MAMBA_ROOT_PREFIX="$HOME/mamba"
@@ -77,9 +77,11 @@ path=("$MAMBA_ROOT_PREFIX/bin" $path)
 {{- end }}
 
 # ── Pixi (project Python environments) ──────────────────────
-{{- if and .develop (lookPath "pixi") }}
+{{- if .develop }}
 export PIXI_HOME="${HOME}/.pixi"
 path+=("${PIXI_HOME}/bin")
+# Share PyPI wheel cache with uv (avoids duplicate downloads)
+export PIXI_CACHE_PYPI_WHEELS_DIR="${HOME}/.cache/uv"
 {{- end }}
 
 # ── Direnv (auto-load project-level environment) ─────────────
@@ -185,7 +187,7 @@ EOF
   return $ret
 }
 {{- end }}
-{{- if and (or (or .develop (eq .profile "work")) (and (eq .profile "personal") (or (eq .chezmoi.os "darwin") (eq .chezmoi.os "windows")))) (lookPath "mamba") }}
+{{- if and (or (eq .profile "work") (and (eq .profile "personal") (or (eq .chezmoi.os "darwin") (eq .chezmoi.os "windows")))) (lookPath "mamba") }}
 
 conda() {
   mamba "$@"
