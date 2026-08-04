@@ -10,10 +10,10 @@
 {{-   $profile = "hpc" -}}
 {{- end -}}
 
-{{- /* tier: simple (VM/container) | standard | develop
+{{- /* tier: simple (VM/container) | standard | develop (per-user)
      - simple: VM/container (minimal, no brew)
-     - develop: headless server (Linux without desktop = dev machine)
-     - standard: desktop with real display (full GUI tools) */ -}}
+     - develop: dev user (full dev tooling)
+     - standard: normal user (desktop or server, no dev tooling) */ -}}
 {{- $tier := "standard" -}}
 {{- if eq .chezmoi.username "dev" -}}
 {{-   $tier = "develop" -}}
@@ -44,11 +44,6 @@
 {{-   else if not (lookPath "gnome-session") -}}
 {{-     $headless = true -}}
 {{-   end -}}
-{{- end -}}
-
-{{- /* tier override: headless personal Linux = develop (dev server) */ -}}
-{{- if and (eq .chezmoi.os "linux") $headless (eq $profile "personal") (ne $tier "simple") -}}
-{{-   $tier = "develop" -}}
 {{- end -}}
 
 {{- /* Derived */ -}}
