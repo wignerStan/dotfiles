@@ -202,13 +202,28 @@ else {
     } catch { Write-Host "    scoop install failed: $($_.Exception.Message)" -ForegroundColor Yellow }
 }
 
-# Tools via winget (scoop fallback): git (full, with Git Bash + GUI), sing-box, uv, micromamba, pixi
+# Tools via winget (scoop fallback): git (full, with Git Bash + GUI), uv, micromamba, pixi.
+# (sing-box core is installed directly in both tiers — see below — since its winget
+# package is unreliable and the core binary has clean GitHub releases.)
 Install-Tool -WingetId 'Git.Git'              -ScoopName 'git'        -BinName 'git'        -Label 'git (full)'
-Install-Tool -WingetId 'sing-box.sing-box'     -ScoopName 'sing-box'   -BinName 'sing-box'   -Label 'sing-box'
 Install-Tool -WingetId 'astral-sh.uv'          -ScoopName 'uv'         -BinName 'uv'         -Label 'uv'
 Install-Tool -WingetId 'Mamba.Micromamba'      -ScoopName 'micromamba' -BinName 'micromamba' -Label 'micromamba'
 Install-Tool -WingetId 'prefix-dev.pixi'       -ScoopName 'pixi'       -BinName 'pixi'       -Label 'pixi'
 {{- end }}
+
+# ═══════════════════════════════════════════════════════════════
+# sing-box CORE — direct install, both tiers.
+# We want the sing-box *core* binary (SagerNet/sing-box), NOT a GUI app, and its
+# winget package ID is unreliable — so download the core binary directly from
+# GitHub releases (arm64/amd64) into ~/.local/sing-box, add to User PATH.
+# ═══════════════════════════════════════════════════════════════
+$sbTag = Get-LatestRelease 'SagerNet/sing-box'
+if ($sbTag) {
+    $sbVer = $sbTag -replace '^v',''   # v1.13.16 -> 1.13.16
+    Install-Direct -Label 'sing-box (core)' `
+        -Url "https://github.com/SagerNet/sing-box/releases/download/$sbTag/sing-box-$sbVer-windows-$__arch.zip" `
+        -Dest "$env:USERPROFILE\.local\sing-box" -PathDirs @('') -TestBin 'sing-box'
+}
 
 # ═══════════════════════════════════════════════════════════════
 # 2. MAMBA BASE ENV (python) — both tiers
