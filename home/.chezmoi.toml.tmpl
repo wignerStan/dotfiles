@@ -10,11 +10,19 @@
 {{-   $profile = "hpc" -}}
 {{- end -}}
 
-{{- /* Axis 2: develop (composition layer — additive dev tooling) */ -}}
-{{- $develop := false -}}
+{{- /* tier: simple (VM/container) | standard | develop (full dev tooling) */ -}}
+{{- $tier := "standard" -}}
 {{- if eq .chezmoi.username "dev" -}}
-{{-   $develop = true -}}
+{{-   $tier = "develop" -}}
+{{- else if or (env "CODESPACES") (env "REMOTE_CONTAINERS_IPC") (eq .chezmoi.username "root" "ubuntu") -}}
+{{-   $tier = "simple" -}}
+{{- else if stat "/sys/class/dmi/id/product_name" -}}
+{{-   $pn := output "cat" "/sys/class/dmi/id/product_name" | trim -}}
+{{-   if or (contains "Virtual" $pn) (contains "KVM" $pn) (contains "QEMU" $pn) (contains "Parallels" $pn) -}}
+{{-     $tier = "simple" -}}
+{{-   end -}}
 {{- end -}}
+{{- $develop := eq $tier "develop" -}}
 
 {{- /* Axis 3: headless (no real desktop session) */ -}}
 {{- $headless := false -}}
@@ -25,20 +33,6 @@
 {{-     $headless = true -}}
 {{-   else if not (lookPath "gnome-session") -}}
 {{-     $headless = true -}}
-{{-   end -}}
-{{- end -}}
-
-{{- /* is_vm: true if running inside a guest VM */ -}}
-{{- $is_vm := false -}}
-{{- if eq .chezmoi.os "linux" -}}
-{{-   if stat "/sys/class/dmi/id/product_name" -}}
-{{-     $pn := output "cat" "/sys/class/dmi/id/product_name" | trim -}}
-{{-     $is_vm = or (contains "Virtual" $pn) (contains "KVM" $pn) (contains "QEMU" $pn) -}}
-{{-   end -}}
-{{- else if eq .chezmoi.os "windows" -}}
-{{-   if stat "/sys/class/dmi/id/product_name" -}}
-{{-     $pn := output "cat" "/sys/class/dmi/id/product_name" | trim -}}
-{{-     $is_vm = or (contains "Virtual" $pn) (contains "Parallels" $pn) -}}
 {{-   end -}}
 {{- end -}}
 
@@ -103,7 +97,7 @@ encryption = "age"
     primary_shell = "zsh"
     is_ephemeral = {{ $ephemeral }}
     is_headless = {{ $headless }}
-    is_vm = {{ $is_vm }}
+    tier = {{ $tier | quote }}
     use_china_mirrors = {{ $use_china_mirrors }}
     geo = {{ $geo | quote }}
     profile = {{ $profile | quote }}

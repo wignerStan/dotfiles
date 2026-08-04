@@ -44,7 +44,7 @@ if (Test-Cmd 'winget') {
 # Only on bare-metal Windows. Guest VMs use winget exclusively (scoop's
 # installer is blocked by the security manager on the UNC working dir that
 # chezmoi run_ scripts execute from, and the VM has no need for scoop).
-{{- if not .is_vm }}
+{{- if not (eq .tier "simple") }}
 if (Test-Cmd 'scoop') {
     Write-Skip 'scoop'
 } else {

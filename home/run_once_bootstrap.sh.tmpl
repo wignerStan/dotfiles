@@ -1,5 +1,5 @@
 {{- /* Unix-only bootstrap (Homebrew). Windows uses run_onchange_windows-bootstrap.ps1. */ -}}
-{{- if not .is_vm -}}
+{{- if not (eq .tier "simple") -}}
 #!/bin/bash
 
 # ═══════════════════════════════════════════════════════════════
@@ -8,7 +8,7 @@
 
 set -euo pipefail
 
-echo "=== Starting Jacob's Dotfiles Bootstrap (profile={{ .profile }} develop={{ .develop }}) ==="
+echo "=== Starting Jacob's Dotfiles Bootstrap (profile={{ .profile }} tier={{ .tier }}) ==="
 
 # 1. Mirror-aware Homebrew setup
 {{- if .use_china_mirrors }}

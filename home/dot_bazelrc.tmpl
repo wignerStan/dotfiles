@@ -5,7 +5,7 @@
      any OS (darwin/linux) where profile == "personal". Windows VM has no
      bazel remote use, so skip there (and secrets.toml may not be present). */ -}}
 {{- /* Personal bare-metal dev machines (not VM guests, not Windows). */ -}}
-{{- if and (and (eq .profile "personal") (ne .chezmoi.os "windows")) (not .is_vm) -}}
+{{- if and (and (eq .profile "personal") (ne .chezmoi.os "windows")) (not (eq .tier "simple")) -}}
 # BuildBarn remote (k3s on the `incus` host, over Tailscale)
 # cache only: local execution + remote CAS/action cache (works for any project)
 {{- if hasKey . "buildbarn_endpoint" }}
@@ -21,5 +21,5 @@ build:remote --remote_default_exec_properties=OSFamily=Linux
 build:remote --remote_default_exec_properties=container-image=docker://{{ .buildbarn_worker_image }}
 {{- end }}
 {{- else -}}
-# BuildBarn remote config skipped (profile={{ .profile }}, is_vm={{ .is_vm }})
+# BuildBarn remote config skipped (profile={{ .profile }}, tier={{ .tier }})
 {{- end -}}

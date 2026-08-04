@@ -2,11 +2,11 @@
 # Also skip in guest VMs: the TUN proxy runs on the Mac host, not the VM
 # (the VM rides the host's network), and the Homebrew/sing-box run_*.sh scripts
 # can't fork/exec on Windows.
-{{- if or (not (eq .profile "personal")) (eq .chezmoi.os "linux") .is_vm }}
+{{- if or (not (eq .profile "personal")) (eq .chezmoi.os "linux") (eq .tier "simple") }}
 .config/sing-box/
 {{- end }}
 
-{{- if .is_vm }}
+{{- if (eq .tier "simple") }}
 # VM: skip host-only daemons, Unix shells, and Homebrew integration entirely.
 # The VM is Windows-only (apps with no Mac version); it rides the host Mac's
 # TUN proxy and uses PowerShell. Unix-shell templates (fish/zsh/tmux/sing-box)
