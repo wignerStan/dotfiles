@@ -10,10 +10,10 @@
 {{-   $profile = "hpc" -}}
 {{- end -}}
 
-{{- /* tier: simple (VM/container) | standard | develop (per-user)
-     - simple: VM/container (minimal, no brew)
-     - develop: dev user (full dev tooling)
-     - standard: normal user (desktop or server, no dev tooling) */ -}}
+{{- /* tier: simple | standard | develop (per-user identity)
+     - simple:   VM/container (minimal, no brew)
+     - standard: admin/management user (jacob) — manages the develop space
+     - develop:  dev user — actual development workspace */ -}}
 {{- $tier := "standard" -}}
 {{- if eq .chezmoi.username "dev" -}}
 {{-   $tier = "develop" -}}
