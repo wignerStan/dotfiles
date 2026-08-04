@@ -37,16 +37,80 @@ chmod -R 0500 "$HOME/.npm-global-blocked"
 # Work/VPS profile: no Homebrew. Probe for core tools and install
 # missing ones as static binaries from GitHub releases into ~/.local/bin.
 {{- if eq .profile "vps" }}
-# VPS: install core tools via system package manager first
+# ═══ VPS: distro-aware system packages + services ═════════════
+__vps_pkgs=""
+__vps_init=""
+
 if command -v apk &>/dev/null; then
+    # Alpine
+    __vps_pkgs="zsh tmux git curl openssh ripgrep fd fzf bat neovim"
     echo "Installing core packages via apk..."
-    sudo apk add --no-cache zsh tmux starship zoxide ripgrep fd fzf bat eza neovim 2>/dev/null || true
-elif command -v dnf &>/dev/null; then
-    echo "Installing core packages via dnf..."
-    sudo dnf install -y zsh tmux starship zoxide ripgrep fd-find fzf bat eza neovim 2>/dev/null || true
+    sudo apk add --no-cache $__vps_pkgs 2>/dev/null || true
+    # rc-service for Alpine OpenRC
+    __vps_init="openrc"
 elif command -v apt &>/dev/null; then
+    # Debian/Ubuntu
+    __vps_pkgs="zsh tmux git curl ripgrep fd-find fzf bat neovim"
     echo "Installing core packages via apt..."
-    sudo apt update -qq && sudo apt install -y zsh tmux ripgrep fd-find fzf bat neovim 2>/dev/null || true
+    sudo apt update -qq && sudo apt install -y $__vps_pkgs 2>/dev/null || true
+    __vps_init="systemd"
+fi
+
+# ── Git config ────────────────────────────────────────────────
+if ! git config --global user.name &>/dev/null; then
+    git config --global user.name "{{ .name }}"
+    git config --global user.email "{{ .email }}"
+    git config --global init.defaultBranch main
+    git config --global pull.rebase true
+    echo "Git configured"
+fi
+
+# ── Tailscale ─────────────────────────────────────────────────
+if ! command -v tailscale &>/dev/null; then
+    echo "Installing Tailscale..."
+    if [[ "$__vps_init" == "openrc" ]]; then
+        # Alpine: install from edge repo
+        sudo apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community tailscale 2>/dev/null || true
+        sudo rc-update add tailscale default 2>/dev/null
+        sudo rc-service tailscale start 2>/dev/null
+    else
+        curl -fsSL https://tailscale.com/install.sh | sh 2>/dev/null
+        sudo systemctl enable --now tailscaled 2>/dev/null
+    fi
+fi
+if command -v tailscale &>/dev/null && ! tailscale status &>/dev/null; then
+    echo "Tailscale installed but not authenticated. Run: sudo tailscale up"
+fi
+
+# ── Kopia backup ──────────────────────────────────────────────
+if ! command -v kopia &>/dev/null; then
+    echo "Installing Kopia..."
+    if [[ "$__vps_init" == "openrc" ]]; then
+        # Alpine: download static binary
+        __kopia_ver=$(curl -fsSL https://api.github.com/repos/kopia/kopia/releases/latest | grep -oP '"tag_name": "v\K[^"]+')
+        curl -fsSL "https://github.com/kopia/kopia/releases/download/v${__kopia_ver}/kopia-${__kopia_ver}-linux-x86_64.tar.gz" \
+            | sudo tar xz -C /usr/local/bin --strip-components=1 kopia-${__kopia_ver}-linux-x86_64/kopia 2>/dev/null
+    else
+        curl -fsSL https://kopia.io/signing-key | sudo gpg --dearmor -o /usr/share/keyrings/kopia-keyring.gpg 2>/dev/null
+        echo "deb [signed-by=/usr/share/keyrings/kopia-keyring.gpg] http://packages.kopia.io/apt/ stable main" | sudo tee /etc/apt/sources.list.d/kopia.list >/dev/null
+        sudo apt update -qq && sudo apt install -y kopia 2>/dev/null
+    fi
+fi
+
+# ── SSH hardening ─────────────────────────────────────────────
+__sshd_config="/etc/ssh/sshd_config"
+if [[ -f "$__sshd_config" ]]; then
+    echo "Hardening sshd..."
+    sudo sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin prohibit-password/' "$__sshd_config"
+    sudo sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' "$__sshd_config"
+    sudo sed -i 's/^#\?PubkeyAuthentication.*/PubkeyAuthentication yes/' "$__sshd_config"
+    sudo sed -i 's/^#\?MaxAuthTries.*/MaxAuthTries 3/' "$__sshd_config"
+    if [[ "$__vps_init" == "openrc" ]]; then
+        sudo rc-service sshd reload 2>/dev/null || true
+    else
+        sudo systemctl reload sshd 2>/dev/null || sudo systemctl reload ssh 2>/dev/null || true
+    fi
+    echo "sshd hardened: root=prohibit-password, password=no, pubkey=yes"
 fi
 {{- end }}
 
