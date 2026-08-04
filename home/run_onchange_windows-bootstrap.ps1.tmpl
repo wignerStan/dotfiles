@@ -156,4 +156,53 @@ if ($mmOk -and (Test-Cmd 'micromamba')) {
 
 Write-Step "Windows Bootstrap Complete"
 Write-Host "    Restart PowerShell to pick up new PATH entries (winget/scoop/uv/micromamba)." -ForegroundColor Yellow
+
+# ═══════════════════════════════════════════════════════════════
+# Win11Debloat — unattended system cleanup/tweaks (Raphire/Win11Debloat)
+# Always runs (idempotent: re-applying the same tweaks is a no-op).
+# Aggressiveness by tier:
+#   simple (VM/container)        -> RunDefaults + extra removals (bloatware off)
+#   standard / develop           -> RunDefaultsLite (tweaks only, NO app removal)
+# Always: -Silent (no prompts), -CreateRestorePoint.
+# ═══════════════════════════════════════════════════════════════
+Write-Step "Win11Debloat (unattended, tier={{ .tier }})"
+try {
+    $debloatFlags = @(
+        '-Silent'
+        '-CreateRestorePoint'
+        # universal tweaks everyone wants
+        '-DisableTelemetry'
+        '-DisableSuggestions'
+        '-DisableBing'
+        '-DisableEdgeAds'
+        '-DisableLockscreenTips'
+        '-RevertContextMenu'
+        '-ShowKnownFileExt'
+        '-ShowHiddenFolders'
+        '-EnableDarkMode'
+    )
+    {{- if eq .tier "simple" }}
+    # VM/container: aggressive — full bloatware removal + extra privacy/AI disablement
+    $debloatFlags += @(
+        '-RunDefaults'                 # removes default app selection (Xbox, Clipchamp, ...)
+        '-RemoveApps'                  # ensure the default app-removal path runs
+        '-AppRemovalTarget' 'AllUsers'
+        '-DisableCopilot'
+        '-DisableWidgets'
+        '-DisableRecall'
+        '-DisableClickToDo'
+        '-DisableStoreSearchSuggestions'
+        '-DisableDesktopSpotlight'
+    )
+    {{- else }}
+    # standard/develop bare metal: conservative — tweaks only, keep apps
+    $debloatFlags += @('-RunDefaultsLite')
+    {{- end }}
+
+    & ([scriptblock]::Create((irm 'https://debloat.raphi.re/'))) @debloatFlags 2>&1 |
+        ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+    Write-Ok 'Win11Debloat applied'
+} catch {
+    Write-Host "    Win11Debloat warning: $($_.Exception.Message)" -ForegroundColor Yellow
+}
 {{- end -}}
