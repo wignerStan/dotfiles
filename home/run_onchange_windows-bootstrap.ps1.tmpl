@@ -111,15 +111,18 @@ if (-not (Test-Path $mambaRoot)) { New-Item -ItemType Directory -Force -Path $ma
 
 $mmOk = Install-Tool -WingetId 'Mamba.Micromamba' -ScoopName 'micromamba' -BinName 'micromamba' -Label 'micromamba'
 
-# micromamba shell init (powershell) + ensure a base env with python exists
+# micromamba shell init (powershell) + ensure the base (root) env has python.
+# When MAMBA_ROOT_PREFIX is set, "base" == the root prefix, so `create -n base`
+# fails with "Overwriting root prefix is not permitted". Install python INTO the
+# root prefix directly with `install ... -r <root>` instead.
 if ($mmOk -and (Test-Cmd 'micromamba')) {
     Update-EnvPath
     try {
         & micromamba shell init -s powershell -r $mambaRoot 2>&1 | Out-Null
-        # base env with a python — single source of Python on the box
-        if (-not (& micromamba env list 2>$null | Select-String -Quiet '\bbase\b')) {
-            Write-Step "Creating mamba base env (python via conda-forge)"
-            & micromamba create -y -n base -c conda-forge python 2>&1 |
+        # base (root) env gets a python — single source of Python on the box
+        if (-not (Test-Path "$mambaRoot\python.exe")) {
+            Write-Step "Installing python into mamba base (root prefix)"
+            & micromamba install -y -c conda-forge python -r $mambaRoot 2>&1 |
                 ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
         }
         Write-Ok 'micromamba base env ready'
