@@ -276,9 +276,11 @@ if (Test-Cmd 'micromamba') {
 }
 
 # ═══════════════════════════════════════════════════════════════
-# 3. pywinauto (GUI automation, Windows-only) — full bootstrap only
+# 3. pywinauto (GUI automation, Windows-only)
+#    Installed into mamba base python when: tier is simple OR develop,
+#    OR profile is work. standard tier (personal desktop) skips it.
 # ═══════════════════════════════════════════════════════════════
-{{- if eq .bootstrap_mode "full" }}
+{{- if or (or (eq .tier "simple") (eq .tier "develop")) (eq .profile "work") }}
 if ((Test-Cmd 'micromamba') -and (Test-Path "$mambaRoot\python.exe")) {
     try {
         $have = & micromamba run -n base python -c "import pywinauto" 2>$null
@@ -295,7 +297,7 @@ if ((Test-Cmd 'micromamba') -and (Test-Path "$mambaRoot\python.exe")) {
     } catch { Write-Host "    pywinauto warning: $($_.Exception.Message)" -ForegroundColor Yellow }
 }
 {{- else }}
-Write-Skip 'pywinauto (bootstrap_mode={{ .bootstrap_mode }})'
+Write-Skip 'pywinauto (tier={{ .tier }} profile={{ .profile }})'
 {{- end }}
 
 Write-Step "Windows Bootstrap Complete"

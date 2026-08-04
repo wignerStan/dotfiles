@@ -70,12 +70,3 @@ container-data/
 {{- end }}
 
 
-
-# mamba base-env sync USER SERVICE — opt-in (mamba_sync_service).
-# The sync scripts (.local/bin/mamba-sync-base.*) deploy wherever mamba exists,
-# so you can run them manually. But the auto-running service (LaunchAgent plist /
-# Windows scheduled-task registration) only deploys when explicitly enabled.
-{{- if not (hasKey . "mamba_sync_service") }}
-Library/LaunchAgents/com.jacob.mamba-sync-base.plist
-run_onchange_mamba-sync-service-enable.ps1.tmpl
-{{- end }}
