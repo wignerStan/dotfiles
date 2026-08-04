@@ -1,13 +1,15 @@
 # .condarc — managed by chezmoi (all profiles)
+# conda-forge.org is ALWAYS first: it's the only source that serves sharded
+# repodata (repodata_shards.msgpack.zst), which makes the solve ~650x smaller/
+# faster (424KB vs 274MB flat). No CN mirror (EDU or commercial: USTC/TUNA/Aliyun/
+# HuaweiCloud/volces) serves shards, so putting them first forces the slow flat
+# fallback and stalls the solve.
+channels:
+  - conda-forge
 {{- if .use_china_mirrors }}
-channels:
+  # CN fallback (geo=cn): faster package downloads from within China if
+  # conda-forge.org is slow; never used for the solve since conda-forge is first.
   - https://mirrors.ustc.edu.cn/anaconda/cloud/conda-forge
-  - https://mirrors.ustc.edu.cn/anaconda/pkgs/main
-  - https://mirrors.ustc.edu.cn/anaconda/pkgs/r
-  - conda-forge
-{{- else }}
-channels:
-  - conda-forge
 {{- end }}
 use_uv: true
 always_yes: true
