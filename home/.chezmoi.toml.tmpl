@@ -10,7 +10,10 @@
 {{-   $profile = "hpc" -}}
 {{- end -}}
 
-{{- /* tier: simple (VM/container) | standard | develop (full dev tooling) */ -}}
+{{- /* tier: simple (VM/container) | standard | develop
+     - simple: VM/container (minimal, no brew)
+     - develop: headless server (Linux without desktop = dev machine)
+     - standard: desktop with real display (full GUI tools) */ -}}
 {{- $tier := "standard" -}}
 {{- if eq .chezmoi.username "dev" -}}
 {{-   $tier = "develop" -}}
@@ -31,7 +34,7 @@
 {{-   $bootstrap_mode = "full" -}}
 {{- end -}}
 
-{{- /* Axis 3: headless (no real desktop session) */ -}}
+{{- /* headless: no real desktop session */ -}}
 {{- $headless := false -}}
 {{- if or (eq $profile "vps") (eq $profile "hpc") -}}
 {{-   $headless = true -}}
@@ -41,6 +44,11 @@
 {{-   else if not (lookPath "gnome-session") -}}
 {{-     $headless = true -}}
 {{-   end -}}
+{{- end -}}
+
+{{- /* tier override: headless personal Linux = develop (dev server) */ -}}
+{{- if and (eq .chezmoi.os "linux") $headless (eq $profile "personal") (ne $tier "simple") -}}
+{{-   $tier = "develop" -}}
 {{- end -}}
 
 {{- /* Derived */ -}}
@@ -109,17 +117,3 @@ encryption = "age"
     geo = {{ $geo | quote }}
     profile = {{ $profile | quote }}
     bootstrap_mode = {{ $bootstrap_mode | quote }}
-    mamba_root = {{ joinPath .chezmoi.homeDir "mamba" | quote }}
-    arch = {{ .chezmoi.arch | quote }}
-
-    # Paths for modern tools
-    ghostty_config = "~/.config/ghostty/config"
-    nvim_config = "~/.config/nvim"
-
-{{- if lookPath "delta" }}
-[diff]
-    pager = "delta"
-{{- else if lookPath "bat" }}
-[diff]
-    pager = "bat --style=changes"
-{{- end }}

@@ -42,7 +42,6 @@ export HOMEBREW_API_DOMAIN="https://mirrors.ustc.edu.cn/homebrew-bottles/api"
 export HF_ENDPOINT=https://hf-mirror.com
 {{- end }}
 
-
 # ── No-proxy (local/private networks always bypass) ────────────
 export NO_PROXY="127.0.0.1,localhost,::1,192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,100.64.0.0/10,100.100.0.0/16,*.local,*.crashlytics.com"
 export no_proxy="$NO_PROXY"
@@ -71,9 +70,6 @@ export NANOBANANA_MODEL=gemini-3-pro-image-preview
 
 {{- if or (eq .profile "work") (and (eq .profile "personal") (or (eq .chezmoi.os "darwin") (eq .chezmoi.os "windows"))) }}
 # ── Mamba (global Python base environment) ─────────────────
-export MAMBA_EXE="${HOMEBREW_PREFIX:-/home/linuxbrew/.linuxbrew}/opt/micromamba/bin/mamba"
-export MAMBA_ROOT_PREFIX="$HOME/mamba"
-path=("$MAMBA_ROOT_PREFIX/bin" $path)
 {{- end }}
 
 # ── Pixi (project Python environments) ──────────────────────
@@ -185,114 +181,3 @@ EOF
   return $ret
 }
 {{- end }}
-{{- if and (or (eq .profile "work") (and (eq .profile "personal") (or (eq .chezmoi.os "darwin") (eq .chezmoi.os "windows")))) (lookPath "mamba") }}
-
-conda() {
-  mamba "$@"
-  local ret=$?
-  if [[ $ret -ne 0 ]]; then
-    cat >&2 << 'EOF'
-╔═══════════════════════════════════════════════════════════════════════════╗
-║                       🛑  STOP USING CONDA  🛑                             ║
-╚═══════════════════════════════════════════════════════════════════════════╝
-
-This wrapper exists to BREAK YOUR conda HABIT and teach you mamba.
-
-WHY THIS WRAPPER EXISTS:
-─────────────────────────
-  • conda is slow and has poor dependency resolution
-  • mamba is faster with better parallel downloads and solving
-  • mamba is generally compatible with conda commands
-  • This wrapper passes your command to mamba so it still works
-
-Just use mamba directly instead of conda.
-
-For project environments, consider using pixi instead (see: mamba env)
-EOF
-  fi
-  return $ret
-}
-
-mamba() {
-    case "${1-}" in
-        env)
-            cat >&2 << 'EOF'
-╔═══════════════════════════════════════════════════════════════════════════╗
-║                     🛑  STOP USING MAMBA ENV  🛑                           ║
-╚═══════════════════════════════════════════════════════════════════════════╝
-
-This wrapper intercepts 'mamba env' to teach you pixi for project environments.
-
-WHY THIS WRAPPER EXISTS:
-─────────────────────────
-  • pixi UNIFIES conda-forge (pre-compiled) + PyPI (via uv) in ONE project
-  • Replaces BOTH conda/mamba env AND .venv with a single workflow
-  • Workspace-based: one folder contains manifest, lock file, environments
-  • Built-in task runner, lock files, multi-environment support
-
-═══════════════════════════════════════════════════════════════════════════
-  QUICK START (Python project example)
-═══════════════════════════════════════════════════════════════════════════
-
-  pixi init myproject && cd myproject
-  pixi add python numpy pandas           # conda-forge packages (fast, pre-compiled)
-  pixi add --pypi requests               # PyPI-only packages via uv
-  pixi shell                             # Activate environment
-  pixi run python script.py              # Run without activating
-
-═══════════════════════════════════════════════════════════════════════════
-  MIGRATION FROM CONDA/MAMBA
-═══════════════════════════════════════════════════════════════════════════
-
-  conda create -n myenv python=3.11  →  pixi init myenv && pixi add python=3.11
-  conda activate myenv               →  pixi shell
-  conda deactivate                   →  exit
-  conda install numpy                →  pixi add numpy
-  conda remove numpy                 →  pixi remove numpy
-  conda env export > env.yml         →  pixi workspace export conda-environment
-  conda env create -f env.yml        →  pixi import conda-environment env.yml
-
-═══════════════════════════════════════════════════════════════════════════
-  GLOBAL TOOLS (replaces brew/apt for CLI tools)
-═══════════════════════════════════════════════════════════════════════════
-
-  pixi global install ripgrep bat fd gh nvim btop
-  pixi global list
-  pixi global update
-
-═══════════════════════════════════════════════════════════════════════════
-  TASK RUNNER (define in pixi.toml)
-═══════════════════════════════════════════════════════════════════════════
-
-  pixi task add test pytest tests/
-  pixi task add build "python -m build"
-  pixi run test                         # Run task
-  pixi run build
-
-═══════════════════════════════════════════════════════════════════════════
-  MULTI-ENVIRONMENT (dev, test, docs in one project)
-═══════════════════════════════════════════════════════════════════════════
-
-  pixi add --feature dev pytest ruff
-  pixi add --feature docs sphinx
-  pixi shell --environment dev
-
-═══════════════════════════════════════════════════════════════════════════
-  ONE-OFF COMMANDS (no project needed)
-═══════════════════════════════════════════════════════════════════════════
-
-  pixi exec python -VV                  # Run in temp environment
-  pixi exec --spec "python=3.12" python -VV
-
-Docs: https://pixi.sh
-      https://pixi.sh/latest/switching_from/conda/
-EOF
-            __mamba_wrap "$@"
-            ;;
-        *)
-            __mamba_wrap "$@"
-            ;;
-    esac
-}
-{{ end }}
-

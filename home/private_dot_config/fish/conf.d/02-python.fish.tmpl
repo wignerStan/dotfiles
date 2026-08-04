@@ -1,18 +1,10 @@
-# ── Mamba / Micromamba ────────────────────────────────────────
 # Gating: work, or personal desktop (macOS/Windows).
 {{- if or (eq .profile "work") (and (eq .profile "personal") (or (eq .chezmoi.os "darwin") (eq .chezmoi.os "windows"))) }}
 # Gate on the binary existing so non-Homebrew machines skip cleanly.
-# $HOMEBREW_PREFIX is set in 00-env.fish for all shells, so MAMBA_EXE is still
 # exported in non-login shells (matching .zshenv).
-if test -n "$HOMEBREW_PREFIX"; and test -x "$HOMEBREW_PREFIX/opt/micromamba/bin/mamba"
-    set -gx MAMBA_EXE "$HOMEBREW_PREFIX/opt/micromamba/bin/mamba"
-    set -gx MAMBA_ROOT_PREFIX ~/mamba
 
     # Shell hook + activate costs ~30ms of forks; only run for login shells.
     if status is-login
-        $MAMBA_EXE shell hook --shell fish --root-prefix $MAMBA_ROOT_PREFIX | source
-        set -gx MAMBA_NO_PROMPT 1
-        fish_add_path --move --prepend $MAMBA_ROOT_PREFIX/bin
     end
 end
 {{- end }}
