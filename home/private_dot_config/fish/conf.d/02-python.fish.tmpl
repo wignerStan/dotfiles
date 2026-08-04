@@ -22,7 +22,7 @@ end
 if type -q pixi
     set -gx PIXI_HOME ~/.pixi
     fish_add_path --move $PIXI_HOME/bin
-    # Share PyPI wheel cache with uv
-    set -gx PIXI_CACHE_PYPI_WHEELS_DIR ~/.cache/uv
 end
 {{- end }}
+# Share PyPI wheel cache with uv (avoids duplicate downloads)
+set -gx PIXI_CACHE_PYPI_WHEELS_DIR ~/.cache/uv

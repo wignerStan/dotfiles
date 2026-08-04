@@ -80,9 +80,9 @@ path=("$MAMBA_ROOT_PREFIX/bin" $path)
 {{- if .develop }}
 export PIXI_HOME="${HOME}/.pixi"
 path+=("${PIXI_HOME}/bin")
+{{- end }}
 # Share PyPI wheel cache with uv (avoids duplicate downloads)
 export PIXI_CACHE_PYPI_WHEELS_DIR="${HOME}/.cache/uv"
-{{- end }}
 
 # ── Direnv (auto-load project-level environment) ─────────────
 {{- if lookPath "direnv" }}
