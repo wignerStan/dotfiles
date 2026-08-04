@@ -112,3 +112,5 @@ encryption = "age"
     geo = {{ $geo | quote }}
     profile = {{ $profile | quote }}
     bootstrap_mode = {{ $bootstrap_mode | quote }}
+    mamba_root = {{ if eq .chezmoi.os "linux" }}"/develop/mamba"{{ else }}{{ joinPath .chezmoi.homeDir "mamba" | quote }}{{ end }}
+    arch = {{ .chezmoi.arch | quote }}

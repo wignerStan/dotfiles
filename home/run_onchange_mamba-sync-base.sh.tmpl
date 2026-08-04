@@ -1,28 +1,49 @@
 {{- /* Reconcile the mamba base env against .chezmoidata/mamba_base.toml.
-     chezmoi is the trigger (run_onchange). Installs core + current-tier add-ons.
-     Idempotent (only ADDS, never removes). Cross-platform: renders on any OS
-     where micromamba exists. */ -}}
+     Renders an environment.yaml, then mamba installs from it with --use-uv.
+     Idempotent (only ADDS). Uses uv for pip packages (reflink support). */ -}}
 {{- if lookPath "micromamba" -}}
 #!/bin/sh
 set -eu
 export MAMBA_ROOT_PREFIX="{{ .mamba_root }}"
+export UV_CACHE_DIR="{{- if eq .chezmoi.os "linux" -}}/develop/.cache/uv{{- else -}}$HOME/.cache/uv{{- end -}}"
 log() { printf '[mamba-sync] %s\n' "$*"; }
 
 MM="$(command -v micromamba 2>/dev/null || command -v mamba 2>/dev/null || command -v conda 2>/dev/null || true)"
 [ -z "$MM" ] && { log "no micromamba/mamba/conda found, skipping"; exit 0; }
 case "$MM" in *micromamba|*mamba) "$MM" env list 2>/dev/null | grep -qw base || { log "base env not present, skipping"; exit 0; } ;; esac
 
-CHANNELS="{{ range .mamba_base.channels }} -c {{ . }}{{ end }}"
-# core (always) + current-tier add-on
-CONDA_PKGS="{{ range .mamba_base.core.conda }}{{ . }} {{ end }}{{ range (index .mamba_base .tier).conda }}{{ . }} {{ end }}"
-PIP_PKGS="{{ range .mamba_base.core.pip }}{{ . }} {{ end }}{{ range (index .mamba_base .tier).pip }}{{ . }} {{ end }}"
+# Render environment.yaml
+ENV_YAML="$(mktemp /tmp/mamba-base-env.XXXXXX.yaml)"
+trap 'rm -f "$ENV_YAML"' EXIT
+cat > "$ENV_YAML" << 'YAMLEOF'
+name: base
+channels:
+{{- range .mamba_base.channels }}
+  - {{ . }}
+{{- end }}
+dependencies:
+{{- range .mamba_base.core.conda }}
+  - {{ . }}
+{{- end }}
+{{- range (index .mamba_base .tier).conda }}
+  - {{ . }}
+{{- end }}
+{{- if or .mamba_base.core.pip (index .mamba_base .tier).pip }}
+  - pip:
+{{- range .mamba_base.core.pip }}
+    - {{ . }}
+{{- end }}
+{{- range (index .mamba_base .tier).pip }}
+    - {{ . }}
+{{- end }}
+{{- end }}
+YAMLEOF
 
-export UV_CACHE_DIR="{{- if eq .chezmoi.os "linux" -}}/develop/.cache/uv{{- else -}}$HOME/.cache/uv{{- end -}}"
-ALL_PKGS="$CONDA_PKGS $PIP_PKGS"
-if [ -n "$ALL_PKGS" ]; then
-    log "ensuring packages (tier={{ .tier }}): ${ALL_PKGS}"
-    # shellcheck disable=SC2086
-    "$MM" install -y -n base --use-uv ${CHANNELS} ${ALL_PKGS} >/dev/null 2>&1 || log "mamba install reported errors (may be no-op)"
-fi
+log "rendered environment.yaml for tier={{ .tier }}"
+cat "$ENV_YAML"
+
+log "running mamba env update (tier={{ .tier }})..."
+"$MM" env update -n base -f "$ENV_YAML" --use-uv >/dev/null 2>&1 || log "mamba env update reported errors"
+
 log "sync complete (tier={{ .tier }})"
 {{- end -}}
