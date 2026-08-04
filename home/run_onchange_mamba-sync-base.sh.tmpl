@@ -1,35 +1,29 @@
 {{- /* Reconcile the mamba base env against .chezmoidata/mamba_base.toml.
-     Renders an environment.yaml, then mamba installs from it with --use-uv.
-     Idempotent (only ADDS). Uses uv for pip packages (reflink support). */ -}}
+     mamba install with use_uv: true in .condarc handles pip deps via uv. */ -}}
 {{- if lookPath "micromamba" -}}
 #!/bin/sh
 set -eu
 export MAMBA_ROOT_PREFIX="{{ .mamba_root }}"
-export UV_CACHE_DIR="{{- if eq .chezmoi.os "linux" -}}/develop/.cache/uv{{- else -}}$HOME/.cache/uv{{- end -}}"
-export PATH="$(dirname "$MM"):$PATH"
 log() { printf '[mamba-sync] %s\n' "$*"; }
-__uv="$(command -v uv 2>/dev/null || true)"
 
 MM="$(command -v micromamba 2>/dev/null || command -v mamba 2>/dev/null || command -v conda 2>/dev/null || true)"
 [ -z "$MM" ] && { log "no micromamba/mamba/conda found, skipping"; exit 0; }
 case "$MM" in *micromamba|*mamba) "$MM" env list 2>/dev/null | grep -qw base || { log "base env not present, skipping"; exit 0; } ;; esac
 
-log "installing conda packages (tier={{ .tier }})..."
+CHANNELS="{{ range .mamba_base.channels }} -c {{ . }}{{ end }}"
 CONDA_PKGS="{{ range .mamba_base.core.conda }}{{ . }} {{ end }}{{ range (index .mamba_base .tier).conda }}{{ . }} {{ end }}"
-if [ -n "$CONDA_PKGS" ]; then
+PIP_PKGS="{{ range .mamba_base.core.pip }}{{ . }} {{ end }}{{ range (index .mamba_base .tier).pip }}{{ . }} {{ end }}"
+
+if [ -n "${CONDA_PKGS:-}" ]; then
+    log "installing conda packages (tier={{ .tier }}): ${CONDA_PKGS}"
     # shellcheck disable=SC2086
-    "$MM" install -y -n base -c conda-forge $CONDA_PKGS >/dev/null 2>&1 || log "conda install reported errors"
+    "$MM" install -y -n base ${CHANNELS} ${CONDA_PKGS} >/dev/null 2>&1 || log "conda install reported errors"
 fi
 
-PIP_PKGS="{{ range .mamba_base.core.pip }}{{ . }} {{ end }}{{ range (index .mamba_base .tier).pip }}{{ . }} {{ end }}"
-if [ -n "$PIP_PKGS" ] && [ -n "$__uv" ]; then
-    log "installing pip packages via uv (reflink): ${PIP_PKGS}"
+if [ -n "${PIP_PKGS:-}" ]; then
+    log "installing pip packages (tier={{ .tier }}): ${PIP_PKGS}"
     # shellcheck disable=SC2086
-    "$__uv" pip install --python "$MAMBA_ROOT_PREFIX/bin/python" $PIP_PKGS >/dev/null 2>&1 || log "uv pip install reported errors"
-elif [ -n "$PIP_PKGS" ]; then
-    log "installing pip packages (no uv): ${PIP_PKGS}"
-    # shellcheck disable=SC2086
-    "$MM" run -n base python -m pip install $PIP_PKGS >/dev/null 2>&1 || log "pip install reported errors"
+    "$MM" install -y -n base ${PIP_PKGS} >/dev/null 2>&1 || log "mamba install pip packages reported errors"
 fi
 
 log "sync complete (tier={{ .tier }})"
