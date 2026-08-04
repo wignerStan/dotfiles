@@ -23,10 +23,10 @@ if [ -n "$CONDA_PKGS" ]; then
     "$MM" install -y -n base ${CHANNELS} ${CONDA_PKGS} >/dev/null 2>&1 || log "conda install reported errors (may be no-op)"
 fi
 if [ -n "$PIP_PKGS" ]; then
-    log "ensuring pip packages via uv (reflink): ${PIP_PKGS}"
+    log "ensuring pip packages: ${PIP_PKGS}"
     export UV_CACHE_DIR="{{- if eq .chezmoi.os "linux" -}}/develop/.cache/uv{{- else -}}$HOME/.cache/uv{{- end -}}"
     # shellcheck disable=SC2086
-    uv pip install --python "$MAMBA_ROOT_PREFIX/bin/python" ${PIP_PKGS} >/dev/null 2>&1 || log "uv pip install reported errors"
+    "$MM" run -n base python -m pip install --upgrade ${PIP_PKGS} >/dev/null 2>&1 || log "pip install reported errors"
 fi
 log "sync complete (tier={{ .tier }})"
 {{- end -}}
