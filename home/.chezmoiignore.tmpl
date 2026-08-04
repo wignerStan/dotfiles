@@ -62,11 +62,17 @@ install-yazi-plugins.sh
 container-data/
 {{- end }}
 
-# Node/Bun/Go/Pixi configs: develop profile only
-{{- if not .develop }}
+# Node/Bun/Go/Pixi configs: develop tier only
+{{- if ne .tier "develop" }}
 .npmrc
 .bunfig.toml
 .config/go/
+.config/pixi/
+{{- end }}
+
+# uv/pixi shared cache: only personal+linux+standard (bare metal with /develop)
+{{- if not (and (eq .profile "personal") (eq .chezmoi.os "linux") (eq .tier "standard")) }}
+.config/uv/
 .config/pixi/
 {{- end }}
 
@@ -74,7 +80,7 @@ container-data/
 # The sync scripts (.local/bin/mamba-sync-base.*) deploy wherever mamba exists,
 # so you can run them manually. But the auto-running service (LaunchAgent plist /
 # Windows scheduled-task registration) only deploys when explicitly enabled.
-{{- if not .mamba_sync_service }}
+{{- if not (hasKey . "mamba_sync_service") }}
 Library/LaunchAgents/com.jacob.mamba-sync-base.plist
 run_onchange_mamba-sync-service-enable.ps1.tmpl
 {{- end }}

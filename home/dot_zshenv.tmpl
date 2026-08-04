@@ -81,10 +81,6 @@ path=("$MAMBA_ROOT_PREFIX/bin" $path)
 export PIXI_HOME="${HOME}/.pixi"
 path+=("${PIXI_HOME}/bin")
 {{- end }}
-# Shared uv/rattler cache on /develop (same btrfs filesystem as projects for reflinks)
-export UV_CACHE_DIR="/develop/.cache/uv"
-export PIXI_CACHE_PYPI_WHEELS_DIR="/develop/.cache/uv"
-export PIXI_CACHE_DIR="/develop/.cache/rattler"
 
 # ── Direnv (auto-load project-level environment) ─────────────
 {{- if lookPath "direnv" }}
