@@ -69,8 +69,9 @@ fi
 if ! command -v tailscale &>/dev/null; then
     echo "Installing Tailscale..."
     if [[ "$__vps_init" == "openrc" ]]; then
-        # Alpine: install from edge repo
+        # Alpine: install from edge community repo
         sudo apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community tailscale 2>/dev/null || true
+        # OpenRC: enable and start tailscale service
         sudo rc-update add tailscale default 2>/dev/null
         sudo rc-service tailscale start 2>/dev/null
     else
@@ -78,8 +79,27 @@ if ! command -v tailscale &>/dev/null; then
         sudo systemctl enable --now tailscaled 2>/dev/null
     fi
 fi
-if command -v tailscale &>/dev/null && ! tailscale status &>/dev/null; then
-    echo "Tailscale installed but not authenticated. Run: sudo tailscale up"
+# Ensure tailscale is up with --accept-dns=false (use VPS resolver, not Tailscale DNS)
+if command -v tailscale &>/dev/null; then
+    if ! tailscale status &>/dev/null 2>&1; then
+        echo "Tailscale not authenticated. Run: sudo tailscale up --accept-dns=false"
+    else
+        # Already up — re-apply with --accept-dns=false if not set
+        __ts_dns=$(tailscale debug prefs 2>/dev/null | grep -c '"AcceptDNS":\[false\]' || echo 0)
+        if [[ "$__ts_dns" == "0" ]]; then
+            echo "Applying --accept-dns=false to Tailscale..."
+            sudo tailscale up --accept-dns=false --reset=false 2>/dev/null || true
+        fi
+    fi
+fi
+
+# ── OpenRC service hardening (Alpine) ─────────────────────────
+if [[ "$__vps_init" == "openrc" ]]; then
+    # Ensure critical services are enabled at boot
+    for svc in sshd tailscale networking; do
+        sudo rc-update add $svc default 2>/dev/null
+    done
+    echo "OpenRC services enabled: sshd tailscale networking"
 fi
 
 # ── Kopia backup ──────────────────────────────────────────────
