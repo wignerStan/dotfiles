@@ -14,10 +14,17 @@ channels:
 use_uv: true
 always_yes: true
 changeps1: false
-# auto_activate_base: true only when mamba is available (work, or
-# personal desktop on macOS/Windows). False everywhere else.
-{{- if or (eq .profile "work") (and (eq .profile "personal") (or (eq .chezmoi.os "darwin") (eq .chezmoi.os "windows"))) }}
+# auto_activate_base: true wherever mamba is the Python provider
+# (personal on all OS + work). False for VPS/HPC (no mamba).
+{{- if or (eq .profile "work") (eq .profile "personal") }}
 auto_activate_base: true
 {{- else }}
 auto_activate_base: false
+{{- end }}
+{{- if and (eq .profile "personal") (eq .chezmoi.os "linux") }}
+# Shared mamba root on /develop for personal Linux
+envs_dirs:
+  - /develop/mamba/envs
+pkgs_dirs:
+  - /develop/mamba/pkgs
 {{- end }}
