@@ -18,7 +18,7 @@ end
 {{- end }}
 
 # ── Pixi (project Python environments) ──────────────────────
-{{- if .develop }}
+{{- if eq .tier "develop" }}
 if type -q pixi
     set -gx PIXI_HOME ~/.pixi
     fish_add_path --move $PIXI_HOME/bin

@@ -22,7 +22,6 @@
 {{-     $tier = "simple" -}}
 {{-   end -}}
 {{- end -}}
-{{- $develop := eq $tier "develop" -}}
 
 {{- /* bootstrap_mode: full (pywinauto + base-env sync service) | basic.
      Derived from profile: personal/desktop -> full, vps/hpc/headless -> basic.
@@ -111,7 +110,6 @@ encryption = "age"
     use_china_mirrors = {{ $use_china_mirrors }}
     geo = {{ $geo | quote }}
     profile = {{ $profile | quote }}
-    develop = {{ $develop }}
     bootstrap_mode = {{ $bootstrap_mode | quote }}
     mamba_sync_service = {{ $mamba_sync_service }}
     mamba_root = {{ joinPath .chezmoi.homeDir "mamba" | quote }}

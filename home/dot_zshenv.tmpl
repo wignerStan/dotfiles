@@ -65,7 +65,7 @@ export API_TIMEOUT_MS="600000"
 export NANOBANANA_MODEL=gemini-3-pro-image-preview
 
 # ── Cargo (develop profile only) ──────────────────────────────
-{{- if .develop }}
+{{- if eq .tier "develop" }}
 [[ -d "$HOME/.cargo" && -f "$HOME/.cargo/env" ]] && . "$HOME/.cargo/env"
 {{- end }}
 
@@ -77,7 +77,7 @@ path=("$MAMBA_ROOT_PREFIX/bin" $path)
 {{- end }}
 
 # ── Pixi (project Python environments) ──────────────────────
-{{- if .develop }}
+{{- if eq .tier "develop" }}
 export PIXI_HOME="${HOME}/.pixi"
 path+=("${PIXI_HOME}/bin")
 {{- end }}
@@ -100,12 +100,12 @@ command_not_found_handler() {
 # ── PATH (appended last so all above env is available first) ──
 
 # Go (develop profile only)
-{{- if .develop }}
+{{- if eq .tier "develop" }}
 [[ -d "$HOME/go/bin" ]] && path+=("$HOME/go/bin")
 {{- end }}
 
 # ── Node/Rust/Mobile ecosystem (develop profile only) ─────────
-{{- if .develop }}
+{{- if eq .tier "develop" }}
 # pnpm
 {{- if eq .chezmoi.os "darwin" }}
 [[ -d "$HOME/Library/pnpm" ]] && export PNPM_HOME="$HOME/Library/pnpm"
@@ -136,7 +136,7 @@ export PATH
 # ═══════════════════════════════════════════════════════════════
 # Dev tool wrappers (modern replacements) — loaded last
 # ═══════════════════════════════════════════════════════════════
-{{- if and .develop (lookPath "pnpm") }}
+{{- if and (eq .tier "develop") (lookPath "pnpm") }}
 
 npm() {
   pnpm "$@"
@@ -156,7 +156,7 @@ EOF
 }
 {{- end }}
 
-{{- if and .develop (lookPath "bun") }}
+{{- if and (eq .tier "develop") (lookPath "bun") }}
 
 npx() {
   bunx "$@"

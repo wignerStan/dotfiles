@@ -28,7 +28,7 @@ if ! command -v brew &> /dev/null; then
 fi
 
 # ── npm global block (non-work profiles) ───────────────────────
-{{- if and .develop (not (eq .profile "work")) }}
+{{- if and (eq .tier "develop") (not (eq .profile "work")) }}
 mkdir -p "$HOME/.npm-global-blocked"
 chmod -R 0500 "$HOME/.npm-global-blocked"
 {{- end }}
@@ -144,7 +144,7 @@ core_packages=(
     fzf
 )
 
-{{- if .develop }}
+{{- if eq .tier "develop" }}
 # ── Develop layer: full dev tooling ────────────────────────────
 core_packages+=(
     zellij
@@ -173,7 +173,7 @@ brew install "${macos_packages[@]}"
 {{- end }}
 
 # ── Global node tools via Homebrew (develop profile) ─────────
-{{- if .develop }}
+{{- if eq .tier "develop" }}
 echo "Installing global node tools via Homebrew..."
 for pkg in typescript ts-node eslint prettier; do
     brew install "$pkg" 2>/dev/null || echo "Warning: failed to install $pkg, skipping"

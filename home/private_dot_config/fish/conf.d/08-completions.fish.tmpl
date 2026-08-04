@@ -1,5 +1,5 @@
 # ── Completions ─────────────────────────────────────────────────
-{{- if .develop }}
+{{- if eq .tier "develop" }}
 # Bun completions
 if test -f ~/.bun/completions/bun.fish
     source ~/.bun/completions/bun.fish

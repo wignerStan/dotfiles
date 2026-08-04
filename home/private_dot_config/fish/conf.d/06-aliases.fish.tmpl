@@ -18,7 +18,7 @@ set -gx NPM_CONFIG_PREFIX "$HOME/.npm-deadend"
 {{- end }}
 
 # ── Develop profile abbreviations ─────────────────────────────
-{{- if .develop }}
+{{- if eq .tier "develop" }}
 abbr npm pnpm
 abbr npx bunx
 {{- end }}
