@@ -279,16 +279,13 @@ fi
 
 {{- end }}
 
-# ── macOS-only packages ───────────────────────────────────────
+# ── Desktop dev tools (macOS/Windows via brew/winget) ─────────
+{{- if or (eq .chezmoi.os "darwin") (eq .chezmoi.os "windows") }}
+echo "Installing desktop dev tools..."
 {{- if eq .chezmoi.os "darwin" }}
-echo "Installing macOS-only packages..."
-macos_packages=(
-    fish
-    nushell
-    ghostty
-    kubecolor
-)
-brew install "${macos_packages[@]}"
+brew install node pnpm bun biome ruff pyright deno zig fnm go pixi micromamba \
+    fish nushell ghostty kubecolor 2>/dev/null || echo "Warning: some macOS packages failed"
+{{- end }}
 {{- end }}
 
 {{- end }}
