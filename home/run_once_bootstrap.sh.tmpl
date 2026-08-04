@@ -268,9 +268,10 @@ done
 #   go    -> goenv or brew go (brew go is fine, single binary)
 #   node  -> brew node is fine for personal linux (shared)
 # Version managers for project-specific versions:
-if ! command -v fnm &>/dev/null; then
-    echo "Installing fnm (node version manager)..."
-    brew install fnm 2>/dev/null || echo "Warning: fnm install failed"
+# nvm (node version manager) — develop only
+if ! command -v nvm &>/dev/null; then
+    echo "Installing nvm..."
+    curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash 2>/dev/null || echo "Warning: nvm install failed"
 fi
 if ! command -v go &>/dev/null; then
     echo "Installing go via brew..."
@@ -283,7 +284,7 @@ fi
 {{- if or (eq .chezmoi.os "darwin") (eq .chezmoi.os "windows") }}
 echo "Installing desktop dev tools..."
 {{- if eq .chezmoi.os "darwin" }}
-brew install node pnpm bun biome ruff pyright fnm pixi micromamba \
+brew install node pnpm bun biome ruff pyright pixi micromamba \
     fish nushell ghostty kubecolor 2>/dev/null || echo "Warning: some macOS packages failed"
 {{- end }}
 {{- end }}
