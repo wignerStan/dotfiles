@@ -70,10 +70,6 @@ export NANOBANANA_MODEL=gemini-3-pro-image-preview
 
 {{- if or (eq .profile "work") (and (eq .profile "personal") (or (eq .chezmoi.os "darwin") (eq .chezmoi.os "windows"))) }}
 # ── Mamba (global Python base environment) ─────────────────
-{{- end }}
-
-{{- if or (eq .profile "work") (and (eq .profile "personal") (or (eq .chezmoi.os "darwin") (eq .chezmoi.os "windows"))) }}
-# ── Mamba (global Python base environment) ─────────────────
 export MAMBA_EXE="${HOMEBREW_PREFIX:-/home/linuxbrew/.linuxbrew}/opt/micromamba/bin/mamba"
 export MAMBA_ROOT_PREFIX="$HOME/mamba"
 path=("$MAMBA_ROOT_PREFIX/bin" $path)
