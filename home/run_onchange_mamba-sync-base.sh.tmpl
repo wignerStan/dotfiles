@@ -17,16 +17,12 @@ CHANNELS="{{ range .mamba_base.channels }} -c {{ . }}{{ end }}"
 CONDA_PKGS="{{ range .mamba_base.core.conda }}{{ . }} {{ end }}{{ range (index .mamba_base .tier).conda }}{{ . }} {{ end }}"
 PIP_PKGS="{{ range .mamba_base.core.pip }}{{ . }} {{ end }}{{ range (index .mamba_base .tier).pip }}{{ . }} {{ end }}"
 
-if [ -n "$CONDA_PKGS" ]; then
-    log "ensuring conda packages (tier={{ .tier }}): ${CONDA_PKGS}"
+export UV_CACHE_DIR="{{- if eq .chezmoi.os "linux" -}}/develop/.cache/uv{{- else -}}$HOME/.cache/uv{{- end -}}"
+ALL_PKGS="$CONDA_PKGS $PIP_PKGS"
+if [ -n "$ALL_PKGS" ]; then
+    log "ensuring packages (tier={{ .tier }}): ${ALL_PKGS}"
     # shellcheck disable=SC2086
-    "$MM" install -y -n base ${CHANNELS} ${CONDA_PKGS} >/dev/null 2>&1 || log "conda install reported errors (may be no-op)"
-fi
-if [ -n "$PIP_PKGS" ]; then
-    log "ensuring pip packages: ${PIP_PKGS}"
-    export UV_CACHE_DIR="{{- if eq .chezmoi.os "linux" -}}/develop/.cache/uv{{- else -}}$HOME/.cache/uv{{- end -}}"
-    # shellcheck disable=SC2086
-    "$MM" run -n base python -m pip install --upgrade ${PIP_PKGS} >/dev/null 2>&1 || log "pip install reported errors"
+    "$MM" install -y -n base --use-uv ${CHANNELS} ${ALL_PKGS} >/dev/null 2>&1 || log "mamba install reported errors (may be no-op)"
 fi
 log "sync complete (tier={{ .tier }})"
 {{- end -}}
