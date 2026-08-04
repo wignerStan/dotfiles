@@ -31,7 +31,7 @@ pip   = []
 # add notebook/dev extras; still no heavy ML (use a project env for that).
 [mamba_base.develop]
 conda = ["jupyterlab-git", "notebook", "ipykernel"]
-pip   = []
+pip   = ["ruff", "pyright", "mypy"]
 
 # ── simple: VM/container — minimal, no science stack (rides host) ──────────
 [mamba_base.simple]
