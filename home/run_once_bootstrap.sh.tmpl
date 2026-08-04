@@ -249,13 +249,12 @@ done
 # CLI tools and language toolchains via brew (single binaries, no python dep)
 echo "Installing personal Linux dev tools..."
 linux_dev_tools=(
-    node          # node runtime (shared) — pulls python@3.x as brew dep, but
-                  #   brew python is NOT in system PATH on personal Linux (zshenv
-                  #   prepends system dirs). Safe.
+    node
     pnpm
     bun
     biome
     ruff
+    pyright
     deno
     zig
 )
@@ -278,19 +277,7 @@ if ! command -v go &>/dev/null; then
     brew install go 2>/dev/null || echo "Warning: go install failed"
 fi
 
-# pyright (node-based type checker) — install via pnpm, not brew
-# (brew pyright pulls python@3.x through node dependency)
-if command -v pnpm &>/dev/null; then
-    pnpm add -g pyright 2>/dev/null || echo "Warning: pyright install failed"
-fi
 {{- end }}
-
-# ── Python: brew python@3.x breaks system packages. DO NOT install via brew. ──
-# Python runtime comes from:
-#   - personal Linux: system python3 (apt/dnf) — brew is NOT the python provider
-#   - macOS/Windows: mamba base env (micromamba)
-# uv manages project venvs and tool installs on top of the system/mamba python.
-# NEVER run: brew install python python@3.x mypy pyright(node)
 
 # ── macOS-only packages ───────────────────────────────────────
 {{- if eq .chezmoi.os "darwin" }}
