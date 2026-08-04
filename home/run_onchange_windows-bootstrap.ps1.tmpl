@@ -7,8 +7,10 @@
 #
 # Install strategy by tier (tier is orthogonal to bootstrap_mode):
 #   simple  (VM/container) -> NO package managers. Remove winget/scoop if present.
+#                             Direct install: git (MinGit, no Bash/GUI), uv, micromamba.
 #                             NO sing-box (rides host proxy).
 #   standard/develop       -> winget + scoop (extras bucket). Via PMs: git (full,
+#                             Bash+GUI), uv, micromamba, pixi. Plus sing-box core
 #                             (direct) + Windows Administrator service (start=auto).
 # ═══════════════════════════════════════════════════════════════
 # Managed by Chezmoi — runs on Windows only. Do not edit in place.
@@ -105,6 +107,112 @@ $env:UV_DEFAULT_INDEX = 'https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple'
 [Environment]::SetEnvironmentVariable('UV_DEFAULT_INDEX', 'https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple', 'User')
 {{- end }}
 
+$mambaRoot = '{{ .mamba_root }}'
+[Environment]::SetEnvironmentVariable('MAMBA_ROOT_PREFIX', $mambaRoot, 'User')
+$env:MAMBA_ROOT_PREFIX = $mambaRoot
+if (-not (Test-Path $mambaRoot)) { New-Item -ItemType Directory -Force -Path $mambaRoot | Out-Null }
+
+# ═══════════════════════════════════════════════════════════════
+# 1. INSTALL STRATEGY
+# ═══════════════════════════════════════════════════════════════
+{{- if eq .tier "simple" }}
+# ── SIMPLE (VM/container): direct installs, remove package managers ──
+Write-Step "tier=simple: direct installs (no winget/scoop)"
+
+# remove winget (App Installer Appx) if present — VM doesn't use package managers.
+# (We only unregister the Appx; it can be re-added from the Store if ever needed.)
+foreach ($pkg in (Get-AppxPackage -AllUsers -EA SilentlyContinue | Where-Object { $_.Name -eq 'Microsoft.DesktopAppInstaller' })) {
+    try { $pkg | Remove-AppxPackage -AllUsers -EA Stop; Write-Ok "removed winget (App Installer)" }
+    catch { Write-Host "    winget removal skipped: $($_.Exception.Message)" -ForegroundColor Yellow }
+}
+# remove scoop if present
+if (Test-Path "$env:USERPROFILE\scoop") {
+    Remove-Item "$env:USERPROFILE\scoop" -Recurse -Force -EA SilentlyContinue
+    $up = [Environment]::GetEnvironmentVariable('Path','User')
+    $up = (($up -split ';') | Where-Object { $_ -and $_ -notmatch 'scoop\\shims' }) -join ';'
+    [Environment]::SetEnvironmentVariable('Path', $up, 'User')
+    Write-Ok 'removed scoop'
+}
+Update-EnvPath
+
+# git — MinGit (core only, NO Git Bash, NO Git GUI)
+# tag v2.55.0.windows.3 -> asset version 2.55.0.3 (".windows.N" -> ".N")
+$gTag = Get-LatestRelease 'git-for-windows/git'
+$gv = ($gTag -replace '^v','' -replace '\.windows\.','.')   # v2.55.0.windows.3 -> 2.55.0.3
+if ($gv) {
+    Install-Direct -Label 'git (MinGit)' `
+        -Url "https://github.com/git-for-windows/git/releases/download/$gTag/MinGit-$gv-$__arch.zip" `
+        -Dest "$env:USERPROFILE\.local\mingit" -PathDirs @('cmd','mingw64\bin') -TestBin 'git'
+}
+
+# uv — direct from Astral (standalone zip)
+$uvTag = Get-LatestRelease 'astral-sh/uv'
+if ($uvTag) {
+    $uvArc = if ($__arch -eq 'arm64') { 'aarch64-pc-windows-msvc' } else { 'x86_64-pc-windows-msvc' }
+    Install-Direct -Label 'uv' `
+        -Url "https://github.com/astral-sh/uv/releases/download/$uvTag/uv-$uvArc.zip" `
+        -Dest "$env:USERPROFILE\.local\uv" -PathDirs @('') -TestBin 'uv'
+}
+
+# micromamba — direct binary (single .exe) from conda-forge win-arm64/win-64
+$mmSub = if ($__arch -eq 'arm64') { 'win-arm64' } else { 'win-64' }
+if (-not (Test-Cmd 'micromamba')) {
+    Write-Step "micromamba — direct (conda-forge $mmSub)"
+    try {
+        # find latest micromamba version + the .tar.bz2 (contains bin/micromamba.exe)
+        $rd = Invoke-RestMethod -Uri "https://conda.anaconda.org/conda-forge/$mmSub/repodata.json" -UseBasicParsing
+        $cand = $rd.packages.PSObject.Properties | Where-Object { $_.Name -like 'micromamba-*.tar.bz2' } | Sort-Object Name -Descending | Select-Object -First 1
+        if ($cand) {
+            $mmDest = "$env:USERPROFILE\.local\micromamba"
+            $tmp = Join-Path $env:TEMP "$([guid]::NewGuid().ToString('N')).tar.bz2"
+            Invoke-WebRequest -Uri "https://conda.anaconda.org/conda-forge/$mmSub/$($cand.Name)" -OutFile $tmp -UseBasicParsing
+            New-Item -ItemType Directory -Force -Path $mmDest | Out-Null
+            # tar is built into Win10+; extract the bin/micromamba.exe
+            & tar -xjf $tmp -C $mmDest 'Library/bin/micromamba.exe' 2>$null
+            Move-Item "$mmDest\Library\bin\micromamba.exe" "$mmDest\micromamba.exe" -Force
+            Remove-Item "$mmDest\Library" -Recurse -Force -EA SilentlyContinue
+            Remove-Item $tmp -Force
+            $up = [Environment]::GetEnvironmentVariable('Path','User')
+            if ($up -notlike "*$mmDest*") { [Environment]::SetEnvironmentVariable('Path', "$mmDest;$up", 'User') }
+            Update-EnvPath
+            Write-Ok 'micromamba direct'
+        }
+    } catch { Write-Host "    micromamba direct FAILED: $($_.Exception.Message)" -ForegroundColor Red }
+}
+
+{{- else }}
+# ── STANDARD/DEVELOP: winget + scoop, install via package managers ──
+Write-Step "tier={{ .tier }}: package managers (winget + scoop)"
+
+# winget (App Installer) — ensure callable
+if (Test-Cmd 'winget') { Write-Skip 'winget' }
+else {
+    Write-Step "winget missing — opening Store for 'App Installer'"
+    try { Start-Process 'ms-windows-store:' -EA SilentlyContinue } catch {}
+}
+
+# scoop + extras bucket
+if (Test-Cmd 'scoop') { Write-Skip 'scoop' }
+else {
+    Write-Step "Installing scoop + extras bucket..."
+    try {
+        Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -EA SilentlyContinue
+        Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
+        Update-EnvPath
+        & scoop bucket add extras 2>&1 | Out-Null
+        if (Test-Cmd 'scoop') { Write-Ok 'scoop + extras' } else { Write-Host "    scoop not on PATH (restart shell)" -ForegroundColor Yellow }
+    } catch { Write-Host "    scoop install failed: $($_.Exception.Message)" -ForegroundColor Yellow }
+}
+
+# Tools via winget (scoop fallback): git (full, with Git Bash + GUI), uv, micromamba, pixi.
+# (sing-box core is installed directly in both tiers — see below — since its winget
+# package is unreliable and the core binary has clean GitHub releases.)
+Install-Tool -WingetId 'Git.Git'              -ScoopName 'git'        -BinName 'git'        -Label 'git (full)'
+Install-Tool -WingetId 'astral-sh.uv'          -ScoopName 'uv'         -BinName 'uv'         -Label 'uv'
+Install-Tool -WingetId 'Mamba.Micromamba'      -ScoopName 'micromamba' -BinName 'micromamba' -Label 'micromamba'
+Install-Tool -WingetId 'prefix-dev.pixi'       -ScoopName 'pixi'       -BinName 'pixi'       -Label 'pixi'
+{{- end }}
+
 # ═══════════════════════════════════════════════════════════════
 # sing-box CORE + Windows Administrator service — standard/develop ONLY.
 # tier is orthogonal to bootstrap_mode: sing-box installs whenever tier is NOT
@@ -149,26 +257,42 @@ Write-Skip 'sing-box (tier=simple - rides host proxy)'
 {{- end }}
 
 # ═══════════════════════════════════════════════════════════════
+# 2. MAMBA BASE ENV (python) — both tiers
 # ═══════════════════════════════════════════════════════════════
+if (Test-Cmd 'micromamba') {
     Update-EnvPath
     try {
+        & micromamba shell init -s powershell -r $mambaRoot 2>&1 | Out-Null
+        # base == root prefix (MAMBA_ROOT_PREFIX set); install python INTO root with -r
+        if (-not (Test-Path "$mambaRoot\python.exe")) {
+            Write-Step "Installing python into mamba base (root prefix)"
+            & micromamba install -y -c conda-forge python -r $mambaRoot 2>&1 |
                 ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
         }
+        Write-Ok 'micromamba base env ready'
     } catch {
+        Write-Host "    micromamba env init warning: $($_.Exception.Message)" -ForegroundColor Yellow
     }
 }
 
 # ═══════════════════════════════════════════════════════════════
 # 3. pywinauto (GUI automation, Windows-only)
+#    Installed into mamba base python when: tier is simple OR develop,
 #    OR profile is work. standard tier (personal desktop) skips it.
 # ═══════════════════════════════════════════════════════════════
 {{- if or (or (eq .tier "simple") (eq .tier "develop")) (eq .profile "work") }}
+if ((Test-Cmd 'micromamba') -and (Test-Path "$mambaRoot\python.exe")) {
     try {
+        $have = & micromamba run -n base python -c "import pywinauto" 2>$null
         if ($LASTEXITCODE -eq 0) { Write-Skip 'pywinauto' }
         else {
+            Write-Step "Installing pywinauto into mamba base python"
             {{- if .use_china_mirrors }}
+            & micromamba run -n base python -m pip install -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple pywinauto 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
             {{- else }}
+            & micromamba run -n base python -m pip install pywinauto 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
             {{- end }}
+            Write-Ok 'pywinauto installed (mamba base)'
         }
     } catch { Write-Host "    pywinauto warning: $($_.Exception.Message)" -ForegroundColor Yellow }
 }
