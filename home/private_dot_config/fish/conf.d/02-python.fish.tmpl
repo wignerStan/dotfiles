@@ -1,5 +1,5 @@
 # Gating: work, or personal desktop (macOS/Windows).
-{{- if or (eq .profile "work") (and (eq .profile "personal") (or (eq .chezmoi.os "darwin") (eq .chezmoi.os "windows"))) }}
+{{- if or (eq .profile "work") (eq .profile "personal") }}
 # Gate on the binary existing so non-Homebrew machines skip cleanly.
 # exported in non-login shells (matching .zshenv).
 

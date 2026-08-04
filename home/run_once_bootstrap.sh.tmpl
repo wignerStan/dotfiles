@@ -234,7 +234,8 @@ core_packages=(
     shellcheck
     shfmt
     lefthook        # git hooks manager
-    ruff            # python linter/formatter (single Rust binary, no python@3.x dep)
+    ruff            # python linter/formatter (single Rust binary)
+    micromamba      # python env manager (mamba base replaces brew python)
 )
 
 for pkg in "${core_packages[@]}"; do
