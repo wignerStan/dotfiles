@@ -131,29 +131,6 @@ if ($mmOk -and (Test-Cmd 'micromamba')) {
     }
 }
 
-# ── 5. pywinauto (GUI automation — into mamba base python) ───────
-# Only when micromamba base python is available.
-if ($mmOk -and (Test-Cmd 'micromamba')) {
-    try {
-        $have = & micromamba run -n base python -c "import pywinauto" 2>$null
-        if ($LASTEXITCODE -eq 0) {
-            Write-Skip 'pywinauto'
-        } else {
-            Write-Step "Installing pywinauto into mamba base python"
-            {{- if .use_china_mirrors }}
-            & micromamba run -n base python -m pip install -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple pywinauto 2>&1 |
-                ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
-            {{- else }}
-            & micromamba run -n base python -m pip install pywinauto 2>&1 |
-                ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
-            {{- end }}
-            Write-Ok 'pywinauto installed (mamba base)'
-        }
-    } catch {
-        Write-Host "    pywinauto install warning: $($_.Exception.Message)" -ForegroundColor Yellow
-    }
-}
-
 Write-Step "Windows Bootstrap Complete"
 Write-Host "    Restart PowerShell to pick up new PATH entries (winget/scoop/uv/micromamba)." -ForegroundColor Yellow
 
@@ -185,7 +162,6 @@ try {
     # VM/container: aggressive — full bloatware removal + extra privacy/AI disablement
     $debloatFlags += @(
         '-RunDefaults'                 # removes default app selection (Xbox, Clipchamp, ...)
-        '-RemoveApps'                  # ensure the default app-removal path runs
         '-AppRemovalTarget' 'AllUsers'
         '-DisableCopilot'
         '-DisableWidgets'
@@ -199,7 +175,11 @@ try {
     $debloatFlags += @('-RunDefaultsLite')
     {{- end }}
 
-    & ([scriptblock]::Create((irm 'https://debloat.raphi.re/'))) @debloatFlags 2>&1 |
+    # Fetch the script directly from GitHub (not the raphi.re launcher), then run.
+    Write-Host "    fetching Win11Debloat.ps1 from github..." -ForegroundColor DarkGray
+    $debloatScript = Invoke-RestMethod -Uri 'https://raw.githubusercontent.com/Raphire/Win11Debloat/master/Win11Debloat.ps1' -UseBasicParsing
+    $sb = [scriptblock]::Create($debloatScript)
+    & $sb @debloatFlags 2>&1 |
         ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
     Write-Ok 'Win11Debloat applied'
 } catch {
