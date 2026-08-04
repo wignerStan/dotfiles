@@ -1,0 +1,25 @@
+# Mamba base environment — declarative package manifest.
+# Managed by chezmoi. chezmoi merges .chezmoidata/*.toml into the top-level data
+# namespace, so this file's [mamba_base] table is accessible as .mamba_base.* .
+# Consumed by .local/bin/mamba-sync-base.{sh,ps1} to reconcile the base/root env:
+#   - .mamba_base.conda  -> `micromamba install -n base ...`
+#   - .mamba_base.pip    -> `micromamba run -n base python -m pip install ...`
+# Idempotent (conda/pip no-op already-installed) and only ADDS — never removes
+# packages you installed manually.
+
+[mamba_base]
+# Channels for the base env (conda-forge first for sharded repodata; see dot_condarc.tmpl).
+channels = ["conda-forge"]
+
+# Conda packages installed into the base env. Keep minimal — base is the shared
+# Python runtime; project deps belong in per-project envs (uv/pixi/mamba -n).
+conda = [
+    "python",     # the runtime itself
+    "pip",
+    "jupyterlab",
+]
+
+# pip-only packages (no conda build, or prefer PyPI) installed into base python.
+# Empty by default — add on-demand. pywinauto is installed by the bootstrap only
+# when bootstrap_mode == "full" (Windows), NOT here (not a base dependency).
+pip = []

@@ -24,6 +24,14 @@
 {{- end -}}
 {{- $develop := eq $tier "develop" -}}
 
+{{- /* bootstrap_mode: full (pywinauto + base-env sync service) | basic.
+     Derived from profile: personal/desktop -> full, vps/hpc/headless -> basic.
+     Overridable per-machine via the mamba_sync_service prompt below. */ -}}
+{{- $bootstrap_mode := "basic" -}}
+{{- if eq $profile "personal" -}}
+{{-   $bootstrap_mode = "full" -}}
+{{- end -}}
+
 {{- /* Axis 3: headless (no real desktop session) */ -}}
 {{- $headless := false -}}
 {{- if or (eq $profile "vps") (eq $profile "hpc") -}}
@@ -75,10 +83,12 @@
 {{- $github_user := "" -}}
 {{- $name := "Jacob" -}}
 {{- $email := "240170694+wignerStan@users.noreply.github.com" -}}
+{{- $mamba_sync_service := false -}}
 {{- if stdinIsATTY -}}
 {{-   $github_user = promptStringOnce . "github_user" "What is your GitHub username?" "" -}}
 {{-   $name = promptStringOnce . "name" "What is your name?" "Jacob" -}}
 {{-   $email = promptStringOnce . "email" "What is your email?" $email -}}
+{{-   $mamba_sync_service = promptBoolOnce . "mamba_sync_service" "Install the mamba base-env sync user service (LaunchAgent or Scheduled Task)?" false -}}
 {{- end -}}
 
 {{ if $has_age }}
@@ -102,6 +112,8 @@ encryption = "age"
     geo = {{ $geo | quote }}
     profile = {{ $profile | quote }}
     develop = {{ $develop }}
+    bootstrap_mode = {{ $bootstrap_mode | quote }}
+    mamba_sync_service = {{ $mamba_sync_service }}
     mamba_root = {{ joinPath .chezmoi.homeDir "mamba" | quote }}
     arch = {{ .chezmoi.arch | quote }}
 

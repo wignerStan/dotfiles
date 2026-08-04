@@ -1,0 +1,37 @@
+{{- /* Reconcile the mamba base env against .chezmoidata/mamba-base.toml.
+     Runs via LaunchAgent (macOS) / Scheduled Task (Windows-in-ps1).
+     Idempotent: only ADDS missing conda/pip packages, never removes. */ -}}
+{{- if and (or (eq .chezmoi.os "darwin") (eq .chezmoi.os "linux")) (lookPath "micromamba") -}}
+#!/bin/bash
+# Managed by chezmoi. Reconciles the mamba base env to the manifest in
+# .chezmoidata/mamba-base.toml. Safe to re-run (LaunchAgent fires on load + daily).
+set -euo pipefail
+
+export MAMBA_ROOT_PREFIX="{{ .mamba_root }}"
+log() { echo "[$(date '+%H:%M:%S')] mamba-sync: $*"; }
+
+# locate micromamba
+MM="$(command -v micromamba || true)"
+[ -z "$MM" ] && MM="$HOME/.local/share/chezmoi/../../mamba/bin/micromamba"
+# fall back to mamba/conda
+[ -z "$MM" ] && MM="$(command -v mamba || command -v conda || true)"
+[ -z "$MM" ] && { log "no micromamba/mamba/conda found, exiting"; exit 0; }
+
+# base must exist (python installed). Skip silently if not.
+"$MM" env list 2>/dev/null | grep -qw base || { log "base env not present yet, skipping"; exit 0; }
+
+# conda packages from the manifest (.mamba_base table merged from .chezmoidata)
+CONDA_PKGS=( {{- range .mamba_base.conda }} {{ . }} {{- end }} )
+if [ ${#CONDA_PKGS[@]} -gt 0 ]; then
+    log "ensuring conda packages: ${CONDA_PKGS[*]}"
+    "$MM" install -y -n base {{ range .mamba_base.channels -}} -c {{ . }} {{ end }} "${CONDA_PKGS[@]}" >/dev/null 2>&1 || log "conda install reported errors (may be no-op)"
+fi
+
+# pip packages
+PIP_PKGS=( {{- range .mamba_base.pip }} {{ . }} {{- end }} )
+if [ ${#PIP_PKGS[@]} -gt 0 ]; then
+    log "ensuring pip packages: ${PIP_PKGS[*]}"
+    "$MM" run -n base python -m pip install --upgrade "${PIP_PKGS[@]}" >/dev/null 2>&1 || log "pip install reported errors"
+fi
+log "sync complete"
+{{- end -}}

@@ -1,0 +1,30 @@
+{{- /* LaunchAgent: keep mamba base env in sync with the chezmoi manifest.
+     Deployed ONLY when mamba_sync_service == true (gated by chezmoiignore).
+     Fires on load (login) + daily. macOS only. */ -}}
+{{- if and (eq .chezmoi.os "darwin") .mamba_sync_service -}}
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.jacob.mamba-sync-base</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>{{ .chezmoi.homeDir }}/.local/bin/mamba-sync-base.sh</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>9</integer>
+        <key>Minute</key>
+        <integer>17</integer>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>{{ .chezmoi.homeDir }}/Library/Logs/mamba-sync-base.log</string>
+    <key>StandardErrorPath</key>
+    <string>{{ .chezmoi.homeDir }}/Library/Logs/mamba-sync-base.log</string>
+</dict>
+</plist>
+{{- end -}}

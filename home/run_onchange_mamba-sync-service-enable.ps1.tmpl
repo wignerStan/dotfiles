@@ -1,0 +1,24 @@
+{{- /* Windows: register/unregister the mamba-sync-base Scheduled Task.
+     Self-gates: renders empty unless os=windows AND mamba_sync_service.
+     Run via chezmoi run_onchange -> (re)creates the task whenever this changes. */ -}}
+{{- if and (eq .chezmoi.os "windows") .mamba_sync_service -}}
+#powershell
+$ErrorActionPreference = 'SilentlyContinue'
+$script = "{{ .chezmoi.homeDir }}\.local\bin\mamba-sync-base.ps1"
+if (-not (Test-Path $script)) { Write-Host "mamba-sync: target script missing, aborting"; exit 0 }
+
+# remove any prior task so we re-create cleanly with current triggers
+Unregister-ScheduledTask -TaskName 'mamba-sync-base' -Confirm:$false -EA SilentlyContinue
+
+$action    = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-ExecutionPolicy Bypass -NoProfile -File `"$script`""
+$triggers  = @(
+    (New-ScheduledTaskTrigger -AtLogOn),
+    (New-ScheduledTaskTrigger -Daily -At '09:17')
+)
+$principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Limited
+$settings  = New-ScheduledTaskSettingsSet -StartWhenAvailable -DontStopOnIdleEnd
+
+Register-ScheduledTask -TaskName 'mamba-sync-base' `
+    -Action $action -Trigger $triggers -Principal $principal -Settings $settings -Force | Out-Null
+Write-Host "mamba-sync: scheduled task registered (logon + daily 09:17)"
+{{- end -}}

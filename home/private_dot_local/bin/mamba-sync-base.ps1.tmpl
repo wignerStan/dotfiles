@@ -1,0 +1,39 @@
+{{- /* Windows: reconcile the mamba base env against the manifest.
+     Runs via Scheduled Task (registered by a run_ script when mamba_sync_service). */ -}}
+{{- if and (eq .chezmoi.os "windows") (lookPath "micromamba") -}}
+#powershell
+# Managed by chezmoi. Reconciles mamba base env to .chezmoidata/mamba-base.toml.
+# Idempotent; fires on logon + daily via Scheduled Task.
+$ErrorActionPreference = 'SilentlyContinue'
+$ProgressPreference = 'SilentlyContinue'
+$env:MAMBA_ROOT_PREFIX = '{{ .mamba_root }}'
+$env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')
+
+function Log($m){ Write-Host "[$(Get-Date -Format HH:mm:ss)] mamba-sync: $m" }
+
+$mm = Get-Command micromamba -EA SilentlyContinue
+if (-not $mm) { $mm = Get-Command mamba -EA SilentlyContinue }
+if (-not $mm) { $mm = Get-Command conda -EA SilentlyContinue }
+if (-not $mm) { Log 'no micromamba/mamba/conda found, exiting'; exit 0 }
+$mm = $mm.Source
+
+# base must exist
+$haveBase = (& $mm env list 2>$null | Select-String -Quiet '\bbase\b')
+if (-not $haveBase) { Log 'base env not present yet, skipping'; exit 0 }
+
+# conda packages from manifest (.mamba_base table merged from .chezmoidata)
+$condaPkgs = @({{- range .mamba_base.conda }} '{{ . }}' {{- end }})
+if ($condaPkgs.Count -gt 0) {
+    Log "ensuring conda packages: $($condaPkgs -join ' ')"
+    $channels = @({{- range .mamba_base.channels }} '{{ . }}' {{- end }}) | ForEach-Object { @('-c', $_) } | ForEach-Object { $_ }
+    & $mm install -y -n base @channels @condaPkgs 2>&1 | Out-Null
+}
+
+# pip packages
+$pipPkgs = @({{- range .mamba_base.pip }} '{{ . }}' {{- end }})
+if ($pipPkgs.Count -gt 0) {
+    Log "ensuring pip packages: $($pipPkgs -join ' ')"
+    & $mm run -n base python -m pip install --upgrade @pipPkgs 2>&1 | Out-Null
+}
+Log 'sync complete'
+{{- end -}}

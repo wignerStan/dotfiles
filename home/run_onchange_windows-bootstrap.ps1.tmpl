@@ -134,6 +134,34 @@ if ($mmOk -and (Test-Cmd 'micromamba')) {
 Write-Step "Windows Bootstrap Complete"
 Write-Host "    Restart PowerShell to pick up new PATH entries (winget/scoop/uv/micromamba)." -ForegroundColor Yellow
 
+# ── 5. pywinauto (GUI automation, Windows-only) — full bootstrap only ──
+# Installed into mamba base python ONLY when bootstrap_mode == "full".
+# basic mode skips it (not a base dependency). Install on-demand otherwise.
+{{- if eq .bootstrap_mode "full" }}
+if ($mmOk -and (Test-Cmd 'micromamba')) {
+    try {
+        $have = & micromamba run -n base python -c "import pywinauto" 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Skip 'pywinauto'
+        } else {
+            Write-Step "Installing pywinauto into mamba base python"
+            {{- if .use_china_mirrors }}
+            & micromamba run -n base python -m pip install -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple pywinauto 2>&1 |
+                ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+            {{- else }}
+            & micromamba run -n base python -m pip install pywinauto 2>&1 |
+                ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+            {{- end }}
+            Write-Ok 'pywinauto installed (mamba base)'
+        }
+    } catch {
+        Write-Host "    pywinauto install warning: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+}
+{{- else }}
+Write-Skip 'pywinauto (bootstrap_mode={{ .bootstrap_mode }})'
+{{- end }}
+
 # ═══════════════════════════════════════════════════════════════
 # Win11Debloat — unattended system cleanup/tweaks (Raphire/Win11Debloat)
 # Always runs (idempotent: re-applying the same tweaks is a no-op).
