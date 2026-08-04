@@ -1,41 +1,31 @@
 {{- /* Reconcile the mamba base env against .chezmoidata/mamba_base.toml.
-     chezmoi is the trigger: this run_onchange fires whenever the manifest or
-     this script changes (and on first apply). No LaunchAgent/Scheduled Task.
-     Cross-platform: renders on any OS where micromamba exists; runs the
-     appropriate install. Idempotent (only ADDS, never removes). */ -}}
+     chezmoi is the trigger (run_onchange). Installs core + current-tier add-ons.
+     Idempotent (only ADDS, never removes). Cross-platform: renders on any OS
+     where micromamba exists. */ -}}
 {{- if lookPath "micromamba" -}}
 #!/bin/sh
-# Managed by chezmoi. Reconciles the mamba base env to .chezmoidata/mamba_base.toml.
-# Triggered by chezmoi run_onchange (no background service).
 set -eu
-
 export MAMBA_ROOT_PREFIX="{{ .mamba_root }}"
 log() { printf '[mamba-sync] %s\n' "$*"; }
 
-# locate a mamba/conda binary
 MM="$(command -v micromamba 2>/dev/null || command -v mamba 2>/dev/null || command -v conda 2>/dev/null || true)"
 [ -z "$MM" ] && { log "no micromamba/mamba/conda found, skipping"; exit 0; }
+case "$MM" in *micromamba|*mamba) "$MM" env list 2>/dev/null | grep -qw base || { log "base env not present, skipping"; exit 0; } ;; esac
 
-# base (root) env must exist (python installed). Skip silently if not ready.
-case "$MM" in
-    *micromamba|*mamba) "$MM" env list 2>/dev/null | grep -qw base || { log "base env not present, skipping"; exit 0; } ;;
-esac
+CHANNELS="{{ range .mamba_base.channels }} -c {{ . }}{{ end }}"
+# core (always) + current-tier add-on
+CONDA_PKGS="{{ range .mamba_base.core.conda }}{{ . }} {{ end }}{{ range (index .mamba_base .tier).conda }}{{ . }} {{ end }}"
+PIP_PKGS="{{ range .mamba_base.core.pip }}{{ . }} {{ end }}{{ range (index .mamba_base .tier).pip }}{{ . }} {{ end }}"
 
-CONDA_PKGS="{{ range .mamba_base.conda }}{{ . }} {{ end }}"
 if [ -n "$CONDA_PKGS" ]; then
-    log "ensuring conda packages: ${CONDA_PKGS}"
-    {{- range .mamba_base.channels }}
-    CHANNELS="$CHANNELS -c {{ . }}"
-    {{- end }}
+    log "ensuring conda packages (tier={{ .tier }}): ${CONDA_PKGS}"
     # shellcheck disable=SC2086
-    "$MM" install -y -n base ${CHANNELS:-} ${CONDA_PKGS} >/dev/null 2>&1 || log "conda install reported errors (may be no-op)"
+    "$MM" install -y -n base ${CHANNELS} ${CONDA_PKGS} >/dev/null 2>&1 || log "conda install reported errors (may be no-op)"
 fi
-
-PIP_PKGS="{{ range .mamba_base.pip }}{{ . }} {{ end }}"
 if [ -n "$PIP_PKGS" ]; then
     log "ensuring pip packages: ${PIP_PKGS}"
     # shellcheck disable=SC2086
     "$MM" run -n base python -m pip install --upgrade ${PIP_PKGS} >/dev/null 2>&1 || log "pip install reported errors"
 fi
-log "sync complete"
+log "sync complete (tier={{ .tier }})"
 {{- end -}}

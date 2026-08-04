@@ -211,8 +211,9 @@ if ! command -v brew &> /dev/null; then
     /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 fi
 
-# ── Core packages (all profiles except work) ──────────────────
-echo "Installing core packages..."
+# ── Core formulae — lightweight CLI tools, safe for brew on all OSes ──
+# These don't collide with system runtimes; brew managing them is fine.
+echo "Installing core brew formulae..."
 core_packages=(
     zsh
     tmux
@@ -229,20 +230,39 @@ core_packages=(
 )
 
 {{- if eq .tier "develop" }}
-# ── Develop layer: full dev tooling ────────────────────────────
+# ── Develop layer: dev CLI tools (still brew-safe) ────────────
 core_packages+=(
     zellij
-    npm
-    rust
-    go
     stylua
     luarocks
+    just            # task runner
+    shellcheck
+    shfmt
+    lefthook        # git hooks manager
+    ruff            # python linter/formatter (single binary)
 )
 {{- end }}
 
 for pkg in "${core_packages[@]}"; do
     brew install "$pkg" 2>/dev/null || echo "Warning: failed to install $pkg, skipping"
 done
+
+{{- if eq .tier "develop" }}
+# ── Language RUNTIMES — NOT via brew (would break system installs) ──
+# On Linux, brew taking over python/rust/go/node shadows/collides with system
+# package-manager versions and breaks toolchains that expect the system one.
+# Use version managers instead (installed lazily by the shell rc, not here):
+#   rust  -> rustup (https://sh.rustup.rs)    — `curl ... | sh -s -- -y`
+#   go    -> goenv / system golang-go
+#   node  -> fnm / nvm (NOT brew node/npm)    — `fnm install --lts`
+# python -> mamba base (see run_onchange_mamba-sync-base) or system python3.
+# This block intentionally installs nothing; it documents the policy.
+echo "Language runtimes (rust/go/node) intentionally NOT installed via brew — use rustup/goenv/fnm."
+
+# ── Global node tools — only when a node runtime already exists ──
+# Installed via the node version manager's global dir, not brew. Skipped here;
+# `corepack enable` (after node is present) provides yarn/pnpm.
+{{- end }}
 
 # ── macOS-only packages ───────────────────────────────────────
 {{- if eq .chezmoi.os "darwin" }}
@@ -254,14 +274,6 @@ macos_packages=(
     kubecolor
 )
 brew install "${macos_packages[@]}"
-{{- end }}
-
-# ── Global node tools via Homebrew (develop profile) ─────────
-{{- if eq .tier "develop" }}
-echo "Installing global node tools via Homebrew..."
-for pkg in typescript ts-node eslint prettier; do
-    brew install "$pkg" 2>/dev/null || echo "Warning: failed to install $pkg, skipping"
-done
 {{- end }}
 
 {{- end }}
