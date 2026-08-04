@@ -5,11 +5,13 @@
 # Jacob's Windows Bootstrap
 # Idempotent (safe to re-run via run_onchange). tier={{ .tier }} mode={{ .bootstrap_mode }} geo={{ .geo }}
 #
-# Install strategy by tier:
+# Install strategy by tier (tier is orthogonal to bootstrap_mode):
 #   simple  (VM/container) -> NO package managers. Remove winget/scoop if present.
-#                             Install git (MinGit, no Bash/GUI) + uv + micromamba DIRECTLY.
-#   standard/develop       -> winget + scoop (with extras bucket). Install via PMs:
-#                             git (full, incl. Git Bash + GUI), sing-box, uv, micromamba, pixi.
+#                             Direct install: git (MinGit, no Bash/GUI), uv, micromamba.
+#                             NO sing-box (rides host proxy).
+#   standard/develop       -> winget + scoop (extras bucket). Via PMs: git (full,
+#                             Bash+GUI), uv, micromamba, pixi. Plus sing-box core
+#                             (direct) + Windows Administrator service (start=auto).
 # ═══════════════════════════════════════════════════════════════
 # Managed by Chezmoi — runs on Windows only. Do not edit in place.
 
@@ -212,18 +214,47 @@ Install-Tool -WingetId 'prefix-dev.pixi'       -ScoopName 'pixi'       -BinName 
 {{- end }}
 
 # ═══════════════════════════════════════════════════════════════
-# sing-box CORE — direct install, both tiers.
-# We want the sing-box *core* binary (SagerNet/sing-box), NOT a GUI app, and its
-# winget package ID is unreliable — so download the core binary directly from
-# GitHub releases (arm64/amd64) into ~/.local/sing-box, add to User PATH.
+# sing-box CORE + Windows Administrator service — standard/develop ONLY.
+# tier is orthogonal to bootstrap_mode: sing-box installs whenever tier is NOT
+# simple (regardless of full/basic). The core binary (SagerNet/sing-box) is
+# downloaded directly (not a GUI app; winget id unreliable), and registered as
+# a Windows Service (start=auto, runs as LocalSystem == Admin) so the TUN proxy
+# is up at boot. simple tier (VM/container) gets neither — it rides the host.
 # ═══════════════════════════════════════════════════════════════
+{{- if not (eq .tier "simple") }}
 $sbTag = Get-LatestRelease 'SagerNet/sing-box'
 if ($sbTag) {
     $sbVer = $sbTag -replace '^v',''   # v1.13.16 -> 1.13.16
-    Install-Direct -Label 'sing-box (core)' `
+    $sbOk = Install-Direct -Label 'sing-box (core)' `
         -Url "https://github.com/SagerNet/sing-box/releases/download/$sbTag/sing-box-$sbVer-windows-$__arch.zip" `
         -Dest "$env:USERPROFILE\.local\sing-box" -PathDirs @('') -TestBin 'sing-box'
+
+    # Register the Windows service (admin). Idempotent: recreate so binPath stays
+    # current. Config path matches the deployed sing-box config.
+    $sbExe = "$env:USERPROFILE\.local\sing-box\sing-box.exe"
+    $sbCfg = "$env:USERPROFILE\.config\sing-box\config.json"
+    if ($sbOk -and (Test-Path $sbExe) -and (Test-Path $sbCfg)) {
+        Write-Step "sing-box service (LocalSystem, start=auto)"
+        try {
+            & sc.exe stop sing-box 2>&1 | Out-Null
+            & sc.exe delete sing-box 2>&1 | Out-Null
+            Start-Sleep -Seconds 1
+            $binPath = "`"$sbExe`" run -c `"$sbCfg`""
+            & sc.exe create sing-box binPath= $binPath start= auto DisplayName= "sing-box" 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+            & sc.exe description sing-box "sing-box TUN proxy (managed by chezmoi)" 2>&1 | Out-Null
+            & sc.exe start sing-box 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+            Write-Ok 'sing-box service registered + started'
+        } catch {
+            Write-Host "    sing-box service warning: $($_.Exception.Message)" -ForegroundColor Yellow
+            Write-Host "    (service install needs Administrator; re-run elevated)" -ForegroundColor Yellow
+        }
+    } elseif ($sbOk -and -not (Test-Path $sbCfg)) {
+        Write-Host "    sing-box config not found at $sbCfg - service skipped (place config first)" -ForegroundColor Yellow
+    }
 }
+{{- else }}
+Write-Skip 'sing-box (tier=simple - rides host proxy)'
+{{- end }}
 
 # ═══════════════════════════════════════════════════════════════
 # 2. MAMBA BASE ENV (python) — both tiers
