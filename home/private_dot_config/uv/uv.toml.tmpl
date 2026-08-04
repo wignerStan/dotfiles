@@ -1,0 +1,10 @@
+# uv config — managed by chezmoi
+# Shared cache on /develop (same btrfs filesystem as project venvs → reflinks)
+cache-dir = "/develop/.cache/uv"
+link-mode = "clone"
+
+{{- if .use_china_mirrors }}
+[[index]]
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+default = true
+{{- end }}

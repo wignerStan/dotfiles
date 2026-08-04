@@ -1,9 +1,8 @@
-# Pixi config — managed by chezmoi (develop profile only)
-# Share PyPI wheel cache with uv to avoid duplicate downloads
+# Pixi config — managed by chezmoi
+[cache]
+pypi-wheels = "/develop/.cache/uv"
+
 {{- if .use_china_mirrors }}
 [repodata-config]
 channel-priority = "disabled"
 {{- end }}
-
-# Point pixi's embedded uv wheel cache to uv's cache dir
-# This is set at runtime via env var (see .zshenv PIXI_HOME section)

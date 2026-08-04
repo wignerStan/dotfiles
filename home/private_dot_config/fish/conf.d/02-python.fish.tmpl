@@ -24,5 +24,7 @@ if type -q pixi
     fish_add_path --move $PIXI_HOME/bin
 end
 {{- end }}
-# Share PyPI wheel cache with uv (avoids duplicate downloads)
-set -gx PIXI_CACHE_PYPI_WHEELS_DIR ~/.cache/uv
+# Shared uv/rattler cache on /develop (reflinks with project venvs)
+set -gx UV_CACHE_DIR /develop/.cache/uv
+set -gx PIXI_CACHE_PYPI_WHEELS_DIR /develop/.cache/uv
+set -gx PIXI_CACHE_DIR /develop/.cache/rattler
