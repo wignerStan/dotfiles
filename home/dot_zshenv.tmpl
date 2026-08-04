@@ -103,8 +103,7 @@ command_not_found_handler() {
 [[ -d "$HOME/go/bin" ]] && path+=("$HOME/go/bin")
 {{- end }}
 
-# ── Node/Rust/Mobile ecosystem (develop profile only) ─────────
-{{- if eq .tier "develop" }}
+# ── Node ecosystem (all tiers) ────────────────────────────────
 # pnpm
 {{- if eq .chezmoi.os "darwin" }}
 [[ -d "$HOME/Library/pnpm" ]] && export PNPM_HOME="$HOME/Library/pnpm"
@@ -124,7 +123,6 @@ command_not_found_handler() {
 {{- if .use_china_mirrors }}
 export BUN_CONFIG_REGISTRY="https://registry.npmmirror.com"
 {{- end }}
-{{- end }}
 
 # Local user binaries (prepended to override system commands)
 path=($HOME/.local/bin $path)
@@ -135,7 +133,7 @@ export PATH
 # ═══════════════════════════════════════════════════════════════
 # Dev tool wrappers (modern replacements) — loaded last
 # ═══════════════════════════════════════════════════════════════
-{{- if and (eq .tier "develop") (lookPath "pnpm") }}
+{{- if lookPath "pnpm" }}
 
 npm() {
   pnpm "$@"
@@ -155,7 +153,7 @@ EOF
 }
 {{- end }}
 
-{{- if and (eq .tier "develop") (lookPath "bun") }}
+{{- if lookPath "bun" }}
 
 npx() {
   bunx "$@"
