@@ -37,5 +37,11 @@ alias {{ index $parts 0 }} = {{ index $parts 1 | trimAll "'" | trimAll "\"" }}
 {{- end }}
 {{- end }}
 
+# Carapace completion
+if (which carapace | length) > 0 {
+    carapace _carapace nushell | save -f ($nu.cache-dir | path join "carapace.nu")
+    source ($nu.cache-dir | path join "carapace.nu")
+}
+
 # Welcome back
 print (ansi green) "Welcome back, {{ .name }}. Current shell: Nushell" (ansi reset)
