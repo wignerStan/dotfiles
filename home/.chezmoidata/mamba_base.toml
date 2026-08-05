@@ -147,6 +147,7 @@ pip = [
     "numexpr",
     "numpy",
     "odfpy",
+    "ocrmypdf",
     "openpyxl",
     "packaging",
     "pandas",
@@ -299,8 +300,9 @@ pip = [
 ]
 
 [mamba_base.develop]
-# app/web + dev tools
+# app/web + dev tools + trade
 conda = [
+    "ta-lib",
 ]
 pip = [
     "alembic",

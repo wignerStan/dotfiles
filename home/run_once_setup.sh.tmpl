@@ -244,7 +244,7 @@ brew_install vim
 brew_install shellcheck shfmt stylua
 
 # Python runtime
-brew_install uv ruff micromamba pixi
+brew_install uv micromamba pixi
 
 # Node.js runtime
 brew_install node pnpm bun
@@ -261,6 +261,9 @@ brew_install pngpaste terminal-notifier
 # ── Level 2: Extra (setup_mode=full) ──────────────────────
 {{- if eq .setup_mode "full" }}
 echo "Installing Level 2: extra tools..."
+
+# Python dev tools
+brew_install ruff
 
 # Node/python dev tools (LSP, formatters, linters).
 # pre-commit belongs HERE (python dev tool) — NOT in develop.
@@ -284,6 +287,9 @@ brew_install cc-switch-cli beads cliproxyapi
 
 # Network analysis
 brew_install wireshark tcpdump
+
+# Code analysis
+brew_install ast-grep
 
 # Build tools
 brew_install bazel
@@ -369,6 +375,9 @@ echo "Installing Level 3: develop tools..."
 
 # Advanced tools (pre-commit moved up to Level 2 — it's a python dev tool)
 brew_install trivy lefthook just
+
+# SDK / platform tools (cross-platform)
+brew_install supabase
 
 # Reverse engineering / binary analysis (cross-platform)
 brew_install radare2 binwalk
