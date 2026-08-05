@@ -5,6 +5,8 @@
 #!/bin/sh
 set -eu
 export MAMBA_ROOT_PREFIX="{{ .mamba_root }}"
+export CONDA_PREFIX="{{ .mamba_root }}"
+export UV_SYSTEM_PYTHON=1
 export UV_CACHE_DIR="{{- if eq .chezmoi.os "linux" -}}/develop/.cache/uv{{- else -}}$HOME/.cache/uv{{- end -}}"
 log() { printf '[mamba-sync] %s\n' "$*"; }
 
@@ -22,6 +24,7 @@ channels:
   - {{ . }}
 {{- end }}
 dependencies:
+  - uv
 {{- range .mamba_base.core.conda }}
   - {{ . }}
 {{- end }}
