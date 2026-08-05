@@ -314,9 +314,9 @@ brew_install cloudflared wgcf syncthing
 brew_install aliyunpan
 {{- end }}
 
-# macOS-only: APFS tools
+# macOS-only: system tools
 {{- if eq .chezmoi.os "darwin" }}
-brew_install afsctool
+brew_install afsctool duti
 brew install dr-emann/tap/applesauce 2>/dev/null || echo "Warning: applesauce failed"
 {{- end }}
 
@@ -385,9 +385,9 @@ brew_install trivy lefthook just
 # SDK / platform tools (cross-platform)
 brew_install supabase azure-cli
 
-# Reverse engineering / binary analysis (cross-platform)
-brew_install radare2 binwalk
-brew install --cask ghidra 2>/dev/null || echo "Warning: ghidra cask failed"
+# Reverse engineering / binary analysis (optional, cross-platform)
+brew_install radare2 binwalk lief
+brew install --cask ghidra 2>/dev/null || echo "Warning: ghidra cask (optional) failed"
 
 # macOS develop: VM tools
 {{- if eq .chezmoi.os "darwin" }}

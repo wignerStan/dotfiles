@@ -306,6 +306,7 @@ conda = [
 ]
 pip = [
     "alembic",
+    "angr",
     "boto3",
     "botocore",
     "click",
