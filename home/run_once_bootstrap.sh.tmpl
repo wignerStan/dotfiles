@@ -224,7 +224,8 @@ echo "Installing Level 1: basic tools..."
 # CLI utilities
 brew_install() { brew install "$@" 2>/dev/null || echo "Warning: some packages failed: $*"; }
 
-brew_install zsh fish nushell fisher
+brew_install zsh zsh-autosuggestions zsh-syntax-highlighting zsh-history-substring-search
+brew_install fish nushell fisher
 
 # PTY: tmux on all unix (not windows). byobu is linux/wsl only (not mac).
 # zellij moves to Level 2 (extra) — linux/wsl only.
@@ -234,10 +235,10 @@ brew_install byobu
 {{- end }}
 
 brew_install starship zoxide eza bat
-brew_install ripgrep fd fzf jq yq jo
-brew_install age fastfetch
-brew_install git gh glab
-brew_install vim
+brew_install ripgrep fd fzf jq yq
+brew_install coreutils direnv htop tree wget
+brew_install age base64 fastfetch
+brew_install git vim
 
 # Shell lint/format
 brew_install shellcheck shfmt stylua
@@ -250,6 +251,12 @@ brew_install node pnpm bun
 
 # Compression + text processing (perl is great for text munging)
 brew_install p7zip perl
+brew_install parallel
+
+# macOS-only basic utilities
+{{- if eq .chezmoi.os "darwin" }}
+brew_install pngpaste terminal-notifier
+{{- end }}
 
 # ── Level 2: Extra (bootstrap_mode=full) ──────────────────────
 {{- if eq .bootstrap_mode "full" }}
@@ -267,12 +274,38 @@ brew_install ffmpeg imagemagick
 
 # Git/GUI tools
 brew_install lazygit lazydocker yazi
+brew_install gh glab git-delta git-filter-repo gitleaks
 
 # Docs/pdf
 brew_install pandoc
 
 # AI agent tools
-brew_install cc-switch-cli beads
+brew_install cc-switch-cli beads cliproxyapi
+
+# Network analysis
+brew_install wireshark tcpdump
+
+# Build tools
+brew_install bazel
+
+# Containers
+brew_install docker docker-compose
+
+# Backup
+brew_install kopia
+
+# Network services
+brew_install cloudflared wgcf syncthing
+
+# Cloud storage (mac/win only)
+{{- if or (eq .chezmoi.os "darwin") (eq .chezmoi.os "windows") }}
+brew_install aliyunpan
+{{- end }}
+
+# macOS-only: APFS tools
+{{- if eq .chezmoi.os "darwin" }}
+brew_install afsctool
+{{- end }}
 
 # ── Shell strengthen ──
 {{- if or (eq .platform "linux") (eq .platform "wsl") }}
@@ -334,7 +367,7 @@ fi
 echo "Installing Level 3: develop tools..."
 
 # Advanced tools (pre-commit moved up to Level 2 — it's a python dev tool)
-brew_install trivy lefthook
+brew_install trivy lefthook just
 
 # Per-user language toolchains (NOT via brew)
 if ! command -v go &>/dev/null; then
