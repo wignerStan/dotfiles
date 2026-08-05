@@ -250,7 +250,10 @@ brew_install uv micromamba pixi
 brew_install node pnpm bun
 
 # Compression + text processing (perl is great for text munging)
-brew_install p7zip perl
+brew_install p7zip sevenzip perl
+
+# System essentials (brew installs git as dep; chezmoi manages dotfiles)
+brew_install chezmoi
 brew_install parallel
 
 # macOS-only basic utilities
@@ -380,7 +383,7 @@ echo "Installing Level 3: develop tools..."
 brew_install trivy lefthook just
 
 # SDK / platform tools (cross-platform)
-brew_install supabase
+brew_install supabase azure-cli
 
 # Reverse engineering / binary analysis (cross-platform)
 brew_install radare2 binwalk
