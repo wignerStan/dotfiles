@@ -412,9 +412,6 @@ pip = [
     "poetry",
 ]
 
-[mamba_base.calculate]
-conda = []
-pip = []
 
 
 [mamba_base.develop]
