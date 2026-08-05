@@ -35,12 +35,12 @@
 {{-   end -}}
 {{- end -}}
 
-{{- /* bootstrap_mode: full | basic. Orthogonal axis to tier/profile — controls
+{{- /* setup_mode: full | basic. Orthogonal axis to tier/profile — controls
      the breadth of the base-env package set and heavier tooling, independent of
      where the machine sits (simple/standard/develop) or its profile. */ -}}
-{{- $bootstrap_mode := "basic" -}}
+{{- $setup_mode := "basic" -}}
 {{- if or (eq $profile "personal") (eq $tier "develop") -}}
-{{-   $bootstrap_mode = "full" -}}
+{{-   $setup_mode = "full" -}}
 {{- end -}}
 
 {{- /* headless: no real desktop session */ -}}
@@ -130,6 +130,6 @@ encryption = "age"
     use_china_mirrors = {{ $use_china_mirrors }}
     geo = {{ $geo | quote }}
     profile = {{ $profile | quote }}
-    bootstrap_mode = {{ $bootstrap_mode | quote }}
+    setup_mode = {{ $setup_mode | quote }}
     mamba_root = {{ if eq .chezmoi.os "linux" }}"/develop/mamba"{{ else }}{{ joinPath .chezmoi.homeDir "mamba" | quote }}{{ end }}
     arch = {{ .chezmoi.arch | quote }}

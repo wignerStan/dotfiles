@@ -3,7 +3,7 @@
 #!/bin/bash
 
 # ═══════════════════════════════════════════════════════════════
-# Jacob's Multi-Machine Bootstrap v4 — profile-aware
+# Jacob's Multi-Machine Setup v1 — profile-aware
 # ═══════════════════════════════════════════════════════════════
 
 set -euo pipefail
@@ -214,7 +214,7 @@ fi
 # ═══════════════════════════════════════════════════════════════
 # THREE-LEVEL TOOL INSTALLATION
 # Level 1 (basic): all non-simple tiers — CLI + shell + basic lang
-# Level 2 (extra): bootstrap_mode=full — dev tools, media, GUI
+# Level 2 (extra): setup_mode=full — dev tools, media, GUI
 # Level 3 (develop): tier=develop — advanced toolchains, version managers
 # ═══════════════════════════════════════════════════════════════
 
@@ -258,8 +258,8 @@ brew_install parallel
 brew_install pngpaste terminal-notifier
 {{- end }}
 
-# ── Level 2: Extra (bootstrap_mode=full) ──────────────────────
-{{- if eq .bootstrap_mode "full" }}
+# ── Level 2: Extra (setup_mode=full) ──────────────────────
+{{- if eq .setup_mode "full" }}
 echo "Installing Level 2: extra tools..."
 
 # Node/python dev tools (LSP, formatters, linters).
@@ -369,6 +369,16 @@ echo "Installing Level 3: develop tools..."
 
 # Advanced tools (pre-commit moved up to Level 2 — it's a python dev tool)
 brew_install trivy lefthook just
+
+# Reverse engineering / binary analysis (cross-platform)
+brew_install radare2 binwalk
+brew install --cask ghidra 2>/dev/null || echo "Warning: ghidra cask failed"
+
+# macOS develop: VM tools
+{{- if eq .chezmoi.os "darwin" }}
+brew install --cask tart 2>/dev/null || echo "Warning: tart cask failed"
+brew_install lima
+{{- end }}
 
 # Per-user language toolchains (NOT via brew)
 if ! command -v go &>/dev/null; then

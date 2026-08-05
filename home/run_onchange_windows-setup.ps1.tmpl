@@ -2,10 +2,10 @@
 {{- if eq .chezmoi.os "windows" -}}
 #powershell
 # ═══════════════════════════════════════════════════════════════
-# Jacob's Windows Bootstrap
-# Idempotent (safe to re-run via run_onchange). tier={{ .tier }} mode={{ .bootstrap_mode }} geo={{ .geo }}
+# Jacob's Windows Setup
+# Idempotent (safe to re-run via run_onchange). tier={{ .tier }} mode={{ .setup_mode }} geo={{ .geo }}
 #
-# Install strategy by tier (tier is orthogonal to bootstrap_mode):
+# Install strategy by tier (tier is orthogonal to setup_mode):
 #   simple  (VM/container) -> NO package managers. Remove winget/scoop if present.
 #                             Direct install: git (MinGit, no Bash/GUI), uv, micromamba.
 #                             NO sing-box (rides host proxy).
@@ -32,7 +32,7 @@ function Test-Cmd($n) { return [bool](Get-Command $n -ErrorAction SilentlyContin
 $__arch = '64-bit'
 if ($env:PROCESSOR_ARCHITECTURE -match 'ARM|aarch64') { $__arch = 'arm64' }
 
-Write-Step "Starting Windows Bootstrap (tier={{ .tier }} mode={{ .bootstrap_mode }} geo={{ .geo }} arch=$__arch)"
+Write-Step "Starting Windows Setup (tier={{ .tier }} mode={{ .setup_mode }} geo={{ .geo }} arch=$__arch)"
 
 # ═══════════════════════════════════════════════════════════════
 # Helpers
@@ -247,11 +247,11 @@ if (Test-Cmd 'scoop') {
 {{- end }}
 
 # ═══════════════════════════════════════════════════════════════
-# Level 2: Extra (bootstrap_mode=full, non-simple) — desktop dev/media tools.
+# Level 2: Extra (setup_mode=full, non-simple) — desktop dev/media tools.
 # Mirrors the Unix bootstrap's Level 2: terminal emulator + downloaders.
 # ═══════════════════════════════════════════════════════════════
-{{- if and (eq .bootstrap_mode "full") (ne .tier "simple") }}
-Write-Step "Level 2: extra tools (bootstrap_mode=full)"
+{{- if and (eq .setup_mode "full") (ne .tier "simple") }}
+Write-Step "Level 2: extra tools (setup_mode=full)"
 
 # Terminal emulator. WezTerm is the windows terminal (ghostty/iterm2 on mac).
 Install-Tool -WingetId 'wez.wezterm' -ScoopName 'wezterm' -BinName 'wezterm' -Label 'WezTerm'
@@ -399,7 +399,7 @@ if ((Test-Cmd 'micromamba') -and (Test-Path "$mambaRoot\python.exe")) {
 Write-Skip 'pywinauto (tier={{ .tier }} profile={{ .profile }})'
 {{- end }}
 
-Write-Step "Windows Bootstrap Complete"
+Write-Step "Windows Setup Complete"
 Write-Host "    Restart PowerShell to pick up new PATH entries." -ForegroundColor Yellow
 
 # ═══════════════════════════════════════════════════════════════

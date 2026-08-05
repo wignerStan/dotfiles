@@ -1,0 +1,18 @@
+# This is a mock encrypted SSH private key file
+# In production, you would encrypt your actual SSH key using:
+#   chezmoi encrypt --output private_dot_ssh/private_id_rsa.age ~/.ssh/id_rsa
+#
+# To decrypt and view:
+#   chezmoi decrypt private_dot_ssh/private_id_rsa.age
+#
+# The file will be automatically decrypted when you run 'chezmoi apply'
+
+-----BEGIN AGE ENCRYPTED FILE-----
+YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBhYmNkZWZnaGlqa2xtbm9w
+cXJzdHV2d3h5ejEyMzQ1Njc4OTBBQkNERUYKLS0tLS0gRU5EIEVYQU1QTEUgRU5D
+UllQVEVEIERBVEEgLS0tLS0KVGhpcyBpcyBhIG1vY2sgZW5jcnlwdGVkIGZpbGUu
+IEluIHByb2R1Y3Rpb24sIHlvdSB3b3VsZCBzdG9yZQp5b3VyIGFjdHVhbCBlbmNy
+eXB0ZWQgU1NIIGtleXMgaGVyZS4KCkZvciBhIHJlYWwga2V5LCB1c2U6CmNoZXpt
+b2kgZW5jcnlwdCAtLW91dHB1dCBwcml2YXRlX2RvdF9zc2gvcHJpdmF0ZV9pZF9y
+c2EuYWdlIH4vLnNzaC9pZF9yc2EK
+-----END AGE ENCRYPTED FILE-----
