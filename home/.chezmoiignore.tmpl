@@ -31,6 +31,11 @@
 .config/byobu/
 {{- end }}
 
+# Zellij: Linux/WSL only (not darwin)
+{{- if not (or (eq .chezmoi.os "linux") (eq .platform "wsl")) }}
+.config/zellij/
+{{- end }}
+
 {{- if eq .profile "hpc" }}
 # HPC: skip workstation-only tools, use container-data/zsh instead
 .config/ghostty/

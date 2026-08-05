@@ -274,13 +274,11 @@ brew_install pandoc
 # AI agent tools
 brew_install cc-switch-cli beads
 
-# ── Linux shell strengthen ──
+# ── Shell strengthen ──
 {{- if or (eq .platform "linux") (eq .platform "wsl") }}
-brew_install zellij                       # tmux alt — linux/wsl only (moved from basic)
+brew_install zellij                       # tmux alt — linux/wsl only (not darwin)
 {{- end }}
-{{- if eq .platform "linux" }}
-brew_install et                           # Eternal Terminal — ssh enhancement, linux only (not wsl)
-{{- end }}
+brew_install et                           # Eternal Terminal — ssh enhancement, all unix
 
 # ── Terminal emulators ──
 {{- if eq .chezmoi.os "darwin" }}
