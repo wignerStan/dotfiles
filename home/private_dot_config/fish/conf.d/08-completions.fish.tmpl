@@ -1,10 +1,17 @@
 # ── Completions ─────────────────────────────────────────────────
+
+# Carapace: multi-shell completion (replaces native fish completions)
+if command -q carapace
+    set -gx CARAPACE_BRIDGES 'fish,bash,zsh,inshellisense'
+    carapace _carapace | source
+else
 {{- if eq .tier "develop" }}
-# Bun completions
-if test -f ~/.bun/completions/bun.fish
-    source ~/.bun/completions/bun.fish
-end
+    # Bun completions (fallback when carapace not installed)
+    if test -f ~/.bun/completions/bun.fish
+        source ~/.bun/completions/bun.fish
+    end
 {{- end }}
+end
 
 # ── Command not found handler ───────────────────────────────────
 {{- if lookPath "brew" }}
