@@ -218,7 +218,9 @@
         "172.19.0.1/30"
       ],
       "auto_route": true,
-      "stack": "gvisor"
+      "stack": "gvisor"{{- if $newSchema }},
+      "strict_route": true,
+      "dns_mode": "hijack"{{- end }}
     }
   ],
   "outbounds": [
