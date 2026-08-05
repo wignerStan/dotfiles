@@ -419,8 +419,48 @@
       },
       {
         "rule_set": "geosite-ads",
-        "action": "reject"
+        "action": "reject"{{- if $newSchema }},
+        "method": "default",
+        "no_drop": true{{- end }}
       },
+{{- if $newSchema }}
+      {
+        "network": ["tcp"],
+        "port": [80, 443],
+        "action": "sniff",
+        "sniffer": ["http", "tls"],
+        "timeout": "500ms"
+      },
+      {
+        "network": ["udp"],
+        "port": [443],
+        "action": "sniff",
+        "sniffer": ["quic"],
+        "timeout": "500ms"
+      },
+      {
+        "rule_set": "geosite-ads",
+        "action": "reject",
+        "method": "default",
+        "no_drop": true
+      },
+      {
+        "ip_cidr": [
+          "183.47.121.104/32",
+          "122.9.15.129/32",
+          "119.147.11.57/32",
+          "101.91.140.224/32",
+          "42.192.25.141/32",
+          "122.9.13.79/32",
+          "119.147.19.76/32",
+          "101.91.140.124/32"
+        ],
+        "port": [80, 443, 8080],
+        "action": "reject",
+        "method": "default",
+        "no_drop": true
+      },
+{{- end }}
       {
         "domain_suffix": [
           "gemini.google.com", "aistudio.google.com", "makersuite.google.com",
