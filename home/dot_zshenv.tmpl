@@ -76,7 +76,7 @@ path=("$MAMBA_ROOT_PREFIX/bin" $path)
 {{- end }}
 
 # ── Pixi (project Python environments) ──────────────────────
-{{- if or (eq .tier "develop") (eq .tier "calculate") }}
+{{- if eq .tier "develop" }}
 export PIXI_HOME="${HOME}/.pixi"
 path+=("${PIXI_HOME}/bin")
 {{- end }}
@@ -108,8 +108,8 @@ command_not_found_handler() {
 [[ -d "$HOME/go/bin" ]] && path+=("$HOME/go/bin")
 {{- end }}
 
-# ── Node/Bun/Flutter ecosystem (develop + calculate tiers) ────
-{{- if or (eq .tier "develop") (eq .tier "calculate") }}
+# ── Node/Bun/Flutter ecosystem (develop tier only) ───────────
+{{- if eq .tier "develop" }}
 # pnpm
 {{- if eq .chezmoi.os "darwin" }}
 [[ -d "$HOME/Library/pnpm" ]] && export PNPM_HOME="$HOME/Library/pnpm"
@@ -140,7 +140,7 @@ export PATH
 # ═══════════════════════════════════════════════════════════════
 # Dev tool wrappers (modern replacements) — loaded last
 # ═══════════════════════════════════════════════════════════════
-{{- if and (or (eq .tier "develop") (eq .tier "calculate")) (lookPath "pnpm") }}
+{{- if and (eq .tier "develop") (lookPath "pnpm") }}
 
 npm() {
   pnpm "$@"
@@ -160,7 +160,7 @@ EOF
 }
 {{- end }}
 
-{{- if and (or (eq .tier "develop") (eq .tier "calculate")) (lookPath "bun") }}
+{{- if and (eq .tier "develop") (lookPath "bun") }}
 
 npx() {
   bunx "$@"

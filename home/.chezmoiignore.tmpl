@@ -62,7 +62,7 @@ install-yazi-plugins.sh
 container-data/
 {{- end }}
 
-# Node/Bun/Go configs: develop tier only
+# Node/Bun/Go/Pixi configs: develop tier only (calculate uses spack/fortran/cuda)
 {{- if ne .tier "develop" }}
 .npmrc
 .bunfig.toml
