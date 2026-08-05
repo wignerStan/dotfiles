@@ -21,10 +21,19 @@ auto_activate_base: true
 {{- else }}
 auto_activate_base: false
 {{- end }}
-{{- if and (and (eq .tier "") (eq .chezmoi.os "linux")) (ne .chezmoi.username "cal") }}
-# Shared mamba dirs on /develop for personal Linux (excludes calculate — uses spack)
-envs_dirs:
-  - /develop/mamba/envs
+{{- if eq .chezmoi.os "linux" }}
+# ── Package cache: shared on /develop, fallback to user cache ──
 pkgs_dirs:
   - /develop/mamba/pkgs
+{{- if eq .chezmoi.username "jacob" }}
+  - ~/.cache/conda/pkgs
+{{- else if eq .chezmoi.username "dev" }}
+  - ~/.cache/conda/pkgs
+{{- end }}
+# ── Environments: shared base on /develop, user-specific fallback ──
+envs_dirs:
+  - /develop/mamba/envs
+{{- if eq .tier "develop" }}
+  - ~/.conda/envs
+{{- end }}
 {{- end }}
