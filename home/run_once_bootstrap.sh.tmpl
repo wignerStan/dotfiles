@@ -270,12 +270,18 @@ for pkg in "${linux_extra[@]}"; do
     brew install "$pkg" 2>/dev/null || echo "Warning: failed to install $pkg, skipping"
 done
 
-# Version managers
-if ! command -v nvm &>/dev/null; then
-    echo "Installing nvm..."
-    curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash 2>/dev/null || echo "Warning: nvm install failed"
+# Per-user language toolchains (NOT via brew)
+# Go: native multi-version via go install (per-user ~/.go or ~/go)
+if ! command -v go &>/dev/null; then
+    echo "Installing go (per-user)..."
+    GO_VERSION="1.24.5"
+    curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" | tar xz -C "$HOME/.local" 2>/dev/null || echo "Warning: go install failed"
 fi
-brew install go 2>/dev/null || echo "Warning: go install failed"
+# Rust: per-user via rustup
+if ! command -v cargo &>/dev/null; then
+    echo "Installing rustup (per-user)..."
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y 2>/dev/null || echo "Warning: rustup install failed"
+fi
 
 # ── Auto-create dev and cal users ─────────────────────────────
 # dev: full develop workspace at /develop
