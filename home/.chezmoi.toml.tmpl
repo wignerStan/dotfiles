@@ -10,13 +10,19 @@
 {{-   $profile = "hpc" -}}
 {{- end -}}
 
-{{- /* tier: "" (platform default) | develop | calculate | simple
-     - "":         platform default — core + basic language tools
+{{- /* tier: default | system | develop | calculate | simple
+     - default:   fallback when no explicit tier applies (jacob on personal boxes, etc.)
+     - system:    explicit-only — a box designated to own system-level settings (proxy, etc.)
      - develop:   dev user — full dev workspace
      - calculate: cal user — user-isolated workspace (Linux only)
-     - simple:    VM/container — minimal */ -}}
-{{- $tier := "" -}}
-{{- if eq .chezmoi.username "dev" -}}
+     - simple:    VM/container — minimal
+     Auto-detect dev/cal/simple by identity/VM; if none match, tier stays "default".
+     "system" is never auto-detected — set it explicitly via CHEZMOI_TIER=system on the
+     designated box (env override wins over auto-detection; persists across inits). */ -}}
+{{- $tier := "default" -}}
+{{- if env "CHEZMOI_TIER" -}}
+{{-   $tier = env "CHEZMOI_TIER" -}}
+{{- else if eq .chezmoi.username "dev" -}}
 {{-   $tier = "develop" -}}
 {{- else if and (eq .chezmoi.username "cal") (eq .chezmoi.os "linux") -}}
 {{-   $tier = "calculate" -}}
@@ -33,7 +39,7 @@
      the breadth of the base-env package set and heavier tooling, independent of
      where the machine sits (simple/standard/develop) or its profile. */ -}}
 {{- $bootstrap_mode := "basic" -}}
-{{- if eq $profile "personal" -}}
+{{- if or (eq $profile "personal") (eq $tier "develop") -}}
 {{-   $bootstrap_mode = "full" -}}
 {{- end -}}
 

@@ -207,17 +207,98 @@ Install-Tool -WingetId 'Git.Git'              -ScoopName 'git'        -BinName '
 Install-Tool -WingetId 'astral-sh.uv'          -ScoopName 'uv'         -BinName 'uv'         -Label 'uv'
 Install-Tool -WingetId 'Mamba.Micromamba'      -ScoopName 'micromamba' -BinName 'micromamba' -Label 'micromamba'
 Install-Tool -WingetId 'prefix-dev.pixi'       -ScoopName 'pixi'       -BinName 'pixi'       -Label 'pixi'
+
+# Basic CLI/shell/dev tools — mirror of the unix brew basic, via winget (scoop fallback).
+Install-Tool -WingetId 'Starship.Starship'       -ScoopName 'starship'  -BinName 'starship'  -Label 'starship'
+Install-Tool -WingetId 'ajeetdsouza.zoxide'      -ScoopName 'zoxide'    -BinName 'zoxide'    -Label 'zoxide'
+Install-Tool -WingetId 'eza-community.eza'       -ScoopName 'eza'       -BinName 'eza'       -Label 'eza'
+Install-Tool -WingetId 'sharkdp.bat'             -ScoopName 'bat'       -BinName 'bat'       -Label 'bat'
+Install-Tool -WingetId 'BurntSushi.ripgrep'      -ScoopName 'ripgrep'   -BinName 'rg'        -Label 'ripgrep'
+Install-Tool -WingetId 'sharkdp.fd'              -ScoopName 'fd'        -BinName 'fd'        -Label 'fd'
+Install-Tool -WingetId 'junegunn.fzf'            -ScoopName 'fzf'       -BinName 'fzf'       -Label 'fzf'
+Install-Tool -WingetId 'jqlang.jq'               -ScoopName 'jq'        -BinName 'jq'        -Label 'jq'
+Install-Tool -WingetId 'MikeFarah.yq'            -ScoopName 'yq'        -BinName 'yq'        -Label 'yq'
+Install-Tool -WingetId 'GitHub.cli'              -ScoopName 'gh'        -BinName 'gh'        -Label 'gh'
+Install-Tool -WingetId 'GLab.GLab'               -ScoopName 'glab'      -BinName 'glab'      -Label 'glab'
+Install-Tool -WingetId 'FiloSottile.age'         -ScoopName 'age'       -BinName 'age'       -Label 'age'
+Install-Tool -WingetId 'Fastfetch-cli.Fastfetch' -ScoopName 'fastfetch' -BinName 'fastfetch' -Label 'fastfetch'
+Install-Tool -WingetId '7zip.7zip'               -ScoopName '7zip'      -BinName '7z'        -Label '7zip'
+Install-Tool -WingetId 'astral-sh.ruff'          -ScoopName 'ruff'      -BinName 'ruff'      -Label 'ruff'
+Install-Tool -WingetId 'JohnnyMorganz.StyLua'    -ScoopName 'stylua'    -BinName 'stylua'    -Label 'stylua'
+Install-Tool -WingetId 'Nushell.Nushell'         -ScoopName 'nushell'   -BinName 'nu'        -Label 'nushell'
+# Frontend/UI/package stack (basic). rust/go/C++ toolchains stay in WSL, NOT native windows.
+Install-Tool -WingetId 'OpenJS.NodeJS'           -ScoopName 'nodejs'    -BinName 'node'      -Label 'Node.js'
+Install-Tool -WingetId 'pnpm.pnpm'               -ScoopName 'pnpm'      -BinName 'pnpm'      -Label 'pnpm'
+Install-Tool -WingetId 'Oven-sh.Bun'             -ScoopName 'bun'       -BinName 'bun'       -Label 'Bun'
+
+# Coreutils via winget (Microsoft.Coreutils) + scoop unix/text utils (basic windows).
+# NOTE: perl is NOT installed here. Git Bash (Git.Git, full install) already embeds perl —
+#       do NOT add StrawberryPerl (StrawberryPerl.StrawberryPerl); rely on Git Bash's perl.
+if (Test-Cmd 'winget') {
+    Write-Step "Microsoft.Coreutils — winget install"
+    & winget install --id Microsoft.Coreutils -e --source winget --accept-source-agreements --accept-package-agreements --disable-interactivity --silent 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+    Update-EnvPath
+}
+if (Test-Cmd 'scoop') {
+    & scoop install cacert lessmsi innounp 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+    & scoop install gawk sed file scoop-search 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+    Update-EnvPath
+}
 {{- end }}
 
 # ═══════════════════════════════════════════════════════════════
-# sing-box CORE + Windows Administrator service — standard/develop ONLY.
-# tier is orthogonal to bootstrap_mode: sing-box installs whenever tier is NOT
-# simple (regardless of full/basic). The core binary (SagerNet/sing-box) is
-# downloaded directly (not a GUI app; winget id unreliable), and registered as
-# a Windows Service (start=auto, runs as LocalSystem == Admin) so the TUN proxy
-# is up at boot. simple tier (VM/container) gets neither — it rides the host.
+# Level 2: Extra (bootstrap_mode=full, non-simple) — desktop dev/media tools.
+# Mirrors the Unix bootstrap's Level 2: terminal emulator + downloaders.
 # ═══════════════════════════════════════════════════════════════
-{{- if not (eq .tier "simple") }}
+{{- if and (eq .bootstrap_mode "full") (ne .tier "simple") }}
+Write-Step "Level 2: extra tools (bootstrap_mode=full)"
+
+# Terminal emulator. WezTerm is the windows terminal (ghostty/iterm2 on mac).
+Install-Tool -WingetId 'wez.wezterm' -ScoopName 'wezterm' -BinName 'wezterm' -Label 'WezTerm'
+
+# TeX — windows uses MiKTeX (mac: BasicTeX, linux: texlive).
+Install-Tool -WingetId 'MiKTeX.MiKTeX' -ScoopName 'miktex' -BinName 'miktex' -Label 'MiKTeX'
+
+# Uninstaller utility (desktop).
+Install-Tool -WingetId 'GeekUninstaller.GeekUninstaller' -ScoopName 'geek' -BinName 'geek' -Label 'Geek Uninstaller'
+
+{{- if and (eq .profile "personal") (not .is_headless) }}
+# Downloaders — windows personal desktop only (brew can't pull these reliably).
+Install-Tool -WingetId 'yt-dlp.yt-dlp' -ScoopName 'yt-dlp' -BinName 'yt-dlp' -Label 'yt-dlp'
+
+# bilidown — direct install (no winget/scoop package): iuroc/bilidown GoReleaser zip.
+$__bdTag = Get-LatestRelease 'iuroc/bilidown'
+if ($__bdTag) {
+    $__bdArc = if ($__arch -eq 'arm64') { 'arm64' } else { 'x86_64' }
+    Install-Direct -Label 'bilidown (Bilibili downloader)' `
+        -Url "https://github.com/iuroc/bilidown/releases/download/$__bdTag/bilidown_Windows_$__bdArc.zip" `
+        -Dest "$env:USERPROFILE\.local\bilidown" -PathDirs @('') -TestBin 'bilidown'
+}
+{{- end }}
+{{- end }}
+
+# ═══════════════════════════════════════════════════════════════
+# Level 3: Develop (windows) — WSL only. Heavy toolchains (rust/go/C++) live in
+# the personal WSL (linux), NOT native windows; native gets only the basic
+# frontend/UI/package tools installed above. WSL internals are personal/separate.
+# ═══════════════════════════════════════════════════════════════
+{{- if eq .tier "develop" }}
+Write-Step "develop: enable WSL (rust/go/C++ toolchains live in the personal WSL)"
+try {
+    & wsl --install --no-distribution 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+    Write-Ok 'wsl --install (reboot to finalize if newly enabled)'
+} catch { Write-Host "    wsl setup needs Administrator: $($_.Exception.Message)" -ForegroundColor Yellow }
+{{- end }}
+
+# ═══════════════════════════════════════════════════════════════
+# sing-box CORE + Windows Administrator service — personal mac/windows ONLY
+# (standard/develop tiers). sing-box installs when profile=personal AND tier is
+# NOT simple. The core binary (SagerNet/sing-box) is downloaded directly (not a
+# GUI app; winget id unreliable), and registered as a Windows Service (start=auto,
+# runs as LocalSystem == Admin) so the TUN proxy is up at boot. Linux personal uses
+# the "system" tier instead (no sing-box); simple tier (VM/container) rides the host.
+# ═══════════════════════════════════════════════════════════════
+{{- if and (eq .profile "personal") (not (eq .tier "simple")) }}
 $sbTag = Get-LatestRelease 'SagerNet/sing-box'
 if ($sbTag) {
     $sbVer = $sbTag -replace '^v',''   # v1.13.16 -> 1.13.16
@@ -249,7 +330,7 @@ if ($sbTag) {
     }
 }
 {{- else }}
-Write-Skip 'sing-box (tier=simple - rides host proxy)'
+Write-Skip 'sing-box (not personal, or simple — rides host proxy)'
 {{- end }}
 
 # ═══════════════════════════════════════════════════════════════

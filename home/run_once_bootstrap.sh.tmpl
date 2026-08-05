@@ -225,12 +225,19 @@ echo "Installing Level 1: basic tools..."
 brew_install() { brew install "$@" 2>/dev/null || echo "Warning: some packages failed: $*"; }
 
 brew_install zsh fish nushell fisher
-brew_install tmux zellij byobu
+
+# PTY: tmux on all unix (not windows). byobu is linux/wsl only (not mac).
+# zellij moves to Level 2 (extra) — linux/wsl only.
+brew_install tmux
+{{- if or (eq .platform "linux") (eq .platform "wsl") }}
+brew_install byobu
+{{- end }}
+
 brew_install starship zoxide eza bat
-brew_install ripgrep fd fzf jq yq
+brew_install ripgrep fd fzf jq yq jo
 brew_install age fastfetch
 brew_install git gh glab
-brew_install neovim
+brew_install vim
 
 # Shell lint/format
 brew_install shellcheck shfmt stylua
@@ -241,12 +248,19 @@ brew_install uv ruff micromamba pixi
 # Node.js runtime
 brew_install node pnpm bun
 
+# Compression + text processing (perl is great for text munging)
+brew_install p7zip perl
+
 # ── Level 2: Extra (bootstrap_mode=full) ──────────────────────
 {{- if eq .bootstrap_mode "full" }}
 echo "Installing Level 2: extra tools..."
 
-# Node dev tools (LSP, formatter)
-brew_install biome pyright typescript-language-server
+# Node/python dev tools (LSP, formatters, linters).
+# pre-commit belongs HERE (python dev tool) — NOT in develop.
+brew_install biome pyright typescript-language-server pre-commit
+
+# Editor (neovim) + downloader (aria2) — extra, all platforms/identities
+brew_install neovim aria2
 
 # Image/video
 brew_install ffmpeg imagemagick
@@ -254,16 +268,65 @@ brew_install ffmpeg imagemagick
 # Git/GUI tools
 brew_install lazygit lazydocker yazi
 
+# Docs/pdf
+brew_install pandoc
+
 # AI agent tools
 brew_install cc-switch-cli beads
 
-# Platform-specific
-{{- if and (eq .chezmoi.os "linux") (eq .profile "personal") }}
-brew_install texlive yt-dlp poppler
+# ── Linux shell strengthen ──
+{{- if or (eq .platform "linux") (eq .platform "wsl") }}
+brew_install zellij                       # tmux alt — linux/wsl only (moved from basic)
+{{- end }}
+{{- if eq .platform "linux" }}
+brew_install et                           # Eternal Terminal — ssh enhancement, linux only (not wsl)
 {{- end }}
 
+# ── Terminal emulators ──
 {{- if eq .chezmoi.os "darwin" }}
-brew_install ghostty kubecolor
+brew install --cask ghostty iterm2 2>/dev/null || echo "Warning: some casks failed: ghostty iterm2"
+brew_install kubecolor
+brew_install sing-box                    # TUN proxy core (mac personal standard/develop)
+{{- else if or (eq .platform "linux") (eq .platform "wsl") }}
+{{-   if not .is_headless }}
+brew_install ghostty                      # headful linux/wsl (best-effort; build manually if absent)
+{{-   end }}
+{{- end }}
+# WezTerm is windows-only (installed via the Windows bootstrap ps1).
+
+# ── Docs/pdf — per-platform TeX (mac: BasicTeX, linux: texlive) ──
+{{- if eq .chezmoi.os "darwin" }}
+brew install --cask basictex 2>/dev/null || echo "Warning: basictex cask failed"
+{{- else if and (eq .chezmoi.os "linux") (eq .profile "personal") }}
+brew_install poppler
+# texlive declares `mesa` as a direct dep, which drags in llvm/vulkan/wayland/spirv (~4G).
+# texlive never links mesa at runtime, so install its real deps (excluding mesa), then
+# texlive itself with --ignore-dependencies to skip the bogus mesa requirement.
+__tl_deps=$(brew deps --direct texlive | tr ' ' '\n' | grep -v '^mesa$' | tr '\n' ' ')
+if [ -n "$__tl_deps" ]; then
+    brew install $__tl_deps 2>/dev/null || echo "Warning: some texlive deps failed"
+fi
+brew install --ignore-dependencies texlive 2>/dev/null || echo "Warning: texlive install failed"
+{{- end }}
+
+# ── Downloaders: mac personal desktop only (windows via ps1; linux → python pkg) ──
+{{- if and (eq .chezmoi.os "darwin") (eq .profile "personal") (not .is_headless) }}
+brew_install yt-dlp
+# bilidown — brew can't pull it; direct install from iuroc/bilidown (GoReleaser tar.gz).
+if ! command -v bilidown &>/dev/null; then
+    __bd_arch="x86_64"; [[ "$(uname -m)" == "arm64" ]] && __bd_arch="arm64"
+    __bd_tag=$(curl -fsSL https://api.github.com/repos/iuroc/bilidown/releases/latest | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1)
+    if [ -n "$__bd_tag" ]; then
+        mkdir -p "$HOME/.local/bin"
+        __bd_tmp=$(mktemp -d)
+        curl -fsSL "https://github.com/iuroc/bilidown/releases/download/${__bd_tag}/bilidown_Darwin_${__bd_arch}.tar.gz" | tar xzf - -C "$__bd_tmp" 2>/dev/null
+        __bd_bin=$(find "$__bd_tmp" -type f -name bilidown | head -1)
+        if [ -n "$__bd_bin" ]; then cp "$__bd_bin" "$HOME/.local/bin/bilidown" && chmod +x "$HOME/.local/bin/bilidown"; else echo "Warning: bilidown binary not found in archive"; fi
+        rm -rf "$__bd_tmp"
+    else
+        echo "Warning: bilidown tag lookup failed"
+    fi
+fi
 {{- end }}
 
 {{- end }}
@@ -272,8 +335,8 @@ brew_install ghostty kubecolor
 {{- if eq .tier "develop" }}
 echo "Installing Level 3: develop tools..."
 
-# Advanced tools
-brew_install trivy lefthook pre-commit
+# Advanced tools (pre-commit moved up to Level 2 — it's a python dev tool)
+brew_install trivy lefthook
 
 # Per-user language toolchains (NOT via brew)
 if ! command -v go &>/dev/null; then

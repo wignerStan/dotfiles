@@ -1,0 +1,13 @@
+{{- /* "system" tier (linux personal main/admin user): owns system-level settings.
+
+     sing-box is mac/windows personal only (TUN proxy there). Linux personal does
+     NOT run sing-box. This script is the PLACEHOLDER where linux system-level
+     proxy configuration and other system settings will live. Nothing is wired up
+     yet — add the proxy mechanism + system config here when decided. */ -}}
+{{- if and (eq .tier "system") (eq .chezmoi.os "linux") }}
+#!/bin/bash
+# system tier — linux personal system-level settings (placeholder).
+# TODO: proxy configuration + other system settings go here (sing-box NOT used on linux).
+set -euo pipefail
+echo "=== system tier (linux personal): placeholder — no system settings configured yet ==="
+{{- end -}}
