@@ -211,8 +211,8 @@ if ! command -v brew &> /dev/null; then
     /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 fi
 
-# ── Brew formulae (shared across all users on this machine) ───
-echo "Installing brew formulae..."
+# ── Core CLI tools (all non-simple/work/vps profiles) ─────────
+echo "Installing core CLI tools..."
 core_packages=(
     zsh
     tmux
@@ -226,67 +226,78 @@ core_packages=(
     age
     fastfetch
     fzf
-    uv              # python package manager (single Rust binary)
     zellij
     stylua
     luarocks
-    just            # task runner
+    just
     shellcheck
     shfmt
-    lefthook        # git hooks manager
-    ruff            # python linter/formatter (single Rust binary)
-    micromamba      # python env manager (mamba base replaces brew python)
+    lefthook
 )
 
 for pkg in "${core_packages[@]}"; do
     brew install "$pkg" 2>/dev/null || echo "Warning: failed to install $pkg, skipping"
 done
 
-{{- if and (eq .chezmoi.os "linux") (eq .profile "personal") }}
-# ── Personal Linux: brew is shared system-wide (standard manages it) ──
-# All users (standard + develop) share the same brew install.
-# Develop user (dev) has no brew write access — relies on standard's installs.
-
-# CLI tools and language toolchains via brew (single binaries, no python dep)
-echo "Installing personal Linux dev tools..."
-linux_dev_tools=(
+# ── Language toolchain (Python + Node ecosystem) ──────────────
+echo "Installing language tools..."
+lang_tools=(
+    uv
+    ruff
+    pyright
+    micromamba
     node
     pnpm
     bun
     biome
-    pyright
-    deno
-    zig
+    perl
 )
-for pkg in "${linux_dev_tools[@]}"; do
+
+for pkg in "${lang_tools[@]}"; do
     brew install "$pkg" 2>/dev/null || echo "Warning: failed to install $pkg, skipping"
 done
 
-# Heavy language runtimes — NOT via brew (breaks system toolchains)
-# Use version managers installed into ~/.local or standard's home:
-#   rust  -> rustup (curl https://sh.rustup.rs | sh)
-#   go    -> goenv or brew go (brew go is fine, single binary)
-#   node  -> brew node is fine for personal linux (shared)
-# Version managers for project-specific versions:
-# nvm (node version manager) — develop only
+{{- if and (eq .chezmoi.os "linux") (eq .profile "personal") }}
+# ── Personal Linux: develop + calculate users, shared brew ────
+# jacob (standard) manages brew; dev and cal use it via group access.
+# Additional runtimes for personal Linux:
+linux_extra=(
+    deno
+    zig
+    pixi
+)
+for pkg in "${linux_extra[@]}"; do
+    brew install "$pkg" 2>/dev/null || echo "Warning: failed to install $pkg, skipping"
+done
+
+# Version managers
 if ! command -v nvm &>/dev/null; then
     echo "Installing nvm..."
     curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash 2>/dev/null || echo "Warning: nvm install failed"
 fi
-if ! command -v go &>/dev/null; then
-    echo "Installing go via brew..."
-    brew install go 2>/dev/null || echo "Warning: go install failed"
-fi
+brew install go 2>/dev/null || echo "Warning: go install failed"
+
+# ── Auto-create dev and cal users ─────────────────────────────
+# dev: full develop workspace at /develop
+# cal: user-isolated workspace, real workspace projects
+for u in dev cal; do
+    if ! id -u "$u" &>/dev/null; then
+        echo "Creating user: $u"
+        home_dir="/$u"
+        [ "$u" = "dev" ] && home_dir="/develop"
+        sudo useradd -m -d "$home_dir" -s /home/linuxbrew/.linuxbrew/bin/zsh "$u" 2>/dev/null || echo "Warning: failed to create $u"
+        # Add to dev group for shared /develop access
+        sudo usermod -aG dev "$u" 2>/dev/null || true
+    fi
+    # Ensure shell is zsh
+    sudo chsh -s /home/linuxbrew/.linuxbrew/bin/zsh "$u" 2>/dev/null || true
+done
 
 {{- end }}
 
-# ── Desktop dev tools (macOS/Windows via brew/winget) ─────────
-{{- if or (eq .chezmoi.os "darwin") (eq .chezmoi.os "windows") }}
-echo "Installing desktop dev tools..."
+# ── Desktop tools (macOS) ─────────────────────────────────────
 {{- if eq .chezmoi.os "darwin" }}
-brew install node pnpm bun biome pyright pixi \
-    fish nushell ghostty kubecolor 2>/dev/null || echo "Warning: some macOS packages failed"
-{{- end }}
+brew install pixi fish nushell ghostty kubecolor 2>/dev/null || echo "Warning: some macOS packages failed"
 {{- end }}
 
 {{- end }}

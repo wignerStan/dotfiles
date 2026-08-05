@@ -64,7 +64,7 @@ export API_TIMEOUT_MS="600000"
 export NANOBANANA_MODEL=gemini-3-pro-image-preview
 
 # ── Cargo (develop profile only) ──────────────────────────────
-{{- if eq .tier "develop" }}
+{{- if or (eq .tier "develop") (eq .tier "calculate") }}
 [[ -d "$HOME/.cargo" && -f "$HOME/.cargo/env" ]] && . "$HOME/.cargo/env"
 {{- end }}
 
@@ -76,7 +76,7 @@ path=("$MAMBA_ROOT_PREFIX/bin" $path)
 {{- end }}
 
 # ── Pixi (project Python environments) ──────────────────────
-{{- if eq .tier "develop" }}
+{{- if or (eq .tier "develop") (eq .tier "calculate") }}
 export PIXI_HOME="${HOME}/.pixi"
 path+=("${PIXI_HOME}/bin")
 {{- end }}
@@ -104,11 +104,12 @@ command_not_found_handler() {
 # ── PATH (appended last so all above env is available first) ──
 
 # Go (develop profile only)
-{{- if eq .tier "develop" }}
+{{- if or (eq .tier "develop") (eq .tier "calculate") }}
 [[ -d "$HOME/go/bin" ]] && path+=("$HOME/go/bin")
 {{- end }}
 
-# ── Node ecosystem (all tiers) ────────────────────────────────
+# ── Node/Bun/Flutter ecosystem (develop + calculate tiers) ────
+{{- if or (eq .tier "develop") (eq .tier "calculate") }}
 # pnpm
 {{- if eq .chezmoi.os "darwin" }}
 [[ -d "$HOME/Library/pnpm" ]] && export PNPM_HOME="$HOME/Library/pnpm"
@@ -128,6 +129,7 @@ command_not_found_handler() {
 {{- if .use_china_mirrors }}
 export BUN_CONFIG_REGISTRY="https://registry.npmmirror.com"
 {{- end }}
+{{- end }}
 
 # Local user binaries (prepended to override system commands)
 path=($HOME/.local/bin $path)
@@ -138,7 +140,7 @@ export PATH
 # ═══════════════════════════════════════════════════════════════
 # Dev tool wrappers (modern replacements) — loaded last
 # ═══════════════════════════════════════════════════════════════
-{{- if lookPath "pnpm" }}
+{{- if and (or (eq .tier "develop") (eq .tier "calculate")) (lookPath "pnpm") }}
 
 npm() {
   pnpm "$@"
@@ -158,7 +160,7 @@ EOF
 }
 {{- end }}
 
-{{- if lookPath "bun" }}
+{{- if and (or (eq .tier "develop") (eq .tier "calculate")) (lookPath "bun") }}
 
 npx() {
   bunx "$@"

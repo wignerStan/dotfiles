@@ -210,7 +210,7 @@ tm() {
     TERM=xterm-256color command tmux "$@"
 }
 
-{{- if eq .tier "develop" }}
+{{- if or (eq .tier "develop") (eq .tier "calculate") }}
 # ── Develop-only AI tool wrappers ──────────────────────────────
 cc() {
     term=xterm-256color command claude --settings ~/.claude/settings.org.json "$@"

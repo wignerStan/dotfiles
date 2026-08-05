@@ -10,13 +10,16 @@
 {{-   $profile = "hpc" -}}
 {{- end -}}
 
-{{- /* tier: simple | standard | develop (per-user identity)
-     - simple:   VM/container (minimal, no brew)
-     - standard: admin/management user (jacob) — manages the develop space
-     - develop:  dev user — actual development workspace */ -}}
+{{- /* tier: simple | develop | calculate (per-user identity)
+     - simple:    VM/container — minimal, no brew
+     - develop:   dev user — full dev workspace (manages /develop)
+     - calculate: cal user — user-isolated workspace, real workspace projects
+     - standard:  fallback for admin/management (jacob on non-dev machines) */ -}}
 {{- $tier := "standard" -}}
 {{- if eq .chezmoi.username "dev" -}}
 {{-   $tier = "develop" -}}
+{{- else if eq .chezmoi.username "cal" -}}
+{{-   $tier = "calculate" -}}
 {{- else if or (env "CODESPACES") (env "REMOTE_CONTAINERS_IPC") (eq .chezmoi.username "root" "ubuntu") -}}
 {{-   $tier = "simple" -}}
 {{- else if stat "/sys/class/dmi/id/product_name" -}}

@@ -409,7 +409,12 @@ pip = [
     "yarl",
     "zipp",
     "zopfli",
+    "poetry",
 ]
+
+[mamba_base.calculate]
+conda = []
+pip = []
 
 [mamba_base.standard]
 conda = []
