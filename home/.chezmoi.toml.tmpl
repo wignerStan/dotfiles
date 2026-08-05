@@ -18,7 +18,7 @@
 {{- $tier := "" -}}
 {{- if eq .chezmoi.username "dev" -}}
 {{-   $tier = "develop" -}}
-{{- else if eq .chezmoi.username "cal" -}}
+{{- else if and (eq .chezmoi.username "cal") (eq .chezmoi.os "linux") -}}
 {{-   $tier = "calculate" -}}
 {{- else if or (env "CODESPACES") (env "REMOTE_CONTAINERS_IPC") (eq .chezmoi.username "root" "ubuntu") -}}
 {{-   $tier = "simple" -}}
@@ -51,6 +51,15 @@
 
 {{- /* Derived */ -}}
 {{- $ephemeral := or (eq $profile "vps") (eq $profile "hpc") -}}
+
+{{- /* Platform: detect WSL2 (chezmoi reports "linux" for WSL2) */ -}}
+{{- $platform := .chezmoi.os -}}
+{{- if and (eq .chezmoi.os "linux") (stat "/proc/version") -}}
+{{-   $procver := lower (output "cat" "/proc/version") -}}
+{{-   if contains "microsoft" $procver -}}
+{{-     $platform = "wsl" -}}
+{{-   end -}}
+{{- end -}}
 
 {{- /* Geo location detection (timezone-based, cross-platform: macOS/Linux/Windows) */ -}}
 {{- /* macOS has no /etc/timezone; readlink /etc/localtime works on macOS + Linux. */ -}}
@@ -111,6 +120,7 @@ encryption = "age"
     is_ephemeral = {{ $ephemeral }}
     is_headless = {{ $headless }}
     tier = {{ $tier | quote }}
+    platform = {{ $platform | quote }}
     use_china_mirrors = {{ $use_china_mirrors }}
     geo = {{ $geo | quote }}
     profile = {{ $profile | quote }}
