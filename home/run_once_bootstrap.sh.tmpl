@@ -263,11 +263,15 @@ done
 {{- if and (eq .chezmoi.os "linux") (eq .profile "personal") }}
 # ── Personal Linux: develop + calculate users, shared brew ────
 # jacob (standard) manages brew; dev and cal use it via group access.
-# Additional runtimes for personal Linux:
+# Heavy media/doc tools (personal Linux only):
 linux_extra=(
-    deno
-    zig
-    pixi
+    texlive
+    yt-dlp
+    ffmpeg
+    imagemagick-full
+    poppler
+    lazygit
+    lazydocker
 )
 for pkg in "${linux_extra[@]}"; do
     brew install "$pkg" 2>/dev/null || echo "Warning: failed to install $pkg, skipping"
