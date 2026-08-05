@@ -211,108 +211,95 @@ if ! command -v brew &> /dev/null; then
     /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 fi
 
-# ── Core CLI tools (all non-simple/work/vps profiles) ─────────
-echo "Installing core CLI tools..."
-core_packages=(
-    zsh
-    fish
-    nushell
-    fisher
-    tmux
-    starship
-    zoxide
-    eza
-    bat
-    ripgrep
-    fd
-    neovim
-    age
-    fastfetch
-    fzf
-    zellij
-    stylua
-    luarocks
-    just
-    shellcheck
-    shfmt
-    lefthook
-)
+# ═══════════════════════════════════════════════════════════════
+# THREE-LEVEL TOOL INSTALLATION
+# Level 1 (basic): all non-simple tiers — CLI + shell + basic lang
+# Level 2 (extra): bootstrap_mode=full — dev tools, media, GUI
+# Level 3 (develop): tier=develop — advanced toolchains, version managers
+# ═══════════════════════════════════════════════════════════════
 
-for pkg in "${core_packages[@]}"; do
-    brew install "$pkg" 2>/dev/null || echo "Warning: failed to install $pkg, skipping"
-done
+# ── Level 1: Basic (all brew-capable tiers) ───────────────────
+echo "Installing Level 1: basic tools..."
 
-# ── Basic language tools (default for all brew-capable profiles) ──
-echo "Installing basic language tools..."
-lang_tools=(
-    uv
-    ruff
-    pyright
-    micromamba
-    node
-    pnpm
-    bun
-    biome
-    perl
-)
+# CLI utilities
+brew_install() { brew install "$@" 2>/dev/null || echo "Warning: some packages failed: $*"; }
 
-for pkg in "${lang_tools[@]}"; do
-    brew install "$pkg" 2>/dev/null || echo "Warning: failed to install $pkg, skipping"
-done
+brew_install zsh fish nushell fisher
+brew_install tmux zellij byobu
+brew_install starship zoxide eza bat
+brew_install ripgrep fd fzf jq yq
+brew_install age fastfetch
+brew_install git gh glab
+brew_install neovim
 
+# Shell lint/format
+brew_install shellcheck shfmt stylua
+
+# Python runtime
+brew_install uv ruff micromamba pixi
+
+# Node.js runtime
+brew_install node pnpm bun
+
+# ── Level 2: Extra (bootstrap_mode=full) ──────────────────────
+{{- if eq .bootstrap_mode "full" }}
+echo "Installing Level 2: extra tools..."
+
+# Node dev tools (LSP, formatter)
+brew_install biome pyright typescript-language-server
+
+# Image/video
+brew_install ffmpeg imagemagick
+
+# Git/GUI tools
+brew_install lazygit lazydocker yazi
+
+# AI agent tools
+brew_install cc-switch-cli beads
+
+# Platform-specific
 {{- if and (eq .chezmoi.os "linux") (eq .profile "personal") }}
-# ── Personal Linux: develop + calculate users, shared brew ────
-# jacob (standard) manages brew; dev and cal use it via group access.
-# Heavy media/doc tools (personal Linux only):
-linux_extra=(
-    texlive
-    yt-dlp
-    ffmpeg
-    imagemagick-full
-    poppler
-    lazygit
-    lazydocker
-)
-for pkg in "${linux_extra[@]}"; do
-    brew install "$pkg" 2>/dev/null || echo "Warning: failed to install $pkg, skipping"
-done
+brew_install texlive yt-dlp poppler
+{{- end }}
+
+{{- if eq .chezmoi.os "darwin" }}
+brew_install ghostty kubecolor
+{{- end }}
+
+{{- end }}
+
+# ── Level 3: Develop (tier=develop) ───────────────────────────
+{{- if eq .tier "develop" }}
+echo "Installing Level 3: develop tools..."
+
+# Advanced tools
+brew_install trivy lefthook pre-commit
 
 # Per-user language toolchains (NOT via brew)
-# Go: native multi-version via go install (per-user ~/.go or ~/go)
 if ! command -v go &>/dev/null; then
     echo "Installing go (per-user)..."
     GO_VERSION="1.24.5"
     curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" | tar xz -C "$HOME" 2>/dev/null || echo "Warning: go install failed"
 fi
-# Rust: per-user via rustup
 if ! command -v cargo &>/dev/null; then
     echo "Installing rustup (per-user)..."
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y 2>/dev/null || echo "Warning: rustup install failed"
 fi
 
-# ── Auto-create dev and cal users ─────────────────────────────
-# dev: full develop workspace at /develop
-# cal: user-isolated workspace, real workspace projects
+{{- end }}
+
+# ── Auto-create dev and cal users (personal Linux) ────────────
+{{- if and (eq .chezmoi.os "linux") (eq .profile "personal") }}
 for u in dev cal; do
     if ! id -u "$u" &>/dev/null; then
         echo "Creating user: $u"
         home_dir="/$u"
         [ "$u" = "dev" ] && home_dir="/develop"
         sudo useradd -m -d "$home_dir" -s /home/linuxbrew/.linuxbrew/bin/zsh "$u" 2>/dev/null || echo "Warning: failed to create $u"
-        # Add to dev group for shared /develop access
         sudo usermod -aG dev "$u" 2>/dev/null || true
     fi
-    # Ensure shell is zsh
     sudo chsh -s /home/linuxbrew/.linuxbrew/bin/zsh "$u" 2>/dev/null || true
 done
-
-{{- end }}
-
-# ── Desktop tools (macOS) ─────────────────────────────────────
-{{- if eq .chezmoi.os "darwin" }}
-brew install pixi fish nushell ghostty kubecolor 2>/dev/null || echo "Warning: some macOS packages failed"
-# No eslint/prettier — biome (in lang_tools) replaces both
-# No typescript — use via pnpm -g or bunx when needed
 {{- end }}
 
 {{- end }}
