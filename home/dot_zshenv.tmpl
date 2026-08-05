@@ -64,7 +64,7 @@ export API_TIMEOUT_MS="600000"
 export NANOBANANA_MODEL=gemini-3-pro-image-preview
 
 # ── Cargo (develop profile only) ──────────────────────────────
-{{- if or (eq .tier "develop") (eq .tier "calculate") }}
+{{- if eq .tier "develop" }}
 [[ -d "$HOME/.cargo" && -f "$HOME/.cargo/env" ]] && . "$HOME/.cargo/env"
 {{- end }}
 
@@ -104,7 +104,7 @@ command_not_found_handler() {
 # ── PATH (appended last so all above env is available first) ──
 
 # Go (develop profile only)
-{{- if or (eq .tier "develop") (eq .tier "calculate") }}
+{{- if eq .tier "develop" }}
 [[ -d "$HOME/go/bin" ]] && path+=("$HOME/go/bin")
 {{- end }}
 
