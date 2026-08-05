@@ -69,8 +69,6 @@ export NANOBANANA_MODEL=gemini-3-pro-image-preview
 {{- end }}
 
 {{- if and (or (eq .profile "work") (eq .profile "personal")) (and (ne .tier "calculate") (ne .tier "simple")) }}
-# Ensure brew libs are in LD_LIBRARY_PATH for micromamba (needs libsimdjson etc.)
-[[ -n "$HOMEBREW_PREFIX" ]] && export LD_LIBRARY_PATH="${HOMEBREW_PREFIX}/lib:${LD_LIBRARY_PATH:-}"
 # ── Mamba (global Python base environment) ─────────────────
 export MAMBA_EXE="${HOMEBREW_PREFIX:-/home/linuxbrew/.linuxbrew}/opt/micromamba/bin/mamba"
 export MAMBA_ROOT_PREFIX="{{- if eq .chezmoi.os "linux" -}}/develop/mamba{{- else -}}$HOME/mamba{{- end -}}"
