@@ -235,10 +235,10 @@ brew_install byobu
 {{- end }}
 
 brew_install starship zoxide eza bat
-brew_install ripgrep fd fzf jq yq
+brew_install ripgrep fd fzf jq yq jo
 brew_install coreutils direnv htop tree wget
 brew_install age base64 fastfetch
-brew_install git vim
+brew_install vim
 
 # Shell lint/format
 brew_install shellcheck shfmt stylua
@@ -305,6 +305,7 @@ brew_install aliyunpan
 # macOS-only: APFS tools
 {{- if eq .chezmoi.os "darwin" }}
 brew_install afsctool
+brew install dr-emann/tap/applesauce 2>/dev/null || echo "Warning: applesauce failed"
 {{- end }}
 
 # ── Shell strengthen ──
