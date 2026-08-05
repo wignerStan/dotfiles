@@ -275,6 +275,7 @@ pip = [
     "xyzservices",
     "yarl",
     "zipp",
+    "websocket-client",
     "zopfli",
     "curl-cffi",
     "pycryptodome",
@@ -347,7 +348,6 @@ pip = [
     "uvicorn",
     "uvloop",
     "watchfiles",
-    "websocket-client",
     "websockets",
     "wsproto",
 ]
