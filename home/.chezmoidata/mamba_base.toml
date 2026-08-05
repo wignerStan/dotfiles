@@ -409,14 +409,15 @@ pip = [
     "yarl",
     "zipp",
     "zopfli",
-    "poetry",
 ]
 
 
 
 [mamba_base.develop]
 conda = []
-pip = []
+pip = [
+    "poetry",
+]
 
 [mamba_base.simple]
 conda = []

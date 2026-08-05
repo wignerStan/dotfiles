@@ -49,5 +49,42 @@ YAMLEOF
 log "running mamba env update (tier={{ .tier }})..."
 "$MM" env update -n base -f "$ENV_YAML" --use-uv 2>&1 || log "mamba env update reported errors"
 
-log "sync complete (tier={{ .tier }})"
+log "base sync complete (tier={{ .tier }})"
+
+# ── Develop env (separate from base) ───────────────────────────
+{{- if eq .tier "develop" }}
+DEV_YAML="$(mktemp /tmp/mamba-dev-env.XXXXXX.yaml)"
+trap 'rm -f "$ENV_YAML" "$DEV_YAML"' EXIT
+cat > "$DEV_YAML" << 'YAMLEOF'
+name: develop
+channels:
+{{- range .mamba_base.channels }}
+  - {{ . }}
+{{- end }}
+dependencies:
+  - uv
+  - python=3.12
+  - pip
+{{- if hasKey .mamba_base "develop" }}
+{{- range (index .mamba_base "develop").conda }}
+  - {{ . }}
+{{- end }}
+{{- if (index .mamba_base "develop").pip }}
+  - pip:
+{{- range (index .mamba_base "develop").pip }}
+    - {{ . }}
+{{- end }}
+{{- end }}
+{{- end }}
+YAMLEOF
+
+log "creating/updating develop env..."
+if ! "$MM" env list 2>/dev/null | grep -qw develop; then
+    "$MM" env create -f "$DEV_YAML" -y --use-uv 2>&1 || log "develop env create reported errors"
+else
+    "$MM" env update -n develop -f "$DEV_YAML" --use-uv 2>&1 || log "develop env update reported errors"
+fi
+log "develop env sync complete"
+{{- end }}
+
 {{- end -}}
