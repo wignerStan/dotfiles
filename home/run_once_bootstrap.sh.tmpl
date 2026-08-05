@@ -275,7 +275,7 @@ done
 if ! command -v go &>/dev/null; then
     echo "Installing go (per-user)..."
     GO_VERSION="1.24.5"
-    curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" | tar xz -C "$HOME/.local" 2>/dev/null || echo "Warning: go install failed"
+    curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" | tar xz -C "$HOME" 2>/dev/null || echo "Warning: go install failed"
 fi
 # Rust: per-user via rustup
 if ! command -v cargo &>/dev/null; then
