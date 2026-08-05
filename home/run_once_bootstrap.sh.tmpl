@@ -244,6 +244,7 @@ echo "Installing basic language tools..."
 lang_tools=(
     uv
     ruff
+    pyright
     micromamba
     node
     pnpm
@@ -304,6 +305,7 @@ done
 {{- if eq .chezmoi.os "darwin" }}
 brew install pixi fish nushell ghostty kubecolor 2>/dev/null || echo "Warning: some macOS packages failed"
 # No eslint/prettier — biome (in lang_tools) replaces both
+# No typescript — use via pnpm -g or bunx when needed
 {{- end }}
 
 {{- end }}
