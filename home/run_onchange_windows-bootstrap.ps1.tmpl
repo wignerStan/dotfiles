@@ -107,10 +107,14 @@ $env:UV_DEFAULT_INDEX = 'https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple'
 [Environment]::SetEnvironmentVariable('UV_DEFAULT_INDEX', 'https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple', 'User')
 {{- end }}
 
+# mamba root prefix — only set up when mamba is actually used (non-simple tiers).
+# simple tier uses uv-managed python, no mamba at all.
+{{- if ne .tier "simple" }}
 $mambaRoot = '{{ .mamba_root }}'
 [Environment]::SetEnvironmentVariable('MAMBA_ROOT_PREFIX', $mambaRoot, 'User')
 $env:MAMBA_ROOT_PREFIX = $mambaRoot
 if (-not (Test-Path $mambaRoot)) { New-Item -ItemType Directory -Force -Path $mambaRoot | Out-Null }
+{{- end }}
 
 # ═══════════════════════════════════════════════════════════════
 # 1. INSTALL STRATEGY
