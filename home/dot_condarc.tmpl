@@ -21,7 +21,7 @@ auto_activate_base: true
 {{- else }}
 auto_activate_base: false
 {{- end }}
-{{- if and (eq .tier "standard") (eq .chezmoi.os "linux") }}
+{{- if and (eq .tier "") (eq .chezmoi.os "linux") }}
 # Shared mamba dirs on /develop for personal Linux (jacob=standard, dev=develop)
 envs_dirs:
   - /develop/mamba/envs

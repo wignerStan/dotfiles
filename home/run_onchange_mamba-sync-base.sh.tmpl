@@ -28,15 +28,19 @@ dependencies:
 {{- range .mamba_base.core.conda }}
   - {{ . }}
 {{- end }}
-{{- range (index .mamba_base .tier).conda }}
+{{- $tier_data := dict "conda" (list) "pip" (list) -}}
+{{- if hasKey .mamba_base .tier -}}
+{{-   $tier_data = index .mamba_base .tier -}}
+{{- end -}}
+{{- range $tier_data.conda }}
   - {{ . }}
 {{- end }}
-{{- if or .mamba_base.core.pip (index .mamba_base .tier).pip }}
+{{- if or .mamba_base.core.pip $tier_data.pip }}
   - pip:
 {{- range .mamba_base.core.pip }}
     - {{ . }}
 {{- end }}
-{{- range (index .mamba_base .tier).pip }}
+{{- range $tier_data.pip }}
     - {{ . }}
 {{- end }}
 {{- end }}

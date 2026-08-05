@@ -10,12 +10,12 @@
 {{-   $profile = "hpc" -}}
 {{- end -}}
 
-{{- /* tier: simple | develop | calculate (per-user identity)
-     - simple:    VM/container — minimal, no brew
-     - develop:   dev user — full dev workspace (manages /develop)
-     - calculate: cal user — user-isolated workspace, real workspace projects
-     - standard:  fallback for admin/management (jacob on non-dev machines) */ -}}
-{{- $tier := "standard" -}}
+{{- /* tier: "" (platform default) | develop | calculate | simple
+     - "":         platform default — core + basic language tools
+     - develop:   dev user — full dev workspace
+     - calculate: cal user — user-isolated workspace (Linux only)
+     - simple:    VM/container — minimal */ -}}
+{{- $tier := "" -}}
 {{- if eq .chezmoi.username "dev" -}}
 {{-   $tier = "develop" -}}
 {{- else if eq .chezmoi.username "cal" -}}

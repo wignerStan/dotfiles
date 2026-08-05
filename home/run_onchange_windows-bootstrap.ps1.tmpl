@@ -70,7 +70,7 @@ function Install-Direct {
     }
 }
 
-# winget-first, scoop-fallback (standard tier only).
+# winget-first, scoop-fallback (default tier only).
 function Install-Tool {
     param([string]$WingetId, [string]$ScoopName, [string]$BinName, [string]$Label)
     if (Test-Cmd $BinName) { Write-Skip $Label; return $true }
@@ -278,7 +278,7 @@ if (Test-Cmd 'micromamba') {
 # ═══════════════════════════════════════════════════════════════
 # 3. pywinauto (GUI automation, Windows-only)
 #    Installed into mamba base python when: tier is simple OR develop,
-#    OR profile is work. standard tier (personal desktop) skips it.
+#    OR profile is work. default tier (personal desktop) skips it.
 # ═══════════════════════════════════════════════════════════════
 {{- if or (or (eq .tier "simple") (eq .tier "develop")) (eq .profile "work") }}
 if ((Test-Cmd 'micromamba') -and (Test-Path "$mambaRoot\python.exe")) {

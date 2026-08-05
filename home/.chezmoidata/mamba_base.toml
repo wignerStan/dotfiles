@@ -416,9 +416,6 @@ pip = [
 conda = []
 pip = []
 
-[mamba_base.standard]
-conda = []
-pip = []
 
 [mamba_base.develop]
 conda = []

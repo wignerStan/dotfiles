@@ -239,8 +239,8 @@ for pkg in "${core_packages[@]}"; do
     brew install "$pkg" 2>/dev/null || echo "Warning: failed to install $pkg, skipping"
 done
 
-# ── Language toolchain (Python + Node ecosystem) ──────────────
-echo "Installing language tools..."
+# ── Basic language tools (default for all brew-capable profiles) ──
+echo "Installing basic language tools..."
 lang_tools=(
     uv
     ruff
