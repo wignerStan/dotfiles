@@ -154,30 +154,22 @@ if ($uvTag) {
         -Dest "$env:USERPROFILE\.local\uv" -PathDirs @('') -TestBin 'uv'
 }
 
-# micromamba — direct binary (single .exe) from conda-forge win-arm64/win-64
-$mmSub = if ($__arch -eq 'arm64') { 'win-arm64' } else { 'win-64' }
-if (-not (Test-Cmd 'micromamba')) {
-    Write-Step "micromamba — direct (conda-forge $mmSub)"
+# Python — via uv (system python, no mamba on simple tier).
+# uv is installed above; use it to install a managed CPython that uv exposes as
+# the system python. Idempotent.
+if (Test-Cmd 'uv') {
+    Update-EnvPath
+    Write-Step "python via uv (uv python install)"
     try {
-        # find latest micromamba version + the .tar.bz2 (contains bin/micromamba.exe)
-        $rd = Invoke-RestMethod -Uri "https://conda.anaconda.org/conda-forge/$mmSub/repodata.json" -UseBasicParsing
-        $cand = $rd.packages.PSObject.Properties | Where-Object { $_.Name -like 'micromamba-*.tar.bz2' } | Sort-Object Name -Descending | Select-Object -First 1
-        if ($cand) {
-            $mmDest = "$env:USERPROFILE\.local\micromamba"
-            $tmp = Join-Path $env:TEMP "$([guid]::NewGuid().ToString('N')).tar.bz2"
-            Invoke-WebRequest -Uri "https://conda.anaconda.org/conda-forge/$mmSub/$($cand.Name)" -OutFile $tmp -UseBasicParsing
-            New-Item -ItemType Directory -Force -Path $mmDest | Out-Null
-            # tar is built into Win10+; extract the bin/micromamba.exe
-            & tar -xjf $tmp -C $mmDest 'Library/bin/micromamba.exe' 2>$null
-            Move-Item "$mmDest\Library\bin\micromamba.exe" "$mmDest\micromamba.exe" -Force
-            Remove-Item "$mmDest\Library" -Recurse -Force -EA SilentlyContinue
-            Remove-Item $tmp -Force
+        & uv python install 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+        # expose uv's managed python dir so plain `python`/`pip` resolve
+        $pyRoot = & uv python dir 2>$null
+        if ($pyRoot -and (Test-Path $pyRoot)) {
             $up = [Environment]::GetEnvironmentVariable('Path','User')
-            if ($up -notlike "*$mmDest*") { [Environment]::SetEnvironmentVariable('Path', "$mmDest;$up", 'User') }
-            Update-EnvPath
-            Write-Ok 'micromamba direct'
+            if ($up -notlike "*$pyRoot*") { [Environment]::SetEnvironmentVariable('Path', "$pyRoot;$up", 'User') }
         }
-    } catch { Write-Host "    micromamba direct FAILED: $($_.Exception.Message)" -ForegroundColor Red }
+        Write-Ok 'python via uv'
+    } catch { Write-Host "    uv python install warning: $($_.Exception.Message)" -ForegroundColor Yellow }
 }
 
 {{- else }}
@@ -277,10 +269,31 @@ if (Test-Cmd 'micromamba') {
 
 # ═══════════════════════════════════════════════════════════════
 # 3. pywinauto (GUI automation, Windows-only)
-#    Installed into mamba base python when: tier is simple OR develop,
-#    OR profile is work. default tier (personal desktop) skips it.
+#    Installed when: tier is simple OR develop, OR profile is work.
+#    default tier (personal desktop) skips it.
+#    Python source: simple -> uv (no mamba); develop/work -> mamba base.
 # ═══════════════════════════════════════════════════════════════
 {{- if or (or (eq .tier "simple") (eq .tier "develop")) (eq .profile "work") }}
+{{- if eq .tier "simple" }}
+# simple: uv is the python — install pywinauto into uv's managed python.
+if (Test-Cmd 'uv') {
+    try {
+        Update-EnvPath
+        $have = & uv run python -c "import pywinauto" 2>$null
+        if ($LASTEXITCODE -eq 0) { Write-Skip 'pywinauto' }
+        else {
+            Write-Step "Installing pywinauto (uv python)"
+            {{- if .use_china_mirrors }}
+            & uv pip install --python "$(uv python find 2>$null)" -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple pywinauto 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+            {{- else }}
+            & uv pip install --python "$(uv python find 2>$null)" pywinauto 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+            {{- end }}
+            Write-Ok 'pywinauto installed (uv python)'
+        }
+    } catch { Write-Host "    pywinauto warning: $($_.Exception.Message)" -ForegroundColor Yellow }
+}
+{{- else }}
+# develop/work: mamba base python.
 if ((Test-Cmd 'micromamba') -and (Test-Path "$mambaRoot\python.exe")) {
     try {
         $have = & micromamba run -n base python -c "import pywinauto" 2>$null
@@ -296,6 +309,7 @@ if ((Test-Cmd 'micromamba') -and (Test-Path "$mambaRoot\python.exe")) {
         }
     } catch { Write-Host "    pywinauto warning: $($_.Exception.Message)" -ForegroundColor Yellow }
 }
+{{- end }}
 {{- else }}
 Write-Skip 'pywinauto (tier={{ .tier }} profile={{ .profile }})'
 {{- end }}
