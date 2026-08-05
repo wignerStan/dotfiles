@@ -254,7 +254,6 @@ linux_dev_tools=(
     pnpm
     bun
     biome
-    ruff
     pyright
     deno
     zig
@@ -285,7 +284,7 @@ fi
 {{- if or (eq .chezmoi.os "darwin") (eq .chezmoi.os "windows") }}
 echo "Installing desktop dev tools..."
 {{- if eq .chezmoi.os "darwin" }}
-brew install node pnpm bun biome ruff pyright pixi micromamba \
+brew install node pnpm bun biome pyright pixi \
     fish nushell ghostty kubecolor 2>/dev/null || echo "Warning: some macOS packages failed"
 {{- end }}
 {{- end }}
