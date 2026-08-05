@@ -289,7 +289,10 @@ brew_install gh glab git-delta git-filter-repo gitleaks
 brew_install pandoc
 
 # AI agent tools
-brew_install cc-switch-cli beads cliproxyapi
+brew_install cc-switch-cli beads cliproxyapi opencode
+
+# AI CLI agents (cask on macOS, formula on Linux)
+brew install --cask codex claude-code 2>/dev/null || { brew_install codex claude-code 2>/dev/null || echo "Warning: AI CLI agents failed"; }
 
 # Network analysis
 brew_install wireshark tcpdump
@@ -329,6 +332,9 @@ brew_install et                           # Eternal Terminal — ssh enhancement
 # ── Terminal emulators ──
 {{- if eq .chezmoi.os "darwin" }}
 brew install --cask ghostty iterm2 2>/dev/null || echo "Warning: some casks failed: ghostty iterm2"
+
+# Fonts (Nerd Fonts for terminal icons)
+brew install --cask font-maple-mono-nf-cn font-meslo-lg-nerd-font font-symbols-only-nerd-font 2>/dev/null || echo "Warning: some font casks failed"
 brew_install kubecolor
 brew_install sing-box                    # TUN proxy core (mac personal standard/develop)
 {{- else if or (eq .platform "linux") (eq .platform "wsl") }}
