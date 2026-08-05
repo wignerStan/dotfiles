@@ -310,17 +310,27 @@ brew_install docker docker-compose docker-credential-helper
 brew_install kopia
 
 # Network services
-brew_install cloudflared wgcf syncthing
+brew_install cloudflared wgcf syncthing rclone ngrok
 
 # Cloud storage (mac/win only)
 {{- if or (eq .chezmoi.os "darwin") (eq .chezmoi.os "windows") }}
 brew_install aliyunpan
 {{- end }}
 
-# macOS-only: system tools
+# macOS-only: system tools + GUI apps
 {{- if eq .chezmoi.os "darwin" }}
 brew_install afsctool duti
 brew install dr-emann/tap/applesauce 2>/dev/null || echo "Warning: applesauce failed"
+
+# macOS desktop apps (Level 2, mac-only casks)
+brew install --cask aldente fuse-t android-file-transfer cyberduck hammerspoon vesta pearcleaner motrix meld rectangle 2>/dev/null || echo "Warning: some mac casks failed"
+{{- end }}
+
+# Cross-platform personal apps (mac + windows, personal profile)
+{{- if and (or (eq .chezmoi.os "darwin") (eq .chezmoi.os "windows")) (eq .profile "personal") }}
+# adb (android-platform-tools is the cask name on mac, formula on others)
+brew install --cask android-platform-tools 2>/dev/null || brew_install android-platform-tools 2>/dev/null || echo "Warning: adb failed"
+brew install --cask siyuan obsidian localsend keepassxc zoom windows-app 2>/dev/null || echo "Warning: some personal casks failed"
 {{- end }}
 
 # ── Shell strengthen ──
