@@ -262,6 +262,31 @@ Install-Tool -WingetId 'MiKTeX.MiKTeX' -ScoopName 'miktex' -BinName 'miktex' -La
 # Uninstaller utility (desktop).
 Install-Tool -WingetId 'GeekUninstaller.GeekUninstaller' -ScoopName 'geek' -BinName 'geek' -Label 'Geek Uninstaller'
 
+# Cross-platform CLI tools (mirror Unix Level 2)
+Install-Tool -WingetId 'Rclone.Rclone'           -ScoopName 'rclone'    -BinName 'rclone'    -Label 'rclone'
+Install-Tool -WingetId 'ngrok.ngrok'              -ScoopName 'ngrok'     -BinName 'ngrok'     -Label 'ngrok'
+Install-Tool -WingetId 'Syncthing.Syncthing'     -ScoopName 'syncthing' -BinName 'syncthing' -Label 'syncthing'
+Install-Tool -WingetId 'Cloudflare.cloudflared'  -ScoopName 'cloudflared' -BinName 'cloudflared' -Label 'cloudflared'
+
+# Desktop apps (mac+win personal casks, winget equivalents)
+{{- if and (eq .profile "personal") (not .is_headless) }}
+Write-Step "Personal desktop apps (winget)"
+$__desktopApps = @(
+    @{Id='Obsidian.Obsidian';          Label='Obsidian'},
+    @{Id='SiYuan.SiYuan';              Label='SiYuan'},
+    @{Id='LocalSend.LocalSend';        Label='LocalSend'},
+    @{Id='KeePassXCTeam.KeePassXC';    Label='KeePassXC'},
+    @{Id='Zoom.Zoom';                  Label='Zoom'},
+    @{Id='Microsoft.RemoteDesktop';    Label='Windows App (RDP)'},
+    @{Id='Google.PlatformTools';       Label='Android Platform Tools (adb)'}
+)
+foreach ($app in $__desktopApps) {
+    if (Test-Cmd 'winget') {
+        & winget install --id $app.Id -e --source winget --accept-source-agreements --accept-package-agreements --disable-interactivity --silent 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+    }
+}
+{{- end }}
+
 {{- if and (eq .profile "personal") (not .is_headless) }}
 # Downloaders — windows personal desktop only (brew can't pull these reliably).
 Install-Tool -WingetId 'yt-dlp.yt-dlp' -ScoopName 'yt-dlp' -BinName 'yt-dlp' -Label 'yt-dlp'
