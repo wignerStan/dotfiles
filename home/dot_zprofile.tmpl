@@ -28,4 +28,8 @@ else
     alias mamba="$MAMBA_EXE"
 fi
 unset __mamba_setup
+{{- if eq .tier "develop" }}
+# Activate develop env (separate from base — develop has its own packages)
+mamba activate develop 2>/dev/null
+{{- end }}
 {{- end }}

@@ -79,10 +79,11 @@ dependencies:
 YAMLEOF
 
 log "creating/updating develop env..."
-if ! "$MM" env list 2>/dev/null | grep -qw develop; then
-    "$MM" env create -f "$DEV_YAML" -y --use-uv 2>&1 || log "develop env create reported errors"
+DEV_ENV="{{ .chezmoi.homeDir }}/.conda/envs/develop"
+    if [ ! -d "$DEV_ENV" ]; then
+        "$MM" env create -f "$DEV_YAML" -y --use-uv --prefix "$DEV_ENV" 2>&1 || log "develop env create reported errors"
 else
-    "$MM" env update -n develop -f "$DEV_YAML" --use-uv 2>&1 || log "develop env update reported errors"
+    "$MM" env update -p "$DEV_ENV" -f "$DEV_YAML" --use-uv 2>&1 || log "develop env update reported errors"
 fi
 log "develop env sync complete"
 {{- end }}
