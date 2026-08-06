@@ -124,3 +124,25 @@ the guest actually writes new data.
 
 - [ ] External backup deletion — **hold until user manually verifies** the moved VM.
 - [ ] 徽商期货快期V3 — unrecoverable (source X: gone); reinstall from vendor.
+
+## Script layout (this repo)
+
+The one-off session scripts that were scattered across `~/` are curated into
+`home/scripts/winvm/<category>/` (applies to `~/scripts/winvm/` here and to
+`C:\Users\jacob\scripts\winvm\` in the guest via chezmoi):
+
+| Category | Holds |
+|----------|-------|
+| `debloat/` | Win11Debloat run (vm-debloat3), aggressive/stubborn removal, appx/winget/OneDrive removal, the SYSTEM takeown+reg-delete DesktopAppInstaller trio (`vm-rm-dai*.ps1`, `vm-takeown-dai.ps1`), dism/tile/final-clean |
+| `defender/` | kill/own/tamper-off/bootfix/disable-backend + `vm-defstate.ps1` (state check), `vm-restore-setup.ps1` (permanent disable) |
+| `security/` | SecHealthUI re-add/rereg, KB5007651, WebView2/Edge restore for the Security GUI, `vm-find-sechealth.ps1`, dependency probe |
+| `restore/` | user-data restore + Weisoft robocopy + backup scripts |
+| `runtime/` | VC90/VC2008/VC-redist, regsvr32/x86 registration, WebView2 fix, hive import |
+| `env/` | PATH/UAC/autologon set, pywinauto fix, bootstrap, chezmoi pull/reapply |
+| `verify/` | `final-check.ps1` + debloat/user-data WebView2 verification probes |
+| `maintenance/` | `vm-trim.ps1` (Optimize-Volume -ReTrim) |
+| `winstock/` | WinStock GUI automation (`auto/detail/final/gui/watch/test` `.py`+`.bat`), `reg-task.ps1` (watch Task Scheduler) |
+
+Everything else from the session (per-step logs, reg dumps, `dp*/deep*/diag*/inspect*/find*/wtest*/wh6*` probes,
+superseded iterations like `vm-debloat{1,2}`, `verify{2,3,4}`, `vm-fixmamba{1,2}`…) was **deleted** — the
+lessons are kept here and in `win11-stubborn-removal.md`, the working scripts above are committed.
