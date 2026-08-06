@@ -125,10 +125,14 @@ Write-Step "tier=simple: direct installs (no winget/scoop)"
 
 # remove winget (App Installer Appx) if present — VM doesn't use package managers.
 # (We only unregister the Appx; it can be re-added from the Store if ever needed.)
-foreach ($pkg in (Get-AppxPackage -AllUsers -EA SilentlyContinue | Where-Object { $_.Name -eq 'Microsoft.DesktopAppInstaller' })) {
-    try { $pkg | Remove-AppxPackage -AllUsers -EA Stop; Write-Ok "removed winget (App Installer)" }
-    catch { Write-Host "    winget removal skipped: $($_.Exception.Message)" -ForegroundColor Yellow }
-}
+# NOTE: -AllUsers needs elevation; without admin this degrades to a warning.
+try {
+    $__wingetPkgs = Get-AppxPackage -AllUsers -EA Stop | Where-Object { $_.Name -eq 'Microsoft.DesktopAppInstaller' }
+    foreach ($pkg in $__wingetPkgs) {
+        try { $pkg | Remove-AppxPackage -AllUsers -EA Stop; Write-Ok "removed winget (App Installer)" }
+        catch { Write-Host "    winget removal skipped: $($_.Exception.Message)" -ForegroundColor Yellow }
+    }
+} catch { Write-Host "    winget removal skipped (needs admin): $($_.Exception.Message)" -ForegroundColor Yellow }
 # remove scoop if present
 if (Test-Path "$env:USERPROFILE\scoop") {
     Remove-Item "$env:USERPROFILE\scoop" -Recurse -Force -EA SilentlyContinue
