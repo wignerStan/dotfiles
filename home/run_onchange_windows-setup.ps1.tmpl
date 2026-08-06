@@ -519,6 +519,9 @@ try {
     {{- if eq .tier "simple" }}
         RunDefaults = $true; AppRemovalTarget = 'AllUsers'; DisableCopilot = $true; DisableWidgets = $true
         DisableRecall = $true; DisableClickToDo = $true; DisableStoreSearchSuggestions = $true; DisableDesktopSpotlight = $true
+        # aggressive: full Edge removal (browser + binaries). Stubborn leftovers
+        # (SecHealthUI/WindowsApps) are handled by the SYSTEM cleanup step.
+        ForceRemoveEdge = $true
     {{- else }}
         RunDefaultsLite = $true
     {{- end }}
