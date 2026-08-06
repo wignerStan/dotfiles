@@ -469,9 +469,9 @@ if (Test-Cmd 'uv') {
         else {
             Write-Step "Installing pywinauto (uv python)"
             {{- if .use_china_mirrors }}
-            & uv pip install --python "$__pyExe" -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple pywinauto 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+            & uv pip install --python "$__pyExe" --break-system-packages -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple pywinauto 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
             {{- else }}
-            & uv pip install --python "$__pyExe" pywinauto 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+            & uv pip install --python "$__pyExe" --break-system-packages pywinauto 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
             {{- end }}
             Write-Ok 'pywinauto installed (uv python)'
         }
@@ -506,6 +506,8 @@ Write-Host "    Restart PowerShell to pick up new PATH entries." -ForegroundColo
 # 4. Win11Debloat — unattended cleanup/tweaks (Raphire/Win11Debloat, from GitHub)
 #    simple -> RunDefaults (remove bloatware) + aggressive privacy/AI-off
 #    other  -> RunDefaultsLite (tweaks only, keep apps)
+#    NOTE: needs the FULL repo (Config/Scripts/Regfiles dirs are referenced via
+#    $PSScriptRoot); fetching the bare .ps1 breaks with empty-path errors.
 # ---------------------------------------------------------------
 Write-Step "Win11Debloat (tier={{ .tier }})"
 try {
@@ -521,8 +523,28 @@ try {
         RunDefaultsLite = $true
     {{- end }}
     }
-    $debloatScript = Invoke-RestMethod -Uri 'https://raw.githubusercontent.com/Raphire/Win11Debloat/master/Win11Debloat.ps1' -UseBasicParsing
-    & ([scriptblock]::Create($debloatScript)) @debloatFlags 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
-    Write-Ok 'Win11Debloat applied'
+    $__dRoot = Join-Path $env:USERPROFILE '.local\win11debloat'
+    $__dScript = Join-Path $__dRoot 'Win11Debloat.ps1'
+    if (-not (Test-Path $__dScript)) {
+        Write-Step "Win11Debloat — downloading full repo (Config/Scripts/Regfiles)"
+        $__dZip = Join-Path $env:TEMP 'win11debloat.zip'
+        Invoke-WebRequest -Uri 'https://github.com/Raphire/Win11Debloat/archive/refs/heads/master.zip' -OutFile $__dZip -UseBasicParsing
+        if (Test-Path $__dRoot) { Remove-Item $__dRoot -Recurse -Force -EA SilentlyContinue }
+        New-Item -ItemType Directory -Force -Path $__dRoot | Out-Null
+        Expand-Archive -Path $__dZip -DestinationPath $__dRoot -Force
+        Remove-Item $__dZip -Force
+        # zip extracts to Win11Debloat-master/ — flatten one level
+        $__dNested = Join-Path $__dRoot 'Win11Debloat-master'
+        if (Test-Path $__dNested) {
+            Get-ChildItem -Path $__dNested | Move-Item -Destination $__dRoot -Force
+            Remove-Item $__dNested -Force -EA SilentlyContinue
+        }
+    }
+    if (Test-Path $__dScript) {
+        & $__dScript @debloatFlags 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+        Write-Ok 'Win11Debloat applied'
+    } else {
+        Write-Host "    Win11Debloat repo not found at $__dScript" -ForegroundColor Yellow
+    }
 } catch { Write-Host "    Win11Debloat warning: $($_.Exception.Message)" -ForegroundColor Yellow }
 {{- end -}}
