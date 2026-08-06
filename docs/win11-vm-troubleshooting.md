@@ -62,6 +62,62 @@ were **wrong** after debloat/restore. Verified real locations:
 fails — the source never existed on this VM. This is a **known permanent gap**;
 reinstall from vendor instead. Do not retry the copy scripts.
 
+### 4. WinStock GUI automation — debug history & lessons
+
+The Weisoft stock client (`C:\Weisoft Stock(x64)\WinStock.exe`, **note the space**
+in `Stock(x64)`) has a GBK/Chinese-encoded first-launch dialog that must be
+dismissed before it is usable. Getting it to start and stay started was a
+multi-hour debug session; the probe scripts are kept under
+`scripts/winvm/winstock/` and the actual working sequence below is what was
+verified.
+
+**The problem:** on first launch from a fresh VM WinStock shows a modeless error
+dialog ("无法创建服务进程"-type flow; codepage GBK). A plain `start` / `Popen`
+leaves it stuck on that dialog; `connect()` from pywinauto either fails or the
+window never appears unless the dialog is acknowledged.
+
+**Debug history (what each probe was for):**
+
+| script | what it tried / found |
+|--------|----------------------|
+| `winstock-test.bat` | earliest probe: `start "" /D "C:\Weisoft Stock(x64)" WinStock.exe`, wait 25 s, check `tasklist`, dump window+controls via pywinauto |
+| `winstock-auto.py` | poll every 5 s (up to 60 s) with `Application(backend='uia').connect(path=...)`, dump each window's title + class |
+| `winstock-gui.py` | same, but specifically detects the error dialog by scanning window titles |
+| `winstock-watch.py` | baseline `tasklist` snapshot, watch for the new WinStock process appearing |
+| `winstock-detail.py` | deep dump: every descendant control (`Text/Edit/Button/Hyperlink`), auto-click `确定` to dismiss the dialog, then re-dump |
+| `winstock-test2.py` | after 25 s, look for the error dialog, click `确定`, wait, re-enumerate |
+| `winstock-final.py` | the keeper — 14×5 s poll, auto-dismiss, dump buttons/edits of the first 2 windows, break on success |
+| `reg-task.ps1` | registers a scheduled task (interactive, `Highest`) that runs `winstock-watch.bat` | 
+
+**Lessons that cost the most time (all verified as true):**
+
+1. **Launch `cwd` is required**: run from the install dir
+   (`/D "C:\Weisoft Stock(x64)"`), or the app can't find its
+   `Data/FinanceData.xml` etc. `Popen([...], cwd=r'C:\Weisoft Stock(x64)')`.
+2. **Backend must be `uia`** and you connect **by path**
+   (`Application(backend='uia').connect(path=r'C:\Weisoft Stock(x64)\WinStock.exe')`)
+   — default `win32` backend can't see the modern (WinUI/WebView?) tree.
+3. **Window text is often empty / GBK**: `window_text()` may return `''` for
+   some windows; always check `class_name()` too, and pass titles through
+   `iconv -f GBK -t UTF-8` on the host side.
+4. **It takes up to ~60-70 s** after spawn before a window appears — the 5 s
+   poll loop is intentional; do **not** `connect` once and give up.
+5. **The auto-dismiss flow** (find the error dialog → click `确定` → re-connect)
+   is the whole point: once acknowledged the client stays up in later
+   launches and subsequent boots don't need the scripts at all.
+6. **pywinauto needs its post-install step** in a uv-managed python:
+   `pywin32_postinstall.py -install` (see `env/fix-pywinauto.ps1`), otherwise
+   `import pywinauto` fails on a fresh `uv run` env. chezmoi now gates pywinauto
+   by `tier`/`profile` (commit `d57f415`: tier simple|develop **or** profile
+   work → install; standard + non-work → skip).
+7. **Interactive session**: the client needs a logged-in interactive desktop to
+   show windows — a `prlctl exec`/scheduled non-interactive context can start the
+   process but the window won't be visible/automateable. Use an interactive
+   scheduled task (`reg-task.ps1` uses `Interactive` + `Highest`).
+
+**End state:** `winstock-final.py` is the working auto-start+dismiss probe; the
+pure `auto/gui` probes were superseded and are kept only as reference.
+
 ## Rebase & compaction playbook (the big lesson)
 
 ### What happened
@@ -149,7 +205,7 @@ The one-off session scripts that were scattered across `~/` are curated into
 | `env/` | PATH/UAC/autologon set, pywinauto fix, bootstrap, chezmoi pull/reapply |
 | `verify/` | `final-check.ps1` + debloat/user-data WebView2 verification probes |
 | `maintenance/` | `vm-trim.ps1` (Optimize-Volume -ReTrim) |
-| `winstock/` | WinStock GUI automation (`auto/detail/final/gui/watch/test` `.py`+`.bat`), `reg-task.ps1` (watch Task Scheduler) |
+| `winstock/` | WinStock GUI automation debug history (§4): `final` (working auto-start+dismiss), `auto/gui/detail/watch/test` probes, `reg-task.ps1` (interactive scheduled task) |
 
 Everything else from the session (per-step logs, reg dumps, `dp*/deep*/diag*/inspect*/find*/wtest*/wh6*` probes,
 superseded iterations like `vm-debloat{1,2}`, `verify{2,3,4}`, `vm-fixmamba{1,2}`…) was **deleted** — the
