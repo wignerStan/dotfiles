@@ -485,17 +485,18 @@ Write-Host "    Restart PowerShell to pick up new PATH entries." -ForegroundColo
 # ---------------------------------------------------------------
 Write-Step "Win11Debloat (tier={{ .tier }})"
 try {
-    $debloatFlags = @('-Silent','-CreateRestorePoint',
-        '-DisableTelemetry','-DisableSuggestions','-DisableBing','-DisableEdgeAds',
-        '-DisableLockscreenTips','-RevertContextMenu','-ShowKnownFileExt',
-        '-ShowHiddenFolders','-EnableDarkMode')
+    $debloatFlags = @{
+        Silent = $true; CreateRestorePoint = $true
+        DisableTelemetry = $true; DisableSuggestions = $true; DisableBing = $true; DisableEdgeAds = $true
+        DisableLockscreenTips = $true; RevertContextMenu = $true; ShowKnownFileExt = $true
+        ShowHiddenFolders = $true; EnableDarkMode = $true
     {{- if eq .tier "simple" }}
-    $debloatFlags += @('-RunDefaults','-AppRemovalTarget','AllUsers','-DisableCopilot',
-        '-DisableWidgets','-DisableRecall','-DisableClickToDo',
-        '-DisableStoreSearchSuggestions','-DisableDesktopSpotlight')
+        RunDefaults = $true; AppRemovalTarget = 'AllUsers'; DisableCopilot = $true; DisableWidgets = $true
+        DisableRecall = $true; DisableClickToDo = $true; DisableStoreSearchSuggestions = $true; DisableDesktopSpotlight = $true
     {{- else }}
-    $debloatFlags += @('-RunDefaultsLite')
+        RunDefaultsLite = $true
     {{- end }}
+    }
     $debloatScript = Invoke-RestMethod -Uri 'https://raw.githubusercontent.com/Raphire/Win11Debloat/master/Win11Debloat.ps1' -UseBasicParsing
     & ([scriptblock]::Create($debloatScript)) @debloatFlags 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
     Write-Ok 'Win11Debloat applied'
