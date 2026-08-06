@@ -237,7 +237,7 @@ brew_install byobu
 brew_install starship zoxide eza bat carapace
 brew_install ripgrep fd fzf jq yq jo
 brew_install coreutils direnv htop tree wget
-brew_install age base64 fastfetch
+brew_install age gnupg base64 fastfetch   # gnupg = gpg dep (age/gpg decrypt)
 brew_install vim
 
 # Shell lint/format
@@ -405,9 +405,10 @@ brew_install supabase azure-cli
 brew_install radare2 binwalk lief
 brew install --cask ghidra 2>/dev/null || echo "Warning: ghidra cask (optional) failed"
 
-# macOS develop: VM tools
+# macOS develop: VM tools (tart = formula in openai/tools tap, NOT a cask)
 {{- if eq .chezmoi.os "darwin" }}
-brew install --cask tart 2>/dev/null || echo "Warning: tart cask failed"
+brew tap openai/tools 2>/dev/null || true
+brew install openai/tools/tart 2>/dev/null || echo "Warning: tart (openai/tools) install failed"
 brew_install lima
 {{- end }}
 
