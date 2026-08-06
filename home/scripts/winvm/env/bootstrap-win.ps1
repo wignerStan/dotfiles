@@ -1,4 +1,6 @@
 # Jacob's Windows chezmoi bootstrap (Phase 2) — run as jacob
+# Note: binaries are downloaded from their release URLs (no shared-folder
+# installers). See run_onchange_windows-setup.ps1.tmpl for the full setup.
 $ErrorActionPreference = 'Continue'
 $ProgressPreference = 'SilentlyContinue'
 $share = '\\Mac\Home'
@@ -6,14 +8,43 @@ $H = 'C:\Users\jacob'
 $env:HOME = $H
 $env:USERPROFILE = $H
 
+function Get-LatestRelease {
+    param([string]$Repo)
+    try {
+        $r = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -UseBasicParsing -Headers @{ 'User-Agent' = 'chezmoi-bootstrap' }
+        return $r.tag_name
+    } catch { return $null }
+}
+
 Write-Host "==> [1/6] staging MinGit"
 if (-not (Test-Path "$H\.local\mingit\cmd\git.exe")) {
-    Expand-Archive -Path "$share\MinGit-arm64.zip" -DestinationPath "$H\.local\mingit" -Force
+    $gTag = Get-LatestRelease 'git-for-windows/git'
+    $gv = ($gTag -replace '^v','' -replace '\.windows\.','.')
+    $gUrl = "https://github.com/git-for-windows/git/releases/download/$gTag/MinGit-$gv-arm64.zip"
+    if ($gTag) {
+        $zip = "$H\Downloads\MinGit-$gv-arm64.zip"
+        Invoke-WebRequest -Uri $gUrl -OutFile $zip -UseBasicParsing
+        Expand-Archive -Path $zip -DestinationPath "$H\.local\mingit" -Force
+        Remove-Item $zip -Force -EA SilentlyContinue
+        Write-Host "    MinGit $gv staged from $gUrl"
+    } else {
+        Write-Host "    WARN: GitHub unreachable, MinGit not staged"
+    }
 } else { Write-Host "    MinGit already present" }
 
 Write-Host "==> [2/6] staging chezmoi"
 if (-not (Test-Path "$H\.local\chezmoi\chezmoi.exe")) {
-    Expand-Archive -Path "$share\chezmoi_win_arm64.zip" -DestinationPath "$H\.local\chezmoi" -Force
+    $cTag = Get-LatestRelease 'twpayne/chezmoi'
+    $cUrl = "https://github.com/twpayne/chezmoi/releases/download/$cTag/chezmoi_$($cTag.TrimStart('v'))_windows_arm64.zip"
+    if ($cTag) {
+        $zip = "$H\Downloads\chezmoi_$($cTag.TrimStart('v'))_windows_arm64.zip"
+        Invoke-WebRequest -Uri $cUrl -OutFile $zip -UseBasicParsing
+        Expand-Archive -Path $zip -DestinationPath "$H\.local\chezmoi" -Force
+        Remove-Item $zip -Force -EA SilentlyContinue
+        Write-Host "    chezmoi $cTag staged from $cUrl"
+    } else {
+        Write-Host "    WARN: GitHub unreachable, chezmoi not staged"
+    }
 } else { Write-Host "    chezmoi already present" }
 
 Write-Host "==> [3/6] staging age key"
