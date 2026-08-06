@@ -31,6 +31,18 @@ if [[ -d "/home/linuxbrew/.linuxbrew" ]]; then
 fi
 {{- end }}
 
+{{- if eq .chezmoi.os "darwin" }}
+# ── tart (macOS VM runner) ────────────────────────────────────
+# Use the external drive's tart dir when mounted (VM images are dozens of GB);
+# otherwise fall back to ~/.tart. The 60G/space guard lives in the tartvm
+# deploy scripts, not here, to avoid a df fork on every shell startup.
+if [[ -d /Volumes/External/tart ]]; then
+    export TART_HOME=/Volumes/External/tart
+else
+    export TART_HOME="${TART_HOME:-$HOME/.tart}"
+fi
+{{- end }}
+
 {{- if .use_china_mirrors }}
 # ── Homebrew (China mirrors) ──────────────────────────────────
 export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.ustc.edu.cn/brew.git"
@@ -109,8 +121,9 @@ command_not_found_handler() {
 [[ -d "$HOME/go/bin" ]] && path+=("$HOME/go/bin")
 {{- end }}
 
-# ── Node/Bun/Flutter ecosystem (develop tier only) ───────────
-{{- if eq .tier "develop" }}
+# ── Node/Bun ecosystem (Level 2 — all platforms) ─────────────
+# Installed at Level 1; expose the pnpm/bun PATH for every full-setup machine.
+{{- if eq .setup_mode "full" }}
 # pnpm
 {{- if eq .chezmoi.os "darwin" }}
 [[ -d "$HOME/Library/pnpm" ]] && export PNPM_HOME="$HOME/Library/pnpm"
@@ -118,18 +131,22 @@ command_not_found_handler() {
 [[ -d "$HOME/.local/share/pnpm" ]] && export PNPM_HOME="$HOME/.local/share/pnpm"
 {{- end }}
 [[ -n "$PNPM_HOME" ]] && path+=("$PNPM_HOME/bin")
-# Antigravity
-[[ -d "$HOME/.antigravity/antigravity/bin" ]] && path+=$HOME/.antigravity/antigravity/bin
 
 # Bun
 [[ -d "$HOME/.bun" ]] && export BUN_INSTALL="$HOME/.bun"
 [[ -d "$HOME/.bun/bin" ]] && path+=("$BUN_INSTALL/bin")
-
-# Flutter
-[[ -d "$HOME/flutter/bin" ]] && path+=("$HOME/flutter/bin")
 {{- if .use_china_mirrors }}
 export BUN_CONFIG_REGISTRY="https://registry.npmmirror.com"
 {{- end }}
+{{- end }}
+
+# ── Flutter / Antigravity / Cargo (develop tier only) ────────
+{{- if eq .tier "develop" }}
+# Antigravity
+[[ -d "$HOME/.antigravity/antigravity/bin" ]] && path+=$HOME/.antigravity/antigravity/bin
+
+# Flutter
+[[ -d "$HOME/flutter/bin" ]] && path+=("$HOME/flutter/bin")
 {{- end }}
 
 # Local user binaries (prepended to override system commands)

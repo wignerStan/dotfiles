@@ -1,0 +1,103 @@
+{{- /* macOS-only VM host setup — tart/lima. Renders empty on non-darwin so chezmoi skips it. */ -}}
+{{- if and (eq .chezmoi.os "darwin") (ne .tier "simple") -}}
+#!/usr/bin/env bash
+# -------------------------------------------------------------------------------
+# Jacob's tart (macOS-only VM host) setup
+# Idempotent (safe to re-run via run_onchange). tier={{ .tier }} mode={{ .setup_mode }} geo={{ .geo }}
+#
+# tart manages macOS VMs on Apple Silicon via the Virtualization.framework.
+#   - installs: tart (brew), lima (brew) if missing
+#   - creates TART_HOME on the external drive (or ~/.tart fallback) and validates
+#     available space (refuses VM ops below a safe threshold)
+#   - pulls a base macOS image on first run so a deploy later is offline
+#
+# Space policy: VM images are tens of GB. Prefer the external drive; if using
+# the internal volume, require >= 60G free or fail loud (no silent partial state).
+# Managed by Chezmoi — do not edit in place. (bump-20260806)
+# -------------------------------------------------------------------------------
+set -uo pipefail
+
+GREEN=$'\033[0;32m'; YELLOW=$'\033[0;33m'; RED=$'\033[0;31m'; RESET=$'\033[0m'
+log()  { printf '%s\n' "$*"; }
+ok()   { printf '%s   %s%s\n' "${GREEN}ok:$RESET" "$*"; }
+warn() { printf '%s   %s%s\n' "${YELLOW}warn:$RESET" "$*"; }
+die()  { printf '%s   %s%s\n' "${RED}fail:$RESET" "$*" >&2; exit 1; }
+
+is_cmd()   { command -v "$1" >/dev/null 2>&1; }
+brew_keg() { /opt/homebrew/bin/brew keg-only 2>/dev/null >/dev/null; }
+
+# ARCH -> asset suffix is handled by brew; nothing to compute here.
+
+SAFE_MIN_GB=60
+resolve_tart_home() {
+    # Prefer external; fall back to ~/.tart (matches .zshenv / 00-env).
+    if [[ -d /Volumes/External/tart ]]; then
+        echo /Volumes/External/tart
+    else
+        echo "${TART_HOME:-$HOME/.tart}"
+    fi
+}
+
+log "==> macOS tart setup (tier={{ .tier }} mode={{ .setup_mode }} geo={{ .geo }})"
+
+# 1) brew present?
+if ! is_cmd brew && ! [[ -x /opt/homebrew/bin/brew ]]; then
+    die "Homebrew not found — required to install tart/lima. Run bootstrap.sh first."
+fi
+BREW=/opt/homebrew/bin/brew
+[[ -x "$BREW" ]] || BREW=/usr/local/bin/brew
+
+# 2) tart
+if ! is_cmd tart; then
+    log "    installing tart (openai/tap)..."
+    "$BREW" tap openai/tools >/dev/null 2>&1 || true
+    "$BREW" install openai/tools/tart || die "tart install failed"
+    ok "tart installed"
+else
+    ok "tart present: $(tart --version 2>/dev/null | head -1)"
+fi
+
+# 3) lima (helper) — optional, not fatal
+if ! is_cmd lima; then
+    "$BREW" install lima >/dev/null 2>&1 && ok "lima installed" || warn "lima not installed (optional)"
+else
+    ok "lima present"
+fi
+
+# 4) TART_HOME
+TH=$(resolve_tart_home)
+export TART_HOME="$TH"
+log "    TART_HOME=$TH"
+mkdir -p "$TH"/{vms,cache,tmp} 2>/dev/null || die "cannot create TART_HOME=$TH"
+
+# 5) space guard — refuses to operate below a safe floor on the internal volume.
+SAFE_GB=60
+avail_gb=$(df -Pk "$TH" 2>/dev/null | awk 'NR==2{printf "%.0f", $4/1024/1024}')
+avail_gb=${avail_gb:-0}
+if [[ "$TH" == /Volumes/External/* ]]; then
+    ok "external TART_HOME has ${avail_gb}G free"
+else
+    if (( avail_gb < SAFE_GB )); then
+        die "$TH has only ${avail_gb}G free; need >= ${SAFE_GB}G. Mount /Volumes/External for VM storage."
+    else
+        ok "internal TART_HOME has ${avail_gb}G free (>=${SAFE_GB}G)"
+    fi
+fi
+
+# 6) persist for this session + document for shell (fish/zsh already wired via dotfiles)
+log "    (TART_HOME persisted at shell scope by dotfiles; add to /etc or launchd only if you want system-wide.)"
+
+# 7) optional: pull a base image so first VM create is not network-blocked.
+if ! tart list --format json 2>/dev/null | grep -q .; then
+    log "    no VM yet — pulling base image (sonoma base)..."
+    if tart pull ghcr.io/cirruslabs/macos-sonoma-base:latest 2>/dev/null; then
+        ok "pulled base image"
+    else
+        warn "image pull failed (network/Virtualization.framework); create a VM later with tart create"
+    fi
+else
+    ok "existing VM(s) found; skipping base pull"
+fi
+
+log "==> done"
+{{- end -}}

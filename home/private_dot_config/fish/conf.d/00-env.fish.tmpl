@@ -40,6 +40,16 @@ set -gx NANOBANANA_MODEL gemini-3-pro-image-preview
 # ── iTerm2 ──────────────────────────────────────────────────────
 set -gx ITERM_ENABLE_SHELL_INTEGRATION_WITH_TMUX YES
 
+# ── tart (macOS VM runner) ────────────────────────────────────
+# Prefer external drive when mounted; else fall back to ~/.tart.
+{{- if eq .chezmoi.os "darwin" }}
+if test -d /Volumes/External/tart
+    set -gx TART_HOME /Volumes/External/tart
+else if test -z "$TART_HOME"
+    set -gx TART_HOME ~/.tart
+end
+{{- end }}
+
 # ── No-proxy (local/private networks always bypass) ────────────
 set -gx NO_PROXY "127.0.0.1,localhost,::1,192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,100.64.0.0/10,100.100.0.0/16,*.local,*.crashlytics.com"
 set -gx no_proxy $NO_PROXY
