@@ -169,7 +169,12 @@ if (Test-Cmd 'uv') {
     Update-EnvPath
     Write-Step "python via uv (uv python install)"
     try {
-        & uv python install 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+        {{- if eq .chezmoi.arch "arm64" }}
+        # uv defaults to emulated x86_64 python on Windows ARM64; request native aarch64 explicitly.
+        & uv python install --no-progress cpython-3.14-windows-aarch64-none 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+        {{- else }}
+        & uv python install --no-progress 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+        {{- end }}
         # expose uv's managed python dir so plain `python`/`pip` resolve
         $pyRoot = & uv python dir 2>$null
         if ($pyRoot -and (Test-Path $pyRoot)) {
