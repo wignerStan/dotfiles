@@ -1,4 +1,7 @@
-$log = 'C:\Users\jacob\appx-log.txt'
+$U = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -ErrorAction SilentlyContinue).DefaultUserName
+if (-not $U) { $U = $env:USERNAME }
+$H = "C:\Users\$U"
+$log = "$H\appx-log.txt"
 function W($m) { Add-Content $log "$m"; Write-Host $m }
 Set-Content $log "appx enum"
 Get-AppxPackage -AllUsers -EA SilentlyContinue | Where-Object { $_.Name -match 'Edge|SecHealth|WebView' } | ForEach-Object {

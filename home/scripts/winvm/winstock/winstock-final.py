@@ -1,7 +1,8 @@
+import os
 import sys, time, subprocess
 from pywinauto import Application
 
-LOG = r'C:\Users\jacob\winstock-final.log'
+LOG = os.path.join(os.environ['USERPROFILE'], 'winstock-final.log')
 log = open(LOG, 'w', encoding='utf-8')
 def w(*a):
     m = ' '.join(str(x) for x in a)

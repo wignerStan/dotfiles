@@ -1,4 +1,7 @@
-$log = 'C:\Users\jacob\reg2-log.txt'
+$U = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -ErrorAction SilentlyContinue).DefaultUserName
+if (-not $U) { $U = $env:USERNAME }
+$H = "C:\Users\$U"
+$log = "$H\reg2-log.txt"
 Add-Content $log "register.bat re-run"
 cmd /c 'cd /d "C:\Weisoft Stock(x64)" && call register.bat' 2>&1 | Out-String | % { Add-Content $log $_ }
 # check COM registration for key DLLs

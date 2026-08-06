@@ -1,7 +1,10 @@
-$log = "C:\Users\jacob\Downloads\reapply-fix-log.txt"
+$U = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -ErrorAction SilentlyContinue).DefaultUserName
+if (-not $U) { $U = $env:USERNAME }
+$H = "C:\Users\$U"
+$log = "$H\Downloads\reapply-fix-log.txt"
 "=== reapply (mamba base fix) $(Get-Date -Format u) ===" | Out-File $log -Encoding UTF8
 $env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')
-$env:MAMBA_ROOT_PREFIX = "C:\Users\jacob\mamba"
+$env:MAMBA_ROOT_PREFIX = "$H\mamba"
 $src = "$env:USERPROFILE\.local\share\chezmoi"
 $cfg = "$env:USERPROFILE\.config\chezmoi\chezmoi.toml"
 
@@ -12,7 +15,7 @@ Push-Location $src
 Pop-Location
 
 # clear the broken empty base dir so install starts clean
-$mambaRoot = "C:\Users\jacob\mamba"
+$mambaRoot = "$H\mamba"
 if (Test-Path "$mambaRoot\python.exe") { "python already present, skipping" | Add-Content -Path $log -Encoding UTF8 }
 else { "base empty — bootstrap will install python" | Add-Content -Path $log -Encoding UTF8 }
 

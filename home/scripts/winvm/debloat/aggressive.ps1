@@ -1,6 +1,8 @@
+$U = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -ErrorAction SilentlyContinue).DefaultUserName
+if (-not $U) { $U = $env:USERNAME }
+$H = "C:\Users\$U"
 $ErrorActionPreference = 'Continue'
 $ProgressPreference = 'SilentlyContinue'
-$H = 'C:\Users\jacob'
 $log = "$H\aggressive-log.txt"
 function W($m) { Add-Content $log "$m"; Write-Host $m }
 Set-Content $log "STEP0 start as $env:USERNAME"
@@ -21,7 +23,7 @@ if (-not (Test-Path $dScript)) {
     } catch { W "DOWNLOAD FAIL: $($_.Exception.Message)" }
 }
 $flags = @{
-    Silent = $true; CreateRestorePoint = $true; User = 'jacob'
+    Silent = $true; CreateRestorePoint = $true; User = $U
     DisableTelemetry = $true; DisableSuggestions = $true; DisableBing = $true; DisableEdgeAds = $true
     DisableLockscreenTips = $true; RevertContextMenu = $true; ShowKnownFileExt = $true
     ShowHiddenFolders = $true; EnableDarkMode = $true
@@ -29,7 +31,7 @@ $flags = @{
     DisableRecall = $true; DisableClickToDo = $true; DisableStoreSearchSuggestions = $true; DisableDesktopSpotlight = $true
     ForceRemoveEdge = $true
 }
-W "STEP4 invoking Win11Debloat (SYSTEM, -User jacob)..."
+W "STEP4 invoking Win11Debloat (SYSTEM, -User $U)..."
 try {
     & $dScript @flags 2>&1 | ForEach-Object { Add-Content $log "    $_" }
     W "STEP5 done, exit=$LASTEXITCODE"

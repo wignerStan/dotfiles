@@ -1,8 +1,10 @@
+$U = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -ErrorAction SilentlyContinue).DefaultUserName
+if (-not $U) { $U = $env:USERNAME }
+$H = "C:\Users\$U"
 $ErrorActionPreference = 'Continue'
-$log = 'C:\Users\jacob\restore-user-log.txt'
+$log = "$H\restore-user-log.txt"
 function W($m) { Add-Content $log "$m"; Write-Host $m }
 Set-Content $log "user data restore"
-$H = 'C:\Users\jacob'
 $src = '\\Mac\Home\restore-src\jacob'
 # copy backup jacob dir to a share-accessible staging: use \\Mac\Home direct
 $share = '\\Mac\Home'

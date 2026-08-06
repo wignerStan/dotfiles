@@ -1,4 +1,7 @@
-$log = 'C:\Users\jacob\wv2reg-log.txt'
+$U = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -ErrorAction SilentlyContinue).DefaultUserName
+if (-not $U) { $U = $env:USERNAME }
+$H = "C:\Users\$U"
+$log = "$H\wv2reg-log.txt"
 function W($m) { Add-Content $log "$m"; Write-Host $m }
 Set-Content $log "wv2 registry"
 reg load "HKLM\OLD" 'X:\Windows\System32\config\SOFTWARE' 2>&1 | Out-Null

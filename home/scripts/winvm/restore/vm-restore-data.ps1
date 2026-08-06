@@ -1,23 +1,25 @@
 $ErrorActionPreference = "SilentlyContinue"
 $src = "\\Mac\Home\Downloads\vm-backup"
-$u = $env:USERPROFILE
+$U = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -ErrorAction SilentlyContinue).DefaultUserName
+if (-not $U) { $U = $env:USERNAME }
+$u = Join-Path "C:\Users" $U
 
 # SSH
 New-Item -ItemType Directory -Force "$u\.ssh" | Out-Null
-Copy-Item "$src\jacob\ssh\*" "$u\.ssh\" -Force
+Copy-Item "$src\$U\ssh\*" "$u\.ssh\" -Force
 $ssh = (Get-ChildItem "$u\.ssh" -EA SilentlyContinue).Count
 
 # Chezmoi
 New-Item -ItemType Directory -Force "$u\.config\chezmoi" | Out-Null
-Copy-Item "$src\jacob\chezmoi\*" "$u\.config\chezmoi\" -Force
+Copy-Item "$src\$U\chezmoi\*" "$u\.config\chezmoi\" -Force
 $cz = (Get-ChildItem "$u\.config\chezmoi" -EA SilentlyContinue).Count
 
 # Desktop
-Copy-Item "$src\jacob\Desktop\*" "$u\Desktop\" -Recurse -Force -EA SilentlyContinue
+Copy-Item "$src\$U\Desktop\*" "$u\Desktop\" -Recurse -Force -EA SilentlyContinue
 $dt = (Get-ChildItem "$u\Desktop" -Recurse -EA SilentlyContinue).Count
 
 # Documents
-Copy-Item "$src\jacob\Documents\*" "$u\Documents\" -Recurse -Force -EA SilentlyContinue
+Copy-Item "$src\$U\Documents\*" "$u\Documents\" -Recurse -Force -EA SilentlyContinue
 $dc = (Get-ChildItem "$u\Documents" -Recurse -EA SilentlyContinue).Count
 
 # Pyramid config

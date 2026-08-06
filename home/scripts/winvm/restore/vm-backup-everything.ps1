@@ -1,4 +1,7 @@
-$log = "C:\Users\jacob\Downloads\backup-everything-log.txt"
+$U = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -ErrorAction SilentlyContinue).DefaultUserName
+if (-not $U) { $U = $env:USERNAME }
+$H = "C:\Users\$U"
+$log = "$H\Downloads\backup-everything-log.txt"
 "=== backup jacob data + registry $(Get-Date -Format u) ===" | Out-File $log -Encoding UTF8
 function W($m){ Add-Content -Path $log -Value $m -Encoding UTF8 }
 
@@ -42,13 +45,13 @@ New-Item -ItemType Directory -Force -Path $profileDst | Out-Null
 
 # Key dirs to preserve (skip huge/temp caches)
 $dirs = @{
-    "Desktop"    = "C:\Users\jacob\Desktop"
-    "Documents"  = "C:\Users\jacob\Documents"
-    "Downloads"  = "C:\Users\jacob\Downloads"
-    "AppData-Roaming" = "C:\Users\jacob\AppData\Roaming"
-    "ssh"        = "C:\Users\jacob\.ssh"
-    "chezmoi"    = "C:\Users\jacob\.config\chezmoi"
-    "local-bin"  = "C:\Users\jacob\.local"
+    "Desktop"    = "$H\Desktop"
+    "Documents"  = "$H\Documents"
+    "Downloads"  = "$H\Downloads"
+    "AppData-Roaming" = "$H\AppData\Roaming"
+    "ssh"        = "$H\.ssh"
+    "chezmoi"    = "$H\.config\chezmoi"
+    "local-bin"  = "$H\.local"
 }
 
 foreach ($name in $dirs.Keys) {
@@ -67,12 +70,12 @@ foreach ($name in $dirs.Keys) {
 # AppData\Local — selectively (skip caches, temp)
 W "`n=== selective AppData\Local ==="
 $localPick = @(
-    "C:\Users\jacob\AppData\Local\Microsoft\Office",
-    "C:\Users\jacob\AppData\Local\Packages"
+    "$H\AppData\Local\Microsoft\Office",
+    "$H\AppData\Local\Packages"
 )
 foreach ($p in $localPick) {
     if (Test-Path $p) {
-        $rel = $p.Replace("C:\Users\jacob\AppData\Local\", "")
+        $rel = $p.Replace("$H\AppData\Local\", "")
         $dst = "$profileDst\AppData-Local\$rel"
         W "  copying $rel..."
         Copy-Item $p $dst -Recurse -Force -EA SilentlyContinue

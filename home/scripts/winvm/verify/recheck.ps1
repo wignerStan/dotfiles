@@ -1,4 +1,7 @@
-$log = 'C:\Users\jacob\recheck-log.txt'
+$U = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -ErrorAction SilentlyContinue).DefaultUserName
+if (-not $U) { $U = $env:USERNAME }
+$H = "C:\Users\$U"
+$log = "$H\recheck-log.txt"
 function W($m) { Add-Content $log "$m"; Write-Host $m }
 Set-Content $log "post-reboot recheck"
 W ("Edge.Stable: {0}" -f [bool](Get-AppxPackage -AllUsers -EA SilentlyContinue *MicrosoftEdge.Stable*))

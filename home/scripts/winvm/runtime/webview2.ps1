@@ -1,4 +1,7 @@
-$log = 'C:\Users\jacob\webview2-log.txt'
+$U = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -ErrorAction SilentlyContinue).DefaultUserName
+if (-not $U) { $U = $env:USERNAME }
+$H = "C:\Users\$U"
+$log = "$H\webview2-log.txt"
 function W($m) { Add-Content $log "$m"; Write-Host $m }
 Set-Content $log "webview2 restore"
 if (-not (Test-Path 'C:\Program Files (x86)\Microsoft\EdgeWebView')) {

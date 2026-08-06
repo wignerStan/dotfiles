@@ -1,10 +1,12 @@
+$U = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -ErrorAction SilentlyContinue).DefaultUserName
+if (-not $U) { $U = $env:USERNAME }
+$H = "C:\Users\$U"
 # Jacob's Windows chezmoi bootstrap (Phase 2) — run as jacob
 # Note: binaries are downloaded from their release URLs (no shared-folder
 # installers). See run_onchange_windows-setup.ps1.tmpl for the full setup.
 $ErrorActionPreference = 'Continue'
 $ProgressPreference = 'SilentlyContinue'
 $share = '\\Mac\Home'
-$H = 'C:\Users\jacob'
 $env:HOME = $H
 $env:USERPROFILE = $H
 
@@ -64,8 +66,8 @@ $env:Path = $up
 Write-Host "    PATH set"
 
 Write-Host "==> [5/6] chezmoi init"
-git config --global user.name "jacob"
-git config --global user.email "jacob@winvm.local"
+git config --global user.name "$U"
+git config --global user.email "$U@winvm.local"
 & "$H\.local\chezmoi\chezmoi.exe" init wignerStan/dotfiles 2>&1 | ForEach-Object { Write-Host "    $_" }
 
 Write-Host "==> [6/6] chezmoi apply"

@@ -1,4 +1,7 @@
-$log = "C:\Users\jacob\Downloads\force-rm-store-log.txt"
+$U = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -ErrorAction SilentlyContinue).DefaultUserName
+if (-not $U) { $U = $env:USERNAME }
+$H = "C:\Users\$U"
+$log = "$H\Downloads\force-rm-store-log.txt"
 "=== FORCE remove Store + winget system packages $(Get-Date -Format u) ===" | Out-File $log -Encoding UTF8
 $env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')
 $before = (Get-PSDrive C).Free

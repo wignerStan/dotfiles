@@ -1,5 +1,8 @@
+$U = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -ErrorAction SilentlyContinue).DefaultUserName
+if (-not $U) { $U = $env:USERNAME }
+$H = "C:\Users\$U"
 $ErrorActionPreference = 'Continue'
-$log = 'C:\Users\jacob\stubborn-log.txt'
+$log = "$H\stubborn-log.txt"
 function W($m) { Add-Content $log "$m"; Write-Host $m }
 Set-Content $log "STUBBORN cleanup start as $env:USERNAME"
 

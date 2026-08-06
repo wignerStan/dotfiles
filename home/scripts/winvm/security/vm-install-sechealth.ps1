@@ -1,10 +1,13 @@
-$log = "C:\Users\jacob\Downloads\install-sechealth-log.txt"
+$U = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -ErrorAction SilentlyContinue).DefaultUserName
+if (-not $U) { $U = $env:USERNAME }
+$H = "C:\Users\$U"
+$log = "$H\Downloads\install-sechealth-log.txt"
 "=== install SecHealthUI appx fresh $(Get-Date -Format u) ===" | Out-File $log -Encoding UTF8
 function W($m){ Add-Content -Path $log -Value $m -Encoding UTF8 }
 
 # copy the appx from the Mac share
 $src = "\\Mac\Home\Downloads\Microsoft.SecHealthUI.appx"
-$dst = "C:\Users\jacob\Downloads\Microsoft.SecHealthUI.appx"
+$dst = "$H\Downloads\Microsoft.SecHealthUI.appx"
 Copy-Item $src $dst -Force -EA SilentlyContinue
 W "appx present: $(Test-Path $dst) ($([math]::Round((Get-Item $dst -EA SilentlyContinue).Length/1MB))MB)"
 

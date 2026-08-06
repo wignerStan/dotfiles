@@ -1,7 +1,10 @@
+$U = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -ErrorAction SilentlyContinue).DefaultUserName
+if (-not $U) { $U = $env:USERNAME }
+$H = "C:\Users\$U"
 #powershell
 $ErrorActionPreference = 'SilentlyContinue'
 $ProgressPreference = 'SilentlyContinue'
-$log = "C:\Users\jacob\Downloads\debloat3-log.txt"
+$log = "$H\Downloads\debloat3-log.txt"
 "=== Win11Debloat corrected $(Get-Date -Format u) ===" | Out-File $log -Encoding UTF8
 function W($m) { Add-Content -Path $log -Value $m }
 

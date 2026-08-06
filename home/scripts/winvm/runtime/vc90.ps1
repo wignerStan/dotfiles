@@ -1,4 +1,7 @@
-$log = 'C:\Users\jacob\vc90-log.txt'
+$U = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -ErrorAction SilentlyContinue).DefaultUserName
+if (-not $U) { $U = $env:USERNAME }
+$H = "C:\Users\$U"
+$log = "$H\vc90-log.txt"
 function W($m) { Add-Content $log "$m"; Write-Host $m }
 Set-Content $log "vc90 copy + x86 registration"
 $d = 'C:\Weisoft Stock(x64)'

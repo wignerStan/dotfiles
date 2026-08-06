@@ -1,4 +1,7 @@
-$log = 'C:\Users\jacob\scanvc-log.txt'
+$U = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -ErrorAction SilentlyContinue).DefaultUserName
+if (-not $U) { $U = $env:USERNAME }
+$H = "C:\Users\$U"
+$log = "$H\scanvc-log.txt"
 function W($m) { Add-Content $log "$m"; Write-Host $m }
 Set-Content $log "vc90 ref scan"
 $d = 'C:\Weisoft Stock(x64)'
