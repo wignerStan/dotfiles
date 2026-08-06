@@ -1,0 +1,3 @@
+@echo off
+"\\Mac\Home\vc_redist.arm64.exe" /install /quiet /norestart > C:\Users\jacob\vcredist-log.txt 2>&1
+echo EXITCODE=%ERRORLEVEL% >> C:\Users\jacob\vcredist-log.txt
