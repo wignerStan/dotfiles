@@ -1,5 +1,7 @@
-{{- /* macOS-only VM host setup — tart/lima. Renders empty on non-darwin so chezmoi skips it. */ -}}
-{{- if and (eq .chezmoi.os "darwin") (ne .tier "simple") -}}
+{{- /* macOS-only VM host setup — tart/lima. Renders empty on non-darwin so chezmoi skips it.
+     Gated to develop tier to match where tart/lima are installed (run_once_setup Level 3);
+     a manually-installed tart on a default/basic-tier Mac is fine but not auto-managed here. */ -}}
+{{- if and (eq .chezmoi.os "darwin") (eq .tier "develop") -}}
 #!/usr/bin/env bash
 # -------------------------------------------------------------------------------
 # Jacob's tart (macOS-only VM host) setup
