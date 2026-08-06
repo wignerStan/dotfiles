@@ -176,6 +176,57 @@ if (Test-Cmd 'uv') {
     } catch { Write-Host "    uv python install warning: $($_.Exception.Message)" -ForegroundColor Yellow }
 }
 
+# 7zip — direct installer from ip7z/7zip GitHub releases (official 7-zip mirror).
+# Native arch build (arm64 on ARM machines, x64 otherwise). Silent per-user
+# install into LOCALAPPDATA (no UAC); falls back to default Program Files.
+$__7zArc = if ($__arch -eq 'arm64') { 'arm64' } else { 'x64' }
+if (Test-Cmd '7z') { Write-Skip '7zip' }
+else {
+    $__7zTag = Get-LatestRelease 'ip7z/7zip'
+    if ($__7zTag) {
+        $__7zVer = ($__7zTag -replace '\.','')   # 26.02 -> 2602
+        $__7zInst = Join-Path $env:TEMP "7z$__7zVer-$__7zArc.exe"
+        Write-Step "7zip — direct installer (no package manager, $__7zArc)"
+        try {
+            Invoke-WebRequest -Uri "https://github.com/ip7z/7zip/releases/download/$__7zTag/7z$__7zVer-$__7zArc.exe" -OutFile $__7zInst -UseBasicParsing
+            $__7zDest = "$env:LOCALAPPDATA\7-Zip"
+            Start-Process -Wait -FilePath $__7zInst -ArgumentList '/S', "/D=$__7zDest"
+            if (-not (Test-Path "$__7zDest\7z.exe")) {
+                # per-user install didn't land — try default dir (needs elevation)
+                Start-Process -Wait -FilePath $__7zInst -ArgumentList '/S'
+                $__7zDest = Join-Path ${env:ProgramFiles} '7-Zip'
+            }
+            Remove-Item $__7zInst -Force -EA SilentlyContinue
+            if (Test-Path "$__7zDest\7z.exe") {
+                $up = [Environment]::GetEnvironmentVariable('Path','User')
+                if ($up -notlike "*$__7zDest*") { [Environment]::SetEnvironmentVariable('Path', "$__7zDest;$up", 'User') }
+                Update-EnvPath
+                Write-Ok '7zip'
+            } else { Write-Host "    7zip: installer ran but no 7z.exe found" -ForegroundColor Yellow }
+        } catch { Write-Host "    7zip install failed: $($_.Exception.Message)" -ForegroundColor Yellow }
+    }
+}
+
+# Geek Uninstaller — portable zip, direct from official site (no package manager).
+if (Test-Cmd 'geek') { Write-Skip 'Geek Uninstaller' }
+else {
+    Write-Step "Geek Uninstaller — portable zip (no package manager)"
+    try {
+        $__gkZip = Join-Path $env:TEMP "geek.zip"
+        Invoke-WebRequest -Uri 'https://geekuninstaller.com/geek.zip' -OutFile $__gkZip -UseBasicParsing
+        $__gkDest = "$env:LOCALAPPDATA\GeekUninstaller"
+        New-Item -ItemType Directory -Force -Path $__gkDest | Out-Null
+        Expand-Archive -Path $__gkZip -DestinationPath $__gkDest -Force
+        Remove-Item $__gkZip -Force
+        if (Test-Path "$__gkDest\geek*.exe") {
+            $up = [Environment]::GetEnvironmentVariable('Path','User')
+            if ($up -notlike "*$__gkDest*") { [Environment]::SetEnvironmentVariable('Path', "$__gkDest;$up", 'User') }
+            Update-EnvPath
+            Write-Ok 'Geek Uninstaller'
+        } else { Write-Host "    GeekUninstaller: zip extracted but no exe found" -ForegroundColor Yellow }
+    } catch { Write-Host "    Geek Uninstaller install failed: $($_.Exception.Message)" -ForegroundColor Yellow }
+}
+
 {{- else }}
 # ── STANDARD/DEVELOP: winget + scoop, install via package managers ──
 Write-Step "tier={{ .tier }}: package managers (winget + scoop)"
