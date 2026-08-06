@@ -9,7 +9,7 @@ lesson that cost ~25 GB of external disk.
 
 The VM `Windows 11 (1) (1) (1)` (UUID `{0d72772b-b576-4202-b14e-aefd9790f522}`)
 lives at `~/Parallels/Windows 11.pvm` on an ARM Mac (Parallels Desktop 26.2.2,
-`prlctl 26.2.2`). Guest user `jacob` / `REDACTED_AUTOLOGON_PASSWORD`. Tools: `git`, `uv`,
+`prlctl 26.2.2`). Guest user `jacob`, **blank password** (autologon user). Tools: `git`, `uv`,
 Python (aarch64), `7z`, `GeekUninstaller` are under `~/.local` / `~/.local/share/uv` /
 `%LOCALAPPDATA%` and on the Machine PATH.
 
@@ -27,6 +27,39 @@ Python (aarch64), `7z`, `GeekUninstaller` are under `~/.local` / `~/.local/share
   codepage is GBK (Chinese apps like WinStock) needs
   `... | iconv -f GBK -t UTF-8`. Interactive `prlctl enter` via piped stdin +
   `exit\n`.
+
+## Access model: SYSTEM `enter` + run-as-jacob / run-elevated bat helpers
+
+`prlctl exec --user jacob --password ...` is **dead**: jacob has a blank
+password (autologon), and Parallels refuses an empty password for `exec`. So all
+headless work goes through the **SYSTEM** `prlctl enter` session, and when a
+command must run as the *user* (not SYSTEM) it is wrapped in a small batch that
+uses an interactive scheduled task to drop back down:
+
+| Helper (`env/`) | What it does | Token |
+|-----------------|--------------|-------|
+| `run-as-jacob.bat "cmd"` | creates a jacob **interactive** scheduled task (`/IT`), runs it, waits, deletes it | `winvm\jacob` medium |
+| `run-elevated.bat "cmd"` | same but `/RL HIGHEST` (UAC-silent since ConsentPromptBehaviorAdmin=0) | jacob elevated (High) |
+
+Verified: `run-as-jacob "cmd /c whoami > f"` → `winvm\jacob`;
+`run-elevated "cmd /c whoami /groups | findstr S-1-16 > f"` → `High Mandatory Level`.
+**Gotcha: `cmd /c whoami > f` (with `/c` + the redirect)** — passing the raw
+redirect as the arg to the bat breaks under `%~1`, so always wrap the inner
+command in `cmd /c "..."` and put the full line (redirect included) inside the
+quoted arg. Both bats are **strict ASCII** (`@echo off` + `rem` only) — the
+guest codepage is GBK, and any non-ASCII char in the bat corrupts `cmd` parsing
+(comment lines get mis-executed). True SYSTEM-level ops (TrustedInstaller-won
+files, service changes) stay in the raw `enter` session, not the helpers.
+
+### Autologon investigation (why exec can't auth)
+
+- jacob has a **blank password** (`net user jacob ""`).
+- Autologon works with `AutoAdminLogon=1` + `DefaultUserName=jacob` and **no**
+  restated `DefaultPassword` — a stale `DefaultPassword` that doesn't match
+  makes Windows fall back to the LogonUI login screen. `fix-autologin.bat` keeps
+  the reg clean and turns off standby/hibernate/monitor timeout on AC.
+- Verified end-to-end: clean boot lands at the desktop (`explorer.exe` running,
+  no `LogonUI.exe`).
 
 ## Verified working fixes (this session)
 
