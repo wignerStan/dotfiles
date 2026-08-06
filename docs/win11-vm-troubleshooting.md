@@ -89,27 +89,35 @@ prlctl start "$VM"
 #   (inside guest, as admin:) Optimize-Volume -DriveLetter C -ReTrim
 prlctl stop "$VM"
 
-# 3. (optional, if --online-compact wasn't already on) set it explicitly
-prlctl set "$VM" --device-set hdd --online-compact on
+# 3. force a real host-side compact (prlctl has no compact op)
+prl_disk_tool compact --info --hdd "$HDD"   # "Used blocks" = true data (MB)
 
 # 4. re-create the two checkpoints you want to keep (post-clean, post-data)
 prlctl snapshot "$VM" --name "snapshot3-final" -d "flat base, fully clean"
 prlctl snapshot "$VM" --name "snapshot4-userdata" -d "user data restored"
 ```
 
-**Result:** 65 GB → **52.6 GB** single flat `.hds` layer with two 2 MB
-checkpoint deltas. A target of ~40 GB was **not achievable** — the guest
-filesystem genuinely holds ~52 GB (Win11 24H2 + Weisoft + dev tools + user
-data). Be skeptical of "should be ~40 GB" expectations; the correct expectation
-after a clean debloat on this stack is ~50–55 GB.
+**Result:** 72 GB (52.6 base + 19.5 live) → **24 GB** total (21 GB flat base +
+3 GB deltas). The two big wins:
+- guest-side `Optimize-Volume C -ReTrim` only staged the free blocks;
+- **`prl_disk_tool compact` on a stopped VM** is the real shrinker. It scans
+  NTFS, drops stale allocated-but-unused blocks, and rewrote the layer
+  `60 G → 21 G` (info showed 61549 allocated / 21098 used blocks before).
+
+> **Skeptic's note (the 52.6 GB "only a system?" hunch):** it was partly right.
+> guest `Get-PSDrive C` reports ~282–298 GB "used" **even though real guest
+> files are ~23 GB**. The excess was NOT real data — it was (a) sparse holes the
+> host tracks and (b) ~37 GB of  stale freed blocks still `Allocated` in the
+> layer. Only the host-side `compact` (not guest TRIM, not snapshot-delete)
+> reclaims those. Expect ~21 GB on a clean Win11 24H2 + Weisoft + dev tools.
 
 ### Why `du`/`df` look weird afterwards
 
 The disk is `expanded` (thin-provisioned, up to 300 GB) with
 `online-compact=on`. After flatten+TRIM, most freed blocks are **sparse holes**:
-`du` on the host shows ~52 GB while the guest still reports ~298 GB "used" of
-299 GB. **That is expected and healthy** — the file is 52 GB; it only grows if
-the guest actually writes new data.
+`du` on the host shows the true size while the guest reports ~282 GB "used" of
+299 GB — the guest number is **untrustworthy** (it counts sparse phantom
+blocks). Trust `prl_disk_tool compact --info`'s `Used blocks` instead.
 
 ### Moving the VM to its final home
 
