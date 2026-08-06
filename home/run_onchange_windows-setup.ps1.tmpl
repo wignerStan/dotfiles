@@ -15,7 +15,10 @@
 # ---------------------------------------------------------------
 # Managed by Chezmoi — runs on Windows only. Do not edit in place.
 
-$ErrorActionPreference = 'Stop'
+# NOTE: 'Continue' not 'Stop' — on Windows PowerShell 5.1, native stderr merged via
+# 2>&1 becomes ErrorRecords; with 'Stop' that kills pipelines (e.g. uv download
+# progress lines). Critical steps use explicit -EA Stop inside try/catch instead.
+$ErrorActionPreference = 'Continue'
 $ProgressPreference    = 'SilentlyContinue'
 
 function Write-Step($m){ Write-Host "==> $m" -ForegroundColor Cyan }
@@ -176,7 +179,11 @@ if (Test-Cmd 'uv') {
         & uv python install --no-progress 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
         {{- end }}
         # expose uv's managed python dir so plain `python`/`pip` resolve
+        {{- if eq .chezmoi.arch "arm64" }}
+        $pyRoot = & uv python dir cpython-3.14-windows-aarch64-none 2>$null
+        {{- else }}
         $pyRoot = & uv python dir 2>$null
+        {{- end }}
         if ($pyRoot -and (Test-Path $pyRoot)) {
             $up = [Environment]::GetEnvironmentVariable('Path','User')
             if ($up -notlike "*$pyRoot*") { [Environment]::SetEnvironmentVariable('Path', "$pyRoot;$up", 'User') }
@@ -446,17 +453,25 @@ if (Test-Cmd 'micromamba') {
 {{- if or (or (eq .tier "simple") (eq .tier "develop")) (eq .profile "work") }}
 {{- if eq .tier "simple" }}
 # simple: uv is the python — install pywinauto into uv's managed python.
+# On ARM64, resolve the native aarch64 python explicitly (uv's default is the
+# emulated x86_64 build) instead of relying on `uv run`'s default selection.
 if (Test-Cmd 'uv') {
     try {
         Update-EnvPath
-        $have = & uv run python -c "import pywinauto" 2>$null
+        {{- if eq .chezmoi.arch "arm64" }}
+        $__pyExe = & uv python find cpython-3.14-windows-aarch64-none 2>$null
+        {{- else }}
+        $__pyExe = & uv python find 2>$null
+        {{- end }}
+        if (-not $__pyExe) { throw "uv python not found" }
+        $have = & $__pyExe -c "import pywinauto" 2>$null
         if ($LASTEXITCODE -eq 0) { Write-Skip 'pywinauto' }
         else {
             Write-Step "Installing pywinauto (uv python)"
             {{- if .use_china_mirrors }}
-            & uv pip install --python "$(uv python find 2>$null)" -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple pywinauto 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+            & uv pip install --python "$__pyExe" -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple pywinauto 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
             {{- else }}
-            & uv pip install --python "$(uv python find 2>$null)" pywinauto 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+            & uv pip install --python "$__pyExe" pywinauto 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
             {{- end }}
             Write-Ok 'pywinauto installed (uv python)'
         }
