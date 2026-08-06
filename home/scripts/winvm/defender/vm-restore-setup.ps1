@@ -1,5 +1,8 @@
+$U = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -ErrorAction SilentlyContinue).DefaultUserName
+if (-not $U) { $U = $env:USERNAME }
+$H = "C:\Users\$U"
 $ErrorActionPreference = "SilentlyContinue"
-$log = "C:\Users\jacob\Downloads\defender-disable-log.txt"
+$log = "$H\Downloads\defender-disable-log.txt"
 "=== Defender permanent disable $(Get-Date -Format u) ===" | Out-File $log -Encoding UTF8
 
 function W($m) { Add-Content -Path $log -Value $m }

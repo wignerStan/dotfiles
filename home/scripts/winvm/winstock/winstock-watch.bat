@@ -1,2 +1,2 @@
 @echo off
-"C:\Users\jacob\AppData\Roaming\uv\python\cpython-3.14-windows-aarch64-none\python.exe" C:\Users\jacob\winstock-watch.py > C:\Users\jacob\winstock-watch-cmd.log 2>&1
+"%USERPROFILE%\AppData\Roaming\uv\python\cpython-3.14-windows-aarch64-none\python.exe" %USERPROFILE%\winstock-watch.py > %USERPROFILE%\winstock-watch-cmd.log 2>&1

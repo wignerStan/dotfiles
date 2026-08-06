@@ -1,4 +1,7 @@
-$log = "C:\Users\jacob\Downloads\rm-dai-log.txt"
+$U = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -ErrorAction SilentlyContinue).DefaultUserName
+if (-not $U) { $U = $env:USERNAME }
+$H = "C:\Users\$U"
+$log = "$H\Downloads\rm-dai-log.txt"
 "=== force-remove DesktopAppInstaller folder $(Get-Date -Format u) ===" | Out-File $log -Encoding UTF8
 
 $loc = "C:\Program Files\WindowsApps\Microsoft.DesktopAppInstaller_1.29.280.0_arm64__8wekyb3d8bbwe"

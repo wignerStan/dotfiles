@@ -1,4 +1,7 @@
-$log = "C:\Users\jacob\Downloads\sechealth-rereg.txt"
+$U = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -ErrorAction SilentlyContinue).DefaultUserName
+if (-not $U) { $U = $env:USERNAME }
+$H = "C:\Users\$U"
+$log = "$H\Downloads\sechealth-rereg.txt"
 "" | Out-File $log -Encoding UTF8
 function W($m){ Add-Content -Path $log -Value $m -Encoding UTF8 }
 

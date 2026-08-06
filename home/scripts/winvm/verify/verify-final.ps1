@@ -1,7 +1,10 @@
+$U = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -ErrorAction SilentlyContinue).DefaultUserName
+if (-not $U) { $U = $env:USERNAME }
+$H = "C:\Users\$U"
 $checks = @(
-  "C:\Users\jacob\.ssh\id_chezmoi.pub",
-  "C:\Users\jacob\.ssh\config.vm-backup",
-  "C:\Users\jacob\AppData\Roaming\chezmoi\chezmoi.toml",
+  "$H\.ssh\id_chezmoi.pub",
+  "$H\.ssh\config.vm-backup",
+  "$H\AppData\Roaming\chezmoi\chezmoi.toml",
   "C:\Weisoft\Stock(x64)\WinStock.exe",
   "C:\Weisoft\Stock(x64)\Data"
 )

@@ -1,4 +1,7 @@
-$log = 'C:\Users\jacob\tile-log.txt'
+$U = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -ErrorAction SilentlyContinue).DefaultUserName
+if (-not $U) { $U = $env:USERNAME }
+$H = "C:\Users\$U"
+$log = "$H\tile-log.txt"
 function W($m) { Add-Content $log "$m"; Write-Host $m }
 Set-Content $log "tile cleanup"
 W "== Security shortcuts =="
@@ -7,7 +10,7 @@ Get-ChildItem 'C:\ProgramData\Microsoft\Windows\Start Menu\Programs' -Recurse -E
     Remove-Item $_.FullName -Force -EA SilentlyContinue
     W ("  removed: {0}" -f (-not (Test-Path $_.FullName)))
 }
-Get-ChildItem 'C:\Users\jacob\AppData\Roaming\Microsoft\Windows\Start Menu\Programs' -Recurse -EA SilentlyContinue | Where-Object { $_.Name -match 'Security|安全|Defender' } | ForEach-Object {
+Get-ChildItem "$H\AppData\Roaming\Microsoft\Windows\Start Menu\Programs" -Recurse -EA SilentlyContinue | Where-Object { $_.Name -match 'Security|安全|Defender' } | ForEach-Object {
     W ("  user found: {0}" -f $_.FullName)
     Remove-Item $_.FullName -Force -EA SilentlyContinue
 }

@@ -1,9 +1,12 @@
-$log = "C:\Users\jacob\Downloads\pull-log.txt"
+$U = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -ErrorAction SilentlyContinue).DefaultUserName
+if (-not $U) { $U = $env:USERNAME }
+$H = "C:\Users\$U"
+$log = "$H\Downloads\pull-log.txt"
 "=== fix git ssh + pull $(Get-Date -Format u) ===" | Out-File $log -Encoding UTF8
 $src = "$env:USERPROFILE\.local\share\chezmoi"
 Push-Location $src
 # point this repo's git at the deploy key (id_chezmoi), overriding any stale sshCommand
-git config core.sshCommand "ssh -i C:/Users/jacob/.ssh/id_chezmoi -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+git config core.sshCommand "ssh -i $H/.ssh/id_chezmoi -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
 "sshCommand set" | Add-Content -Path $log -Encoding UTF8
 "pulling..." | Add-Content -Path $log -Encoding UTF8
 $pull = git pull origin main 2>&1 | Out-String

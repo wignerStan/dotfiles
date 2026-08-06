@@ -1,4 +1,7 @@
-$log = "C:\Users\jacob\Downloads\verify-debloat-log.txt"
+$U = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -ErrorAction SilentlyContinue).DefaultUserName
+if (-not $U) { $U = $env:USERNAME }
+$H = "C:\Users\$U"
+$log = "$H\Downloads\verify-debloat-log.txt"
 "=== DEBLOAT VERIFICATION after reboot $(Get-Date -Format u) ===" | Out-File $log -Encoding UTF8
 function W($m){ Add-Content -Path $log -Value $m -Encoding UTF8 }
 $env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')

@@ -1,4 +1,7 @@
-$log = 'C:\Users\jacob\fixpaths-log.txt'
+$U = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -ErrorAction SilentlyContinue).DefaultUserName
+if (-not $U) { $U = $env:USERNAME }
+$H = "C:\Users\$U"
+$log = "$H\fixpaths-log.txt"
 function W($m) { Add-Content $log "$m"; Write-Host $m }
 Set-Content $log "fixpaths"
 foreach ($p in @('C:\Users\Default\AppData\Local\7-Zip','C:\Users\Default\AppData\Local\GeekUninstaller','C:\Users\Default\AppData\Roaming\uv','C:\Users\Default\.local')) {

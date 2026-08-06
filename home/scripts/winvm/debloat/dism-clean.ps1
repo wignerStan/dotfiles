@@ -1,5 +1,8 @@
+$U = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -ErrorAction SilentlyContinue).DefaultUserName
+if (-not $U) { $U = $env:USERNAME }
+$H = "C:\Users\$U"
 $ErrorActionPreference = 'Continue'
-$log = 'C:\Users\jacob\dism-log.txt'
+$log = "$H\dism-log.txt"
 function W($m) { Add-Content $log "$m"; Write-Host $m }
 Set-Content $log "dism cleanup"
 W "== provisioned packages (SecHealth/EdgeDevTools) =="

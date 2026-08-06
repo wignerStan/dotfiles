@@ -1,5 +1,8 @@
+$U = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -ErrorAction SilentlyContinue).DefaultUserName
+if (-not $U) { $U = $env:USERNAME }
+$H = "C:\Users\$U"
 $d = "\\Mac\Home\Downloads\vm-backup"
-New-Item -ItemType Directory -Force -Path "$d\reg","$d\jacob" | Out-Null
+New-Item -ItemType Directory -Force -Path "$d\reg","$d\$U" | Out-Null
 
 # Registry
 reg export "HKCU\SOFTWARE" "$d\reg\HKCU-SOFTWARE.reg" /y 2>$null
@@ -9,10 +12,10 @@ reg export "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" "$d\reg\Run-HKCU
 reg export "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" "$d\reg\Winlogon.reg" /y 2>$null
 
 # Key files
-Copy-Item "C:\Users\jacob\.ssh" "$d\jacob\ssh" -Recurse -Force -EA SilentlyContinue
-Copy-Item "C:\Users\jacob\.config\chezmoi" "$d\jacob\chezmoi" -Recurse -Force -EA SilentlyContinue
-Copy-Item "C:\Users\jacob\Desktop" "$d\jacob\Desktop" -Recurse -Force -EA SilentlyContinue
-Copy-Item "C:\Users\jacob\Documents" "$d\jacob\Documents" -Recurse -Force -EA SilentlyContinue
+Copy-Item "$H\.ssh" "$d\$U\ssh" -Recurse -Force -EA SilentlyContinue
+Copy-Item "$H\.config\chezmoi" "$d\$U\chezmoi" -Recurse -Force -EA SilentlyContinue
+Copy-Item "$H\Desktop" "$d\$U\Desktop" -Recurse -Force -EA SilentlyContinue
+Copy-Item "$H\Documents" "$d\$U\Documents" -Recurse -Force -EA SilentlyContinue
 
 # 金字塔 config
 New-Item -ItemType Directory -Force -Path "$d\jzt" | Out-Null

@@ -1,6 +1,9 @@
-$env:HOME = 'C:\Users\jacob'
-$env:USERPROFILE = 'C:\Users\jacob'
-$env:APPDATA = 'C:\Users\jacob\AppData\Roaming'
-$env:LOCALAPPDATA = 'C:\Users\jacob\AppData\Local'
-& 'C:\Users\jacob\.local\chezmoi\chezmoi.exe' @args
+$U = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -ErrorAction SilentlyContinue).DefaultUserName
+if (-not $U) { $U = $env:USERNAME }
+$H = "C:\Users\$U"
+$env:HOME = "$H"
+$env:USERPROFILE = "$H"
+$env:APPDATA = "$H\AppData\Roaming"
+$env:LOCALAPPDATA = "$H\AppData\Local"
+& "$H\.local\chezmoi\chezmoi.exe" @args
 exit $LASTEXITCODE

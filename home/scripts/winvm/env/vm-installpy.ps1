@@ -1,8 +1,11 @@
-$log = "C:\Users\jacob\Downloads\installpy-log.txt"
+$U = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -ErrorAction SilentlyContinue).DefaultUserName
+if (-not $U) { $U = $env:USERNAME }
+$H = "C:\Users\$U"
+$log = "$H\Downloads\installpy-log.txt"
 "=== install python (direct conda-forge) $(Get-Date -Format u) ===" | Out-File $log -Encoding UTF8
 $env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')
-$env:MAMBA_ROOT_PREFIX = "C:\Users\jacob\mamba"
-$root = "C:\Users\jacob\mamba"
+$env:MAMBA_ROOT_PREFIX = "$H\mamba"
+$root = "$H\mamba"
 
 # clear stalled repodata cache
 "clearing pkgs cache (stalled)..." | Add-Content -Path $log -Encoding UTF8
@@ -12,8 +15,8 @@ Remove-Item "$root\pkgs\cache" -Recurse -Force -EA SilentlyContinue
 # install from DIRECT conda-forge (override .condarc USTC mirror), with timeout + progress
 "installing python=3.13 from direct conda-forge..." | Add-Content -Path $log -Encoding UTF8
 $job = Start-Job -ScriptBlock {
-    $env:MAMBA_ROOT_PREFIX = "C:\Users\jacob\mamba"
-    & micromamba install -y -c https://conda.anaconda.org/conda-forge --override-channels python=3.13 -r "C:\Users\jacob\mamba" 2>&1
+    $env:MAMBA_ROOT_PREFIX = "$H\mamba"
+    & micromamba install -y -c https://conda.anaconda.org/conda-forge --override-channels python=3.13 -r "$H\mamba" 2>&1
 }
 # wait up to 6 minutes
 if (Wait-Job $job -Timeout 360) {
