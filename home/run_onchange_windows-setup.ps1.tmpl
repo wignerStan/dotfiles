@@ -47,7 +47,7 @@ function Install-Direct {
     param(
         [string]$Label, [string]$Url, [string]$Dest, [string[]]$PathDirs, [string]$TestBin
     )
-    if ($TestBin -and (Test-Cmd $TestBin)) { Write-Skip $Label; return $true }
+    if ($TestBin -and (Test-Cmd $TestBin)) { Write-Skip $Label; return }
     Write-Step "$Label — direct install (no package manager)"
     try {
         $zip = Join-Path $env:TEMP "$([guid]::NewGuid().ToString('N')).zip"
@@ -64,9 +64,9 @@ function Install-Direct {
         }
         [Environment]::SetEnvironmentVariable('Path', $up, 'User')
         Update-EnvPath
-        if ($TestBin -and (Test-Cmd $TestBin)) { Write-Ok "$Label direct"; return $true }
+        if ($TestBin -and (Test-Cmd $TestBin)) { Write-Ok "$Label direct"; return }
         Write-Host "    $Label installed; restart shell for PATH" -ForegroundColor Yellow
-        return $true
+        return
     } catch {
         Write-Host "    $Label direct install FAILED: $($_.Exception.Message)" -ForegroundColor Red
         return $false
