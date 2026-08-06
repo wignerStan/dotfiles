@@ -33,6 +33,14 @@
 {{-   if or (contains "Virtual" $pn) (contains "KVM" $pn) (contains "QEMU" $pn) (contains "Parallels" $pn) -}}
 {{-     $tier = "simple" -}}
 {{-   end -}}
+{{- else if eq .chezmoi.os "windows" -}}
+{{-   /* Windows has no /sys DMI path — query Win32_ComputerSystem.Model via PowerShell. */ -}}
+{{-   if lookPath "powershell" -}}
+{{-     $pn := output "powershell" "-NoProfile" "-NonInteractive" "-Command" "(Get-CimInstance Win32_ComputerSystem).Model" | trim -}}
+{{-     if or (contains "Virtual" $pn) (contains "VMware" $pn) (contains "QEMU" $pn) (contains "Parallels" $pn) (contains "VirtualBox" $pn) -}}
+{{-       $tier = "simple" -}}
+{{-     end -}}
+{{-   end -}}
 {{- end -}}
 
 {{- /* setup_mode: full | basic. Orthogonal axis to tier/profile — controls
