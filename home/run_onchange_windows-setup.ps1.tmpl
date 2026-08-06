@@ -1,7 +1,7 @@
 {{- /* Windows-only: renders empty on macOS/Linux, so chezmoi skips execution there. */ -}}
 {{- if eq .chezmoi.os "windows" -}}
 #powershell
-# ═══════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------
 # Jacob's Windows Setup
 # Idempotent (safe to re-run via run_onchange). tier={{ .tier }} mode={{ .setup_mode }} geo={{ .geo }}
 #
@@ -12,7 +12,7 @@
 #   standard/develop       -> winget + scoop (extras bucket). Via PMs: git (full,
 #                             Bash+GUI), uv, micromamba, pixi. Plus sing-box core
 #                             (direct) + Windows Administrator service (start=auto).
-# ═══════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------
 # Managed by Chezmoi — runs on Windows only. Do not edit in place.
 
 $ErrorActionPreference = 'Stop'
@@ -34,9 +34,9 @@ if ($env:PROCESSOR_ARCHITECTURE -match 'ARM|aarch64') { $__arch = 'arm64' }
 
 Write-Step "Starting Windows Setup (tier={{ .tier }} mode={{ .setup_mode }} geo={{ .geo }} arch=$__arch)"
 
-# ═══════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------
 # Helpers
-# ═══════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------
 
 # Download + extract a GitHub release zip into a target dir; add its bin to User PATH.
 # For simple-tier direct installs (no package manager).
@@ -99,9 +99,9 @@ function Get-LatestRelease {
     } catch { return $null }
 }
 
-# ═══════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------
 # shared env (uv mirror)
-# ═══════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------
 {{- if .use_china_mirrors }}
 $env:UV_DEFAULT_INDEX = 'https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple'
 [Environment]::SetEnvironmentVariable('UV_DEFAULT_INDEX', 'https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple', 'User')
@@ -116,9 +116,9 @@ $env:MAMBA_ROOT_PREFIX = $mambaRoot
 if (-not (Test-Path $mambaRoot)) { New-Item -ItemType Directory -Force -Path $mambaRoot | Out-Null }
 {{- end }}
 
-# ═══════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------
 # 1. INSTALL STRATEGY
-# ═══════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------
 {{- if eq .tier "simple" }}
 # ── SIMPLE (VM/container): direct installs, remove package managers ──
 Write-Step "tier=simple: direct installs (no winget/scoop)"
@@ -297,10 +297,10 @@ if (Test-Cmd 'scoop') {
 }
 {{- end }}
 
-# ═══════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------
 # Level 2: Extra (setup_mode=full, non-simple) — desktop dev/media tools.
 # Mirrors the Unix bootstrap's Level 2: terminal emulator + downloaders.
-# ═══════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------
 {{- if and (eq .setup_mode "full") (ne .tier "simple") }}
 Write-Step "Level 2: extra tools (setup_mode=full)"
 
@@ -353,11 +353,11 @@ if ($__bdTag) {
 {{- end }}
 {{- end }}
 
-# ═══════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------
 # Level 3: Develop (windows) — WSL only. Heavy toolchains (rust/go/C++) live in
 # the personal WSL (linux), NOT native windows; native gets only the basic
 # frontend/UI/package tools installed above. WSL internals are personal/separate.
-# ═══════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------
 {{- if eq .tier "develop" }}
 Write-Step "develop: enable WSL (rust/go/C++ toolchains live in the personal WSL)"
 try {
@@ -366,14 +366,14 @@ try {
 } catch { Write-Host "    wsl setup needs Administrator: $($_.Exception.Message)" -ForegroundColor Yellow }
 {{- end }}
 
-# ═══════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------
 # sing-box CORE + Windows Administrator service — personal mac/windows ONLY
 # (standard/develop tiers). sing-box installs when profile=personal AND tier is
 # NOT simple. The core binary (SagerNet/sing-box) is downloaded directly (not a
 # GUI app; winget id unreliable), and registered as a Windows Service (start=auto,
 # runs as LocalSystem == Admin) so the TUN proxy is up at boot. Linux personal uses
 # the "system" tier instead (no sing-box); simple tier (VM/container) rides the host.
-# ═══════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------
 {{- if and (eq .profile "personal") (not (eq .tier "simple")) }}
 $sbTag = Get-LatestRelease 'SagerNet/sing-box'
 if ($sbTag) {
@@ -409,9 +409,9 @@ if ($sbTag) {
 Write-Skip 'sing-box (not personal, or simple — rides host proxy)'
 {{- end }}
 
-# ═══════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------
 # 2. MAMBA BASE ENV (python) — both tiers
-# ═══════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------
 if (Test-Cmd 'micromamba') {
     Update-EnvPath
     try {
@@ -428,12 +428,12 @@ if (Test-Cmd 'micromamba') {
     }
 }
 
-# ═══════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------
 # 3. pywinauto (GUI automation, Windows-only)
 #    Installed when: tier is simple OR develop, OR profile is work.
 #    default tier (personal desktop) skips it.
 #    Python source: simple -> uv (no mamba); develop/work -> mamba base.
-# ═══════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------
 {{- if or (or (eq .tier "simple") (eq .tier "develop")) (eq .profile "work") }}
 {{- if eq .tier "simple" }}
 # simple: uv is the python — install pywinauto into uv's managed python.
@@ -478,11 +478,11 @@ Write-Skip 'pywinauto (tier={{ .tier }} profile={{ .profile }})'
 Write-Step "Windows Setup Complete"
 Write-Host "    Restart PowerShell to pick up new PATH entries." -ForegroundColor Yellow
 
-# ═══════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------
 # 4. Win11Debloat — unattended cleanup/tweaks (Raphire/Win11Debloat, from GitHub)
 #    simple -> RunDefaults (remove bloatware) + aggressive privacy/AI-off
 #    other  -> RunDefaultsLite (tweaks only, keep apps)
-# ═══════════════════════════════════════════════════════════════
+# ---------------------------------------------------------------
 Write-Step "Win11Debloat (tier={{ .tier }})"
 try {
     $debloatFlags = @('-Silent','-CreateRestorePoint',
