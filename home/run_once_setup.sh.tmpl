@@ -225,6 +225,7 @@ echo "Installing Level 1: basic tools..."
 brew_install() { brew install "$@" 2>/dev/null || echo "Warning: some packages failed: $*"; }
 
 brew_install zsh zsh-autosuggestions zsh-syntax-highlighting zsh-history-substring-search
+brew_install autossh   # persistent SSH tunnels (cal/nscc-hf via incus)
 brew_install fish nushell fisher
 
 # PTY: tmux on all unix (not windows). byobu is linux/wsl only (not mac).
