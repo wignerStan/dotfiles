@@ -1,0 +1,34 @@
+{{- $ownerships := list "personal" "work" -}}
+{{- $platforms := list "local" "cloud" -}}
+{{- $tiers := list "simple" "default" "advanced" -}}
+{{- $bootstraps := list "basic" "full" -}}
+{{- $deploys := list "user" "system" "system+user" -}}
+{{- $allowedFacets := list "dev" "proxy" "ai" "hpc" "research" -}}
+{{- if not (has .ownership $ownerships) -}}
+{{-   fail (printf "invalid ownership %q (want one of: %s)" .ownership ($ownerships | join ", ")) -}}
+{{- end -}}
+{{- if not (has .platform $platforms) -}}
+{{-   fail (printf "invalid platform %q (want one of: %s)" .platform ($platforms | join ", ")) -}}
+{{- end -}}
+{{- if not (has .tier $tiers) -}}
+{{-   fail (printf "invalid tier %q (want one of: %s)" .tier ($tiers | join ", ")) -}}
+{{- end -}}
+{{- if not (has .bootstrap $bootstraps) -}}
+{{-   fail (printf "invalid bootstrap %q (want one of: %s)" .bootstrap ($bootstraps | join ", ")) -}}
+{{- end -}}
+{{- if not (has .deploy $deploys) -}}
+{{-   fail (printf "invalid deploy %q (want one of: %s)" .deploy ($deploys | join ", ")) -}}
+{{- end -}}
+{{- if not (kindIs "bool" .is_guest) -}}
+{{-   fail (printf "invalid is_guest type %q (want boolean)" (kindOf .is_guest)) -}}
+{{- end -}}
+{{- $seenFacets := list -}}
+{{- range .facets -}}
+{{-   if not (has . $allowedFacets) -}}
+{{-     fail (printf "invalid facet %q (want one of: %s)" . ($allowedFacets | join ", ")) -}}
+{{-   end -}}
+{{-   if has . $seenFacets -}}
+{{-     fail (printf "duplicate facet %q" .) -}}
+{{-   end -}}
+{{-   $seenFacets = append $seenFacets . -}}
+{{- end -}}

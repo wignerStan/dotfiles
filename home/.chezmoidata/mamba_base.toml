@@ -1,7 +1,7 @@
-# Mamba base environment split: base (scivis) + develop (app/devtools)
-# base: numpy+scipy+opencv+doc/pdf+drawing+format
-# develop: app/web framework + dev tools (poetry, pre-commit, etc)
-# Managed by mamba-sync-base.sh (uv pip install)
+# Mamba environment split by layer:
+#   L3 base env  = [mamba_base.core] only (scivis/generic stack — the "base")
+#   L4 facet     = dedicated env per facet: dev → "develop" env (mamba-sync dev branch)
+# Managed by mamba-sync-base.sh/ps1 (mamba --use-uv / uv pip install).
 
 [mamba_base]
 channels = ["conda-forge"]
@@ -11,8 +11,13 @@ channels = ["conda-forge"]
 conda = [
     "python",
     "pip",
+    "numpy",
+    "scipy",
+    "gensim",
 ]
 pip = [
+    # (thinc/blis/cymem/murmurhash/preshed/srsly removed: no cp314 wheels,
+    # no conda-forge py314 builds — spaCy backend is unusable on this python)
     "absl-py",
     "annotated-types",
     "antlr4-python3-runtime",
@@ -27,7 +32,6 @@ pip = [
     "babel",
     "beautifulsoup4",
     "bleach",
-    "blis",
     "blosc2",
     "bokeh",
     "brotli",
@@ -52,7 +56,6 @@ pip = [
     "cryptography",
     "cssselect2",
     "cycler",
-    "cymem",
     "cython",
     "debugpy",
     "decorator",
@@ -77,7 +80,6 @@ pip = [
     "fsspec",
     "fuzzywuzzy",
     "gemmi",
-    "gensim",
     "geographiclib",
     "geopy",
     "graphviz",
@@ -130,7 +132,6 @@ pip = [
     "mpmath",
     "mrcfile",
     "multipledispatch",
-    "murmurhash",
     "mutagen",
     "namex",
     "narwhals",
@@ -145,7 +146,6 @@ pip = [
     "nltk",
     "notebook",
     "numexpr",
-    "numpy",
     "odfpy",
     "ocrmypdf",
     "openpyxl",
@@ -163,7 +163,6 @@ pip = [
     "plotnine",
     "pluggy",
     "pooch",
-    "preshed",
     "pretty_midi",
     "primepy",
     "prompt_toolkit",
@@ -223,7 +222,6 @@ pip = [
     "rlpycairo",
     "rpds-py",
     "ruamel.yaml",
-    "scipy",
     "seaborn",
     "semantic-version",
     "semver",
@@ -237,7 +235,6 @@ pip = [
     "soundfile",
     "soupsieve",
     "soxr",
-    "srsly",
     "stack-data",
     "statsmodels",
     "sympy",
@@ -245,7 +242,6 @@ pip = [
     "tensorboardx",
     "terminado",
     "textblob",
-    "thinc",
     "threadpoolctl",
     "tifffile",
     "tinycss2",
@@ -280,7 +276,7 @@ pip = [
     "zopfli",
     "curl-cffi",
     "pycryptodome",
-    "nacl",
+    "PyNaCl",
     "requests",
     "requests-cache",
     "urllib3",
@@ -299,8 +295,8 @@ pip = [
     "httpx",
 ]
 
-[mamba_base.develop]
-# app/web + dev tools + trade
+[mamba_base.dev]
+# app/web + dev tools + trade — applied when facets includes "dev"
 conda = [
     "ta-lib",
 ]
@@ -351,19 +347,7 @@ pip = [
     "wsproto",
 ]
 
-[mamba_base.simple]
-conda = [
-]
-pip = [
-]
-
 [mamba_base.hpc]
-conda = [
-]
-pip = [
-]
-
-[mamba_base.vps]
 conda = [
 ]
 pip = [

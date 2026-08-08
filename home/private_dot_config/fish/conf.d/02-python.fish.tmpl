@@ -1,22 +1,41 @@
-# Gating: work, or personal desktop (macOS/Windows).
-{{- if or (eq .profile "work") (eq .profile "personal") }}
-# Gate on the binary existing so non-Homebrew machines skip cleanly.
-# exported in non-login shells (matching .zshenv).
-
-    # Shell hook + activate costs ~30ms of forks; only run for login shells.
-    if status is-login
-    end
+{{- /* shared multi-user cache root, per-machine (machine.toml); unset ⇒ default user caches */ -}}
+{{- $shared := "" -}}
+{{- if and (hasKey . "machine") (hasKey .machine .chezmoi.hostname) -}}
+{{-   $shared = index (index .machine .chezmoi.hostname) "shared_workspace" | default "" -}}
+{{- end -}}
+# ── Mamba (global Python base environment; L3 standard) ────────────────
+{{- if eq .bootstrap "full" }}
+set -gx MAMBA_ROOT_PREFIX {{ .mamba_root | quote }}
+if set -q HOMEBREW_PREFIX; and test -x "$HOMEBREW_PREFIX/opt/micromamba/bin/mamba"
+    set -gx MAMBA_EXE "$HOMEBREW_PREFIX/opt/micromamba/bin/mamba"
+else if type -q micromamba
+    set -gx MAMBA_EXE (command -s micromamba)
+else if type -q mamba
+    set -gx MAMBA_EXE (command -s mamba)
+end
+fish_add_path --move "$MAMBA_ROOT_PREFIX/bin"
+if status is-login; and set -q MAMBA_EXE
+    $MAMBA_EXE shell hook --shell fish --root-prefix "$MAMBA_ROOT_PREFIX" 2>/dev/null | source
+{{- if has "dev" .facets }}
+    mamba activate develop 2>/dev/null
+{{- end }}
 end
 {{- end }}
 
-# ── Pixi (project Python environments) ──────────────────────
-{{- if eq .tier "develop" }}
+# ── Pixi (project Python environments; research facet) ──────────────────
+{{- if has "research" .facets }}
 if type -q pixi
     set -gx PIXI_HOME ~/.pixi
     fish_add_path --move $PIXI_HOME/bin
+    {{- /* pixi wheels reuse the shared uv cache; unset ⇒ pixi defaults */}}
+    {{- if $shared }}
+    set -gx PIXI_CACHE_PYPI_WHEELS_DIR {{ $shared }}/.cache/uv
+    set -gx PIXI_CACHE_DIR {{ $shared }}/.cache/rattler
+    {{- end }}
 end
 {{- end }}
-# Shared uv/rattler cache on /develop (reflinks with project venvs)
-set -gx UV_CACHE_DIR /develop/.cache/uv
-set -gx PIXI_CACHE_PYPI_WHEELS_DIR /develop/.cache/uv
-set -gx PIXI_CACHE_DIR /develop/.cache/rattler
+# ── Shared uv cache on <shared_workspace> (reflinks with project venvs) ──
+{{- if $shared }}
+set -gx UV_CACHE_DIR {{ $shared }}/.cache/uv
+set -gx UV_LINK_MODE clone
+{{- end }}

@@ -13,11 +13,15 @@ alias catp bat
 {{- end }}
 
 # ── npm global install redirect (non-work profiles) ────────────
-{{- if not (eq .profile "work") }}
-set -gx NPM_CONFIG_PREFIX "$HOME/.npm-deadend"
+# Reads as "blocked" like the zsh/bash npmrc prefix (.npm-global-blocked);
+# the dir is chmod 0500 by run_once_setup (L3).
+{{- if not (eq .ownership "work") }}
+set -gx NPM_CONFIG_PREFIX "$HOME/.npm-global-blocked"
 {{- end }}
 
-# ── Develop profile abbreviations ─────────────────────────────
+# ── Node/Bun dev-facet abbreviations (pnpm/bun installed at L3) ──────
+{{- if and (eq .bootstrap "full") (has "dev" .facets) }}
 abbr npm pnpm
 abbr npx bunx
+{{- end }}
 

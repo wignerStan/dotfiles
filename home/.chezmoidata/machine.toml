@@ -1,0 +1,35 @@
+# Per-machine declarations, keyed by hostname (chezmoi.hostname; LocalHostName on macOS).
+# Nested under [machine] so normal templates see .machine."<hostname>".
+# The config template reads/parses this source file directly during init because
+# chezmoi loads .chezmoidata only after config generation.
+# Any axis set here is used when the corresponding CHEZMOI_* env var is absent
+# during `chezmoi init`. Unset axes fall back to auto-detection. Re-run init
+# after editing this file; use --override-data for a one-off apply.
+
+[machine."s-MacBook-Air-2"]
+ownership = "personal"
+platform = "local"
+tier = "default"
+facets = ["dev", "research"]
+bootstrap = "full"
+deploy = "system+user"
+is_guest = false
+
+[machine."racknerd"]
+ownership = "personal"
+platform = "cloud"
+tier = "simple"
+facets = ["proxy", "ai"]
+bootstrap = "basic"
+deploy = "system+user"
+# Multi-user shared workspace: uv/pixi/npm caches live under
+# <shared_workspace>/.cache (single btrfs → reflinks). Only the personal
+# Linux box sets this; other machines leave it unset (default user caches).
+shared_workspace = "/develop"
+
+[machine."nscc"]
+ownership = "work"
+platform = "cloud"
+tier = "default"
+facets = ["hpc"]
+bootstrap = "basic"

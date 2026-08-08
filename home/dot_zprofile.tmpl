@@ -15,12 +15,7 @@ if [[ -d "/home/linuxbrew/.linuxbrew" ]]; then
 fi
 {{- end }}
 
-{{- if or (eq .profile "work") (eq .profile "personal") }}
-if [ $? -eq 0 ]; then
-else
-fi
-{{- end }}
-{{- if and (or (eq .profile "work") (eq .profile "personal")) (and (ne .tier "calculate") (ne .tier "simple")) }}
+{{- if eq .bootstrap "full" }}
 __mamba_setup="$("$MAMBA_EXE" shell hook --shell zsh --root-prefix "$MAMBA_ROOT_PREFIX" 2> /dev/null)"
 if [ $? -eq 0 ]; then
     eval "$__mamba_setup"
@@ -28,7 +23,7 @@ else
     alias mamba="$MAMBA_EXE"
 fi
 unset __mamba_setup
-{{- if eq .tier "develop" }}
+{{- if has "dev" .facets }}
 # Activate develop env (separate from base — develop has its own packages)
 mamba activate develop 2>/dev/null
 {{- end }}

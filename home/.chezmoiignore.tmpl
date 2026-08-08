@@ -1,18 +1,22 @@
-# sing-box: personal desktop only (macOS/Windows — runs TUN proxy there).
-# Also skip in guest VMs: the TUN proxy runs on the Mac host, not the VM
-# (the VM rides the host's network), and the Homebrew/sing-box run_*.sh scripts
-# can't fork/exec on Windows.
-{{- if or (not (eq .profile "personal")) (eq .chezmoi.os "linux") (eq .tier "simple") }}
+{{- $axesValidated := includeTemplate "validate-axes" . -}}
+# sing-box: personal macOS/Windows desktop only. Explicit guests ride the host
+# network; resource tier alone does not imply guest placement.
+{{- if or (not (eq .ownership "personal")) (eq .chezmoi.os "linux") .is_guest }}
 .config/sing-box/
 {{- end }}
 
+{{- $pfBasicLayer := or (eq .bootstrap "basic") (eq .bootstrap "full") -}}
+{{- $pfManaged := and (eq .ownership "personal") (eq .chezmoi.os "darwin") $pfBasicLayer -}}
+{{- if not $pfManaged }}
+# PF staging is a personal macOS L2/basic resource. Installation remains
+# system-scoped, but user applies keep these immutable inputs current.
+.config/pf/
+{{- end }}
+
 {{- if (eq .tier "simple") }}
-# VM: skip host-only daemons, Unix shells, and Homebrew integration entirely.
-# The VM is Windows-only (apps with no Mac version); it rides the host Mac's
-# TUN proxy and uses PowerShell. Unix-shell templates (fish/zsh/tmux/sing-box)
-# call Unix-only commands (id, brew) and have no meaning in the guest.
+# Minimal tier: skip optional Unix shells and desktop integrations. Guest-only
+# network behavior is controlled separately by .is_guest above.
 .config/homebrew/
-.config/sing-box/
 .config/zellij/
 .config/yazi/
 .config/ghostty/
@@ -32,11 +36,11 @@
 {{- end }}
 
 # Zellij: Linux/WSL only (not darwin)
-{{- if not (or (eq .chezmoi.os "linux") (eq .platform "wsl")) }}
+{{- if not (or (eq .chezmoi.os "linux") (eq .os_platform "wsl")) }}
 .config/zellij/
 {{- end }}
 
-{{- if eq .profile "hpc" }}
+{{- if has "hpc" .facets }}
 # HPC: skip workstation-only tools, use container-data/zsh instead
 .config/ghostty/
 .config/zellij/
@@ -62,16 +66,17 @@ install-yazi-plugins.sh
 .iterm2_shell_integration.zsh
 {{- end }}
 
-# container-data: only on HPC
-{{- if ne .profile "hpc" }}
+# container-data: only on HPC (hpc facet)
+{{- if not (has "hpc" .facets) }}
 container-data/
 {{- end }}
 
-# Node/Bun/Go/Pixi configs: develop tier only (calculate uses spack/fortran/cuda)
-{{- if ne .tier "develop" }}
-.npmrc
+# Node/Bun/Go configs: dev facet only
+{{- if not (has "dev" .facets) }}
 .bunfig.toml
 .config/go/
 {{- end }}
-
-
+# Pixi config: research facet only
+{{- if not (has "research" .facets) }}
+.config/pixi/
+{{- end }}

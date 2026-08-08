@@ -1,446 +1,351 @@
-{{- /* Unix-only bootstrap (Homebrew). Windows uses run_onchange_windows-bootstrap.ps1. */ -}}
-{{- if not (eq .tier "simple") -}}
+{{- /* Unix bootstrap (Homebrew). Windows: run_onchange_windows-bootstrap.ps1.
+     Runs on Unix except local+simple minimal targets; guest role is separate.
+     Deploy axis (user|system|system+user), enforced at runtime by identity:
+       1) root/system user → ONLY the system scope runs (deploy=system or
+          system+user); the user scope is handled by bootstrap-l1.sh after
+          dropping privileges to the default uid (1000 linux / 501 darwin).
+       2) plain user, deploy=user (default) → user scope only.
+       3) plain user, deploy=system → system scope via sudo elevation.
+       4) plain user, deploy=system+user → user scope then sudo system scope.
+     System commands are ALWAYS elevated ($SUDO) — native/plain-user hosts
+     need the password prompt; on root they run directly.
+     Cloud (platform=cloud) boxes: distro packages are the system scope here;
+     ordered services (nginx/kopia/…) live in run_onchange_linux-cloud-services.sh.tmpl.
+     work ownership = STUB gate (kept minimal until a real work machine exists). */ -}}
+{{- $axesValidated := includeTemplate "validate-axes" . -}}
+{{- if and (ne .chezmoi.os "windows") (or (ne .tier "simple") (eq .platform "cloud")) -}}
 #!/bin/bash
 
 # ═══════════════════════════════════════════════════════════════
-# Jacob's Multi-Machine Setup v1 — profile-aware
+# Jacob's Multi-Machine Bootstrap (axes v2)
+# ownership={{ .ownership }} platform={{ .platform }} tier={{ .tier }}
+# facets={{ .facets | join " " }} bootstrap={{ .bootstrap }} deploy={{ .deploy }}
 # ═══════════════════════════════════════════════════════════════
 
 set -euo pipefail
+echo "=== Dotfiles bootstrap: {{ .ownership }}/{{ .platform }}/{{ .tier }} facets=[{{ .facets | join " " }}] bootstrap={{ .bootstrap }} deploy={{ .deploy }} ==="
 
-echo "=== Starting Jacob's Dotfiles Bootstrap (profile={{ .profile }} tier={{ .tier }}) ==="
+# ───────────────────────────────────────────────────────────────
+# DEPLOY MATRIX — user (default) | system | system+user
+#   1) root/system        → system scope only (system, system+user)
+#   2) plain user+user    → user scope only
+#   3) plain user+system  → elevated system scope only
+#   4) plain user+system+user → user scope then elevated system scope
+# ───────────────────────────────────────────────────────────────
+DEPLOY="{{ .deploy }}"
+RUN_SYSTEM=0
+RUN_USER=0
+case "${DEPLOY}" in
+    system)      RUN_SYSTEM=1 ;;
+    user)        RUN_USER=1 ;;
+    system+user) RUN_SYSTEM=1; RUN_USER=1 ;;
+    *) echo "invalid deploy '${DEPLOY}'" >&2; exit 2 ;;
+esac
 
-# 1. Mirror-aware Homebrew setup
+# System ops are ALWAYS elevated when not root (native/plain-user safe:
+# sudo prompts for the password instead of failing on permission errors).
+SUDO=""
+[[ "$(id -u)" -ne 0 ]] && SUDO="sudo"
+
+# ───────────────────────────────────────────────────────────────
+# SYSTEM SCOPE — elevated (system packages, root git config, users)
+# ───────────────────────────────────────────────────────────────
+system_scope() {
+    echo "=== system-scope pass (elevated) ==="
+    if command -v apk &>/dev/null; then
+        __l2_pkgs=({{- if ne .tier "simple" }}{{- range .packages.system.apk.l2 }} {{ . }}{{- end }}{{- end }})
+        __l3_pkgs=({{- if eq .bootstrap "full" }}{{- range .packages.system.apk.l3 }} {{ . }}{{- end }}{{- end }})
+        __facet_pkgs=()
+{{- if has "dev" .facets }}
+        __facet_pkgs+=({{- range .packages.facets.dev.apk }} {{ . }}{{- end }})
+{{- end }}
+{{- if has "proxy" .facets }}
+        __facet_pkgs+=({{- range .packages.facets.proxy.apk }} {{ . }}{{- end }})
+{{- end }}
+{{- if has "ai" .facets }}
+        __facet_pkgs+=({{- range .packages.facets.ai.apk }} {{ . }}{{- end }})
+{{- end }}
+{{- if has "research" .facets }}
+        __facet_pkgs+=({{- range .packages.facets.research.apk }} {{ . }}{{- end }})
+{{- end }}
+{{- if has "hpc" .facets }}
+        __facet_pkgs+=({{- range .packages.facets.hpc.apk }} {{ . }}{{- end }})
+{{- end }}
+        if (( ${#__l2_pkgs[@]} > 0 )); then
+            $SUDO apk add --no-cache "${__l2_pkgs[@]}" 2>/dev/null \
+                || echo "Warning: L2 apk package installation failed"
+        fi
+        for __pkg in "${__l3_pkgs[@]}" "${__facet_pkgs[@]}"; do
+            [[ -n "$__pkg" ]] || continue
+            $SUDO apk add --no-cache "$__pkg" 2>/dev/null \
+                || echo "Warning: optional apk package failed: $__pkg"
+        done
+    elif command -v apt-get &>/dev/null; then
+        __l2_pkgs=({{- if ne .tier "simple" }}{{- range .packages.system.apt.l2 }} {{ . }}{{- end }}{{- end }})
+        __l3_pkgs=({{- if eq .bootstrap "full" }}{{- range .packages.system.apt.l3 }} {{ . }}{{- end }}{{- end }})
+        __facet_pkgs=()
+{{- if has "dev" .facets }}
+        __facet_pkgs+=({{- range .packages.facets.dev.apt }} {{ . }}{{- end }})
+{{- end }}
+{{- if has "proxy" .facets }}
+        __facet_pkgs+=({{- range .packages.facets.proxy.apt }} {{ . }}{{- end }})
+{{- end }}
+{{- if has "ai" .facets }}
+        __facet_pkgs+=({{- range .packages.facets.ai.apt }} {{ . }}{{- end }})
+{{- end }}
+{{- if has "research" .facets }}
+        __facet_pkgs+=({{- range .packages.facets.research.apt }} {{ . }}{{- end }})
+{{- end }}
+{{- if has "hpc" .facets }}
+        __facet_pkgs+=({{- range .packages.facets.hpc.apt }} {{ . }}{{- end }})
+{{- end }}
+        if (( ${#__l2_pkgs[@]} + ${#__l3_pkgs[@]} + ${#__facet_pkgs[@]} > 0 )); then
+            $SUDO apt-get update -qq
+        fi
+        if (( ${#__l2_pkgs[@]} > 0 )); then
+            echo "  installing L2 system packages: ${__l2_pkgs[*]}"
+            $SUDO env DEBIAN_FRONTEND=noninteractive apt-get install -y "${__l2_pkgs[@]}" 2>/dev/null \
+                || echo "Warning: L2 apt package installation failed"
+        fi
+        for __pkg in "${__l3_pkgs[@]}" "${__facet_pkgs[@]}"; do
+            [[ -n "$__pkg" ]] || continue
+            $SUDO env DEBIAN_FRONTEND=noninteractive apt-get install -y "$__pkg" 2>/dev/null \
+                || echo "Warning: optional apt package failed: $__pkg"
+        done
+    fi
+
+    if ! $SUDO git config --global user.name &>/dev/null; then
+        $SUDO git config --global user.name "{{ .name }}"
+        $SUDO git config --global user.email "{{ .email }}"
+        $SUDO git config --global init.defaultBranch main
+        $SUDO git config --global pull.rebase true
+        echo "Git configured (system scope)"
+    fi
+
+    # Auto-create dev/cal users (personal Linux) — system op
+{{ if and (eq .chezmoi.os "linux") (eq .ownership "personal") -}}
+    # dev user's home is the shared multi-user workspace root (machine.toml)
+{{ $shared := "" -}}
+{{- if and (hasKey . "machine") (hasKey .machine .chezmoi.hostname) -}}
+{{-   $shared = index (index .machine .chezmoi.hostname) "shared_workspace" | default "" -}}
+{{- end -}}
+    # shellcheck disable=SC2043  # template may render one or two fixed users
+    for u in dev{{ if has "hpc" .facets }} cal{{ end }}; do
+        if ! id -u "$u" &>/dev/null; then
+            echo "Creating user: $u"
+            home_dir="/home/$u"{{ if $shared }}
+            [ "$u" = "dev" ] && home_dir="{{ $shared }}"{{ end }}
+            $SUDO useradd -m -d "$home_dir" -s /home/linuxbrew/.linuxbrew/bin/bash "$u" 2>/dev/null || echo "Warning: failed to create $u"
+            $SUDO usermod -aG dev "$u" 2>/dev/null || true
+        fi
+        $SUDO chsh -s /home/linuxbrew/.linuxbrew/bin/bash "$u" 2>/dev/null || true
+    done
+{{- if $shared }}
+    # Shared caches/workspaces require both the default user and dev to retain
+    # group write access as tools create nested directories. Default ACLs make
+    # this durable instead of relying on each tool's umask.
+    if id -u dev &>/dev/null; then
+        if ! getent group dev >/dev/null 2>&1; then
+            $SUDO groupadd dev
+        fi
+        $SUDO usermod -aG dev dev 2>/dev/null || true
+        __default_user="$(id -nu "{{ .default_uid }}" 2>/dev/null || true)"
+        if [[ -n "$__default_user" && "$__default_user" != "dev" ]]; then
+            $SUDO usermod -aG dev "$__default_user" 2>/dev/null || true
+        fi
+        for __shared_dir in \
+            "{{ $shared }}" \
+            "{{ $shared }}/mamba" \
+            "{{ $shared }}/mamba/pkgs" \
+            "{{ $shared }}/mamba/envs" \
+            "{{ $shared }}/.cache" \
+            "{{ $shared }}/.cache/uv" \
+            "{{ $shared }}/.cache/rattler" \
+            "{{ $shared }}/.cache/npm" \
+            "{{ $shared }}/.cache/kopia"; do
+            $SUDO install -d -o dev -g dev -m 2770 "$__shared_dir"
+            if command -v setfacl >/dev/null 2>&1; then
+                $SUDO setfacl -m g:dev:rwx,m:rwx "$__shared_dir"
+                $SUDO setfacl -d -m u::rwx,g::rwx,o::---,m::rwx "$__shared_dir"
+            fi
+        done
+    fi
+{{- end }}
+{{ end -}}
+}
+
+# ───────────────────────────────────────────────────────────────
+# USER SCOPE — default user (brew / mamba / static binaries / git)
+# ───────────────────────────────────────────────────────────────
+user_scope() {
+    # 1. Git config (unless already set)
+    if ! git config --global user.name &>/dev/null; then
+        git config --global user.name "{{ .name }}"
+        git config --global user.email "{{ .email }}"
+        git config --global init.defaultBranch main
+        git config --global pull.rebase true
+        echo "Git configured"
+    fi
+
+    # 2. Mirror-aware Homebrew setup
 {{- if .use_china_mirrors }}
-export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.ustc.edu.cn/brew.git"
-export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.ustc.edu.cn/homebrew-core.git"
-export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.ustc.edu.cn/homebrew-bottles"
-export HOMEBREW_API_DOMAIN="https://mirrors.ustc.edu.cn/homebrew-bottles/api"
+    export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.ustc.edu.cn/brew.git"
+    export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.ustc.edu.cn/homebrew-core.git"
+    export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.ustc.edu.cn/homebrew-bottles"
+    export HOMEBREW_API_DOMAIN="https://mirrors.ustc.edu.cn/homebrew-bottles/api"
 {{- end }}
-
-# ── Homebrew detection (skip install on work — usually no sudo) ─
-if ! command -v brew &> /dev/null; then
-    if [[ -x /home/linuxbrew/.linuxbrew/bin/brew ]]; then
-        eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-    elif [[ -x /opt/homebrew/bin/brew ]]; then
-        eval "$(/opt/homebrew/bin/brew shellenv)"
-    fi
-fi
-
-# ── npm global block (non-work profiles) ───────────────────────
-{{- if and (ne .tier "simple") (not (eq .profile "work")) }}
-mkdir -p "$HOME/.npm-global-blocked"
-chmod -R 0500 "$HOME/.npm-global-blocked"
-{{- end }}
-
-{{- if or (or (eq .profile "work") (eq .profile "vps")) (eq .profile "hpc") }}
-# Work/VPS profile: no Homebrew. Probe for core tools and install
-# missing ones as static binaries from GitHub releases into ~/.local/bin.
-{{- if eq .profile "vps" }}
-# ═══ VPS: distro-aware system packages + services ═════════════
-__vps_pkgs=""
-__vps_init=""
-
-if command -v apk &>/dev/null; then
-    # Alpine
-    __vps_pkgs="zsh tmux git curl openssh ripgrep fd fzf bat neovim"
-    echo "Installing core packages via apk..."
-    sudo apk add --no-cache $__vps_pkgs 2>/dev/null || true
-    # rc-service for Alpine OpenRC
-    __vps_init="openrc"
-elif command -v apt &>/dev/null; then
-    # Debian/Ubuntu
-    __vps_pkgs="zsh tmux git curl ripgrep fd-find fzf bat neovim"
-    echo "Installing core packages via apt..."
-    sudo apt update -qq && sudo apt install -y $__vps_pkgs 2>/dev/null || true
-    __vps_init="systemd"
-fi
-
-# ── Git config ────────────────────────────────────────────────
-if ! git config --global user.name &>/dev/null; then
-    git config --global user.name "{{ .name }}"
-    git config --global user.email "{{ .email }}"
-    git config --global init.defaultBranch main
-    git config --global pull.rebase true
-    echo "Git configured"
-fi
-
-# ── Tailscale ─────────────────────────────────────────────────
-if ! command -v tailscale &>/dev/null; then
-    echo "Installing Tailscale..."
-    if [[ "$__vps_init" == "openrc" ]]; then
-        # Alpine: install from edge community repo
-        sudo apk add --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community tailscale 2>/dev/null || true
-        # OpenRC: enable and start tailscale service
-        sudo rc-update add tailscale default 2>/dev/null
-        sudo rc-service tailscale start 2>/dev/null
-    else
-        curl -fsSL https://tailscale.com/install.sh | sh 2>/dev/null
-        sudo systemctl enable --now tailscaled 2>/dev/null
-    fi
-fi
-# Ensure tailscale is up with --accept-dns=false (use VPS resolver, not Tailscale DNS)
-if command -v tailscale &>/dev/null; then
-    if ! tailscale status &>/dev/null 2>&1; then
-        echo "Tailscale not authenticated. Run: sudo tailscale up --accept-dns=false"
-    else
-        # Already up — re-apply with --accept-dns=false if not set
-        __ts_dns=$(tailscale debug prefs 2>/dev/null | grep -c '"AcceptDNS":\[false\]' || echo 0)
-        if [[ "$__ts_dns" == "0" ]]; then
-            echo "Applying --accept-dns=false to Tailscale..."
-            sudo tailscale up --accept-dns=false --reset=false 2>/dev/null || true
+    if ! command -v brew &> /dev/null; then
+        if [[ -x /home/linuxbrew/.linuxbrew/bin/brew ]]; then
+            eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+        elif [[ -x /opt/homebrew/bin/brew ]]; then
+            eval "$(/opt/homebrew/bin/brew shellenv)"
         fi
     fi
-fi
+    brew_has() { command -v brew &>/dev/null; }
 
-# ── OpenRC service hardening (Alpine) ─────────────────────────
-if [[ "$__vps_init" == "openrc" ]]; then
-    # Ensure critical services are enabled at boot
-    for svc in sshd tailscale networking; do
-        sudo rc-update add $svc default 2>/dev/null
-    done
-    echo "OpenRC services enabled: sshd tailscale networking"
-fi
+    # 3. pnpm/bun/pixi PATH exposure handled in shell configs (.zshenv/fish)
 
-# ── Kopia backup ──────────────────────────────────────────────
-if ! command -v kopia &>/dev/null; then
-    echo "Installing Kopia..."
-    if [[ "$__vps_init" == "openrc" ]]; then
-        # Alpine: download static binary
-        __kopia_ver=$(curl -fsSL https://api.github.com/repos/kopia/kopia/releases/latest | grep -oP '"tag_name": "v\K[^"]+')
-        curl -fsSL "https://github.com/kopia/kopia/releases/download/v${__kopia_ver}/kopia-${__kopia_ver}-linux-x86_64.tar.gz" \
-            | sudo tar xz -C /usr/local/bin --strip-components=1 kopia-${__kopia_ver}-linux-x86_64/kopia 2>/dev/null
+    if brew_has; then
+        # ───────────────────────────────────────────────────────────
+        # L2 BASIC — all non-simple tiers. Shell/dir tooling only;
+        # language stack (uv/mamba/node) is L3 (bootstrap=full);
+        # pixi is research-facet; pnpm/bun are dev-facet. python → linux system pkg (no user install).
+        # ───────────────────────────────────────────────────────────
+        echo "L2 basic tools..."
+        brew_install() { brew install "$@" 2>/dev/null || echo "Warning: some packages failed: $*"; }
+        brew_install {{ range .packages.brew.l2 }}{{ . }} {{ end }}
+        {{- if eq .os_platform "linux" }}
+        brew_install byobu
+        {{- end }}
+        {{- if eq .chezmoi.os "darwin" }}
+        brew_install pngpaste terminal-notifier
+        {{- end }}
+
+        # ──── L3 STANDARD (bootstrap=full) ────────────────────────
+        {{- if eq .bootstrap "full" }}
+        echo "L3 standard tools (bootstrap=full)..."
+        brew_install {{ range .packages.brew.l3 }}{{ . }} {{ end }}
+
+        # npm global installs disabled (non-work); npm cache → ~/.cache/npm (see .npmrc)
+        {{- if ne .ownership "work" }}
+        mkdir -p "$HOME/.npm-global-blocked"
+        chmod -R 0500 "$HOME/.npm-global-blocked"
+        {{- end }}
+
+        # AI CLI agents (cask on macOS, formula on Linux)
+        brew install --cask codex claude-code 2>/dev/null || { brew_install codex claude-code 2>/dev/null || echo "Warning: AI CLI agents failed"; }
+
+        {{- if eq .chezmoi.os "darwin" }}
+        brew_install afsctool duti
+        brew install dr-emann/tap/applesauce 2>/dev/null || echo "Warning: applesauce failed"
+        brew install --cask aldente fuse-t android-file-transfer cyberduck hammerspoon vesta pearcleaner motrix meld rectangle 2>/dev/null || echo "Warning: some mac casks failed"
+        brew install --cask ghostty iterm2 2>/dev/null || echo "Warning: some casks failed: ghostty iterm2"
+        brew install --cask font-maple-mono-nf-cn font-meslo-lg-nerd-font font-symbols-only-nerd-font 2>/dev/null || echo "Warning: some font casks failed"
+        brew_install kubecolor
+        brew_install sing-box
+        brew install --cask basictex 2>/dev/null || echo "Warning: basictex cask failed"
+        {{- else if or (eq .os_platform "linux") (eq .os_platform "wsl") }}
+        {{-   if not .is_headless }}
+        brew_install ghostty
+        {{-   end }}
+        {{- if and (eq .chezmoi.os "linux") (eq .ownership "personal") }}
+        brew_install poppler
+        __tl_deps=$(brew deps --direct texlive | tr '\n' ' ' | sed 's/mesa//g')
+        if [ -n "$__tl_deps" ]; then brew install $__tl_deps 2>/dev/null || echo "Warning: some texlive deps failed"; fi
+        brew install --ignore-dependencies texlive 2>/dev/null || echo "Warning: texlive install failed"
+        {{- end }}
+        {{- end }}
+
+        # Cross-platform personal apps (mac+windows, personal ownership)
+        {{- if and (or (eq .chezmoi.os "darwin") (eq .chezmoi.os "windows")) (eq .ownership "personal") }}
+        brew install --cask android-platform-tools 2>/dev/null || brew_install android-platform-tools 2>/dev/null || echo "Warning: adb failed"
+        brew install --cask siyuan obsidian localsend keepassxc zoom windows-app 2>/dev/null || echo "Warning: some personal casks failed"
+        {{- end }}
+
+        # Per-user downloaders, mac personal desktop only
+        {{- if and (eq .chezmoi.os "darwin") (eq .ownership "personal") (not .is_headless) }}
+        brew_install et
+        brew_install yt-dlp
+        {{- end }}
+        {{- end }}
+
+        # ──── facet overlays (any tier) ─────────────────────────────
+        {{- if has "dev" .facets }}
+        echo "dev facet (L4 overlay)..."
+        brew_install {{ range .packages.facets.dev.brew }}{{ . }} {{ end }}
+        {{- if eq .chezmoi.os "darwin" }}
+        brew tap openai/tools 2>/dev/null || true
+        brew install openai/tools/tart 2>/dev/null || echo "Warning: tart install failed"
+        brew_install lima
+        brew install --cask ghidra 2>/dev/null || echo "Warning: ghidra cask failed"
+        {{- end }}
+        {{- if or (eq .os_platform "linux") (eq .os_platform "wsl") }}
+        if ! command -v go &>/dev/null; then
+            __go_arch="$([ "$(uname -m)" = "aarch64" ] && echo arm64 || echo amd64)"
+            curl -fsSL "https://go.dev/dl/go1.24.5.linux-${__go_arch}.tar.gz" | tar xz -C "$HOME" 2>/dev/null || echo "Warning: go install failed"
+        fi
+        {{- end }}
+        if ! command -v cargo &>/dev/null; then curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y 2>/dev/null || echo "Warning: rustup install failed"; fi
+        {{- end }}
+        {{- if has "proxy" .facets }}
+        echo "proxy facet..."
+        brew_install {{ range .packages.facets.proxy.brew }}{{ . }} {{ end }}
+        {{- end }}
+        echo "Brew path complete"
     else
-        curl -fsSL https://kopia.io/signing-key | sudo gpg --dearmor -o /usr/share/keyrings/kopia-keyring.gpg 2>/dev/null
-        echo "deb [signed-by=/usr/share/keyrings/kopia-keyring.gpg] http://packages.kopia.io/apt/ stable main" | sudo tee /etc/apt/sources.list.d/kopia.list >/dev/null
-        sudo apt update -qq && sudo apt install -y kopia 2>/dev/null
-    fi
-fi
-
-# ── SSH hardening ─────────────────────────────────────────────
-__sshd_config="/etc/ssh/sshd_config"
-if [[ -f "$__sshd_config" ]]; then
-    echo "Hardening sshd..."
-    sudo sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin prohibit-password/' "$__sshd_config"
-    sudo sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' "$__sshd_config"
-    sudo sed -i 's/^#\?PubkeyAuthentication.*/PubkeyAuthentication yes/' "$__sshd_config"
-    sudo sed -i 's/^#\?MaxAuthTries.*/MaxAuthTries 3/' "$__sshd_config"
-    if [[ "$__vps_init" == "openrc" ]]; then
-        sudo rc-service sshd reload 2>/dev/null || true
-    else
-        sudo systemctl reload sshd 2>/dev/null || sudo systemctl reload ssh 2>/dev/null || true
-    fi
-    echo "sshd hardened: root=prohibit-password, password=no, pubkey=yes"
-fi
-{{- end }}
-
-echo "{{ .profile | title }} profile: probing for core tools..."
-mkdir -p "$HOME/.local/bin"
-
-# Helper: detect arch and OS for GitHub release downloads
-__get_arch() {
-    case "$(uname -m)" in
-        x86_64)  echo "x86_64" ;;
-        aarch64|arm64) echo "arm64" ;;
-        *) echo "$(uname -m)" ;;
-    esac
-}
-ARCH=$(__get_arch)
-OS=$(uname -s | tr '[:upper:]' '[:lower:]')
-
-# Probe and install missing core tools from GitHub
-# starship (starship/starship)
-if ! command -v starship &>/dev/null; then
-    echo "Installing starship from GitHub..."
-    curl -fsSL "https://github.com/starship/starship/releases/latest/download/starship-${ARCH}-${OS}.gz"         | gunzip > "$HOME/.local/bin/starship" && chmod +x "$HOME/.local/bin/starship"
-fi
-
-# zoxide (ajitid/zoxide)
-if ! command -v zoxide &>/dev/null; then
-    echo "Installing zoxide from GitHub..."
-    curl -fsSL "https://github.com/ajitid/zoxide/releases/latest/download/zoxide-${ARCH}-${OS/-/_}.tar.gz"         | tar xz -C "$HOME/.local/bin" zoxide 2>/dev/null || echo "Warning: zoxide install failed, skipping"
-fi
-
-# eza (eza-community/eza)
-if ! command -v eza &>/dev/null; then
-    echo "Installing eza from GitHub..."
-    __eza_arch="x86_64"
-    [[ "$ARCH" == "arm64" ]] && __eza_arch="aarch64"
-    curl -fsSL "https://github.com/eza-community/eza/releases/latest/download/eza_${__eza_arch}-${OS}-gnu.tar.gz"         | tar xz -C "$HOME/.local/bin" eza 2>/dev/null || echo "Warning: eza install failed, skipping"
-fi
-
-# bat (sharkdp/bat)
-if ! command -v bat &>/dev/null; then
-    echo "Installing bat from GitHub..."
-    __bat_arch="$ARCH"
-    [[ "$ARCH" == "x86_64" ]] && __bat_arch="x86_64"
-    curl -fsSL "https://github.com/sharkdp/bat/releases/latest/download/bat-v$(curl -fsSL https://api.github.com/repos/sharkdp/bat/releases/latest | grep -oP '"tag_name": "v\K[^"]+')-${__bat_arch}-${OS}.tar.gz"         | tar xz --strip-components=1 -C "$HOME/.local/bin" "*/bat" 2>/dev/null || echo "Warning: bat install failed, skipping"
-fi
-
-# ripgrep (BurntSushi/ripgrep)
-if ! command -v rg &>/dev/null; then
-    echo "Installing ripgrep from GitHub..."
-    curl -fsSL "https://github.com/BurntSushi/ripgrep/releases/latest/download/ripgrep-$(curl -fsSL https://api.github.com/repos/BurntSushi/ripgrep/releases/latest | grep -oP '"tag_name": "\K[^"]+')-${ARCH}-${OS}.tar.gz"         | tar xz --strip-components=1 -C "$HOME/.local/bin" "*/rg" 2>/dev/null || echo "Warning: ripgrep install failed, skipping"
-fi
-
-# fd (sharkdp/fd)
-if ! command -v fd &>/dev/null; then
-    echo "Installing fd from GitHub..."
-    curl -fsSL "https://github.com/sharkdp/fd/releases/latest/download/fd-v$(curl -fsSL https://api.github.com/repos/sharkdp/fd/releases/latest | grep -oP '"tag_name": "v\K[^"]+')-${ARCH}-${OS}.tar.gz"         | tar xz --strip-components=1 -C "$HOME/.local/bin" "*/fd" 2>/dev/null || echo "Warning: fd install failed, skipping"
-fi
-
-# fzf (junegunn/fzf)
-if ! command -v fzf &>/dev/null; then
-    echo "Installing fzf from GitHub..."
-    curl -fsSL "https://github.com/junegunn/fzf/releases/latest/download/fzf-${ARCH}-${OS}.tar.gz"         | tar xz -C "$HOME/.local/bin" fzf 2>/dev/null || echo "Warning: fzf install failed, skipping"
-fi
-
-# fastfetch (fastfetch-cli/fastfetch)
-if ! command -v fastfetch &>/dev/null; then
-    echo "Installing fastfetch from GitHub..."
-    __ff_arch="x86_64"
-    [[ "$ARCH" == "arm64" ]] && __ff_arch="aarch64"
-    curl -fsSL "https://github.com/fastfetch-cli/fastfetch/releases/latest/download/fastfetch-${__ff_arch}-linux.tar.gz"         | tar xz --strip-components=2 -C "$HOME/.local/bin" "fastfetch/usr/bin/fastfetch" 2>/dev/null || echo "Warning: fastfetch install failed, skipping"
-fi
-
-echo "{{ .profile | title }} profile: core tool probe complete"
-{{- else }}
-# Install Homebrew if missing
-if ! command -v brew &> /dev/null; then
-    echo "Homebrew not found. Installing..."
-    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-fi
-
-# ═══════════════════════════════════════════════════════════════
-# THREE-LEVEL TOOL INSTALLATION
-# Level 1 (basic): all non-simple tiers — CLI + shell + basic lang
-# Level 2 (extra): setup_mode=full — dev tools, media, GUI
-# Level 3 (develop): tier=develop — advanced toolchains, version managers
-# ═══════════════════════════════════════════════════════════════
-
-# ── Level 1: Basic (all brew-capable tiers) ───────────────────
-echo "Installing Level 1: basic tools..."
-
-# CLI utilities
-brew_install() { brew install "$@" 2>/dev/null || echo "Warning: some packages failed: $*"; }
-
-brew_install zsh zsh-autosuggestions zsh-syntax-highlighting zsh-history-substring-search
-brew_install autossh   # persistent SSH tunnels (cal/nscc-hf via incus)
-brew_install fish nushell fisher
-
-# PTY: tmux on all unix (not windows). byobu is linux/wsl only (not mac).
-# zellij moves to Level 2 (extra) — linux/wsl only.
-brew_install tmux
-{{- if or (eq .platform "linux") (eq .platform "wsl") }}
-brew_install byobu
-{{- end }}
-
-brew_install starship zoxide eza bat carapace
-brew_install ripgrep fd fzf jq yq jo
-brew_install coreutils direnv htop tree wget
-brew_install age gnupg base64 fastfetch   # gnupg = gpg dep (age/gpg decrypt)
-brew_install vim
-
-# Shell lint/format
-brew_install shellcheck shfmt stylua
-
-# Python runtime
-brew_install uv micromamba pixi
-
-# Node.js runtime
-brew_install node pnpm bun
-
-# Compression + text processing (perl is great for text munging)
-brew_install p7zip sevenzip perl
-
-# System essentials (brew installs git as dep; chezmoi manages dotfiles)
-brew_install chezmoi
-brew_install parallel
-
-# macOS-only basic utilities
-{{- if eq .chezmoi.os "darwin" }}
-brew_install pngpaste terminal-notifier
-{{- end }}
-
-# ── Level 2: Extra (setup_mode=full) ──────────────────────
-{{- if eq .setup_mode "full" }}
-echo "Installing Level 2: extra tools..."
-
-# Python dev tools
-brew_install ruff
-
-# Lua (neovim/lazyvim dependency)
-brew_install luarocks
-
-# Node/python dev tools (LSP, formatters, linters).
-# pre-commit belongs HERE (python dev tool) — NOT in develop.
-brew_install biome pyright typescript-language-server pre-commit
-
-# Editor (neovim) + downloader (aria2) — extra, all platforms/identities
-brew_install neovim aria2
-
-# Image/video
-brew_install ffmpeg imagemagick
-
-# Git/GUI tools
-brew_install lazygit lazydocker yazi
-brew_install gh glab git-delta git-filter-repo gitleaks
-
-# Docs/pdf
-brew_install pandoc
-
-# AI agent tools
-brew_install cc-switch-cli beads cliproxyapi opencode
-
-# AI CLI agents (cask on macOS, formula on Linux)
-brew install --cask codex claude-code 2>/dev/null || { brew_install codex claude-code 2>/dev/null || echo "Warning: AI CLI agents failed"; }
-
-# Network analysis
-brew_install wireshark tcpdump
-
-# Code analysis
-brew_install ast-grep
-
-# Build tools
-brew_install bazel
-
-# Containers
-brew_install docker docker-compose docker-credential-helper
-
-# Backup
-brew_install kopia
-
-# Network services
-brew_install cloudflared wgcf syncthing rclone ngrok
-
-# Cloud storage (mac/win only)
-{{- if or (eq .chezmoi.os "darwin") (eq .chezmoi.os "windows") }}
-brew_install aliyunpan
-{{- end }}
-
-# macOS-only: system tools + GUI apps
-{{- if eq .chezmoi.os "darwin" }}
-brew_install afsctool duti
-brew install dr-emann/tap/applesauce 2>/dev/null || echo "Warning: applesauce failed"
-
-# macOS desktop apps (Level 2, mac-only casks)
-brew install --cask aldente fuse-t android-file-transfer cyberduck hammerspoon vesta pearcleaner motrix meld rectangle 2>/dev/null || echo "Warning: some mac casks failed"
-{{- end }}
-
-# Cross-platform personal apps (mac + windows, personal profile)
-{{- if and (or (eq .chezmoi.os "darwin") (eq .chezmoi.os "windows")) (eq .profile "personal") }}
-# adb (android-platform-tools is the cask name on mac, formula on others)
-brew install --cask android-platform-tools 2>/dev/null || brew_install android-platform-tools 2>/dev/null || echo "Warning: adb failed"
-brew install --cask siyuan obsidian localsend keepassxc zoom windows-app 2>/dev/null || echo "Warning: some personal casks failed"
-{{- end }}
-
-# ── Shell strengthen ──
-{{- if or (eq .platform "linux") (eq .platform "wsl") }}
-brew_install zellij                       # tmux alt — linux/wsl only (not darwin)
-{{- end }}
-brew_install et                           # Eternal Terminal — ssh enhancement, all unix
-
-# ── Terminal emulators ──
-{{- if eq .chezmoi.os "darwin" }}
-brew install --cask ghostty iterm2 2>/dev/null || echo "Warning: some casks failed: ghostty iterm2"
-
-# Fonts (Nerd Fonts for terminal icons)
-brew install --cask font-maple-mono-nf-cn font-meslo-lg-nerd-font font-symbols-only-nerd-font 2>/dev/null || echo "Warning: some font casks failed"
-brew_install kubecolor
-brew_install sing-box                    # TUN proxy core (mac personal standard/develop)
-{{- else if or (eq .platform "linux") (eq .platform "wsl") }}
-{{-   if not .is_headless }}
-brew_install ghostty                      # headful linux/wsl (best-effort; build manually if absent)
-{{-   end }}
-{{- end }}
-# WezTerm is windows-only (installed via the Windows bootstrap ps1).
-
-# ── Docs/pdf — per-platform TeX (mac: BasicTeX, linux: texlive) ──
-{{- if eq .chezmoi.os "darwin" }}
-brew install --cask basictex 2>/dev/null || echo "Warning: basictex cask failed"
-{{- else if and (eq .chezmoi.os "linux") (eq .profile "personal") }}
-brew_install poppler
-# texlive declares `mesa` as a direct dep, which drags in llvm/vulkan/wayland/spirv (~4G).
-# texlive never links mesa at runtime, so install its real deps (excluding mesa), then
-# texlive itself with --ignore-dependencies to skip the bogus mesa requirement.
-__tl_deps=$(brew deps --direct texlive | tr ' ' '\n' | grep -v '^mesa$' | tr '\n' ' ')
-if [ -n "$__tl_deps" ]; then
-    brew install $__tl_deps 2>/dev/null || echo "Warning: some texlive deps failed"
-fi
-brew install --ignore-dependencies texlive 2>/dev/null || echo "Warning: texlive install failed"
-{{- end }}
-
-# ── Downloaders: mac personal desktop only (windows via ps1; linux → python pkg) ──
-{{- if and (eq .chezmoi.os "darwin") (eq .profile "personal") (not .is_headless) }}
-brew_install yt-dlp
-# bilidown — brew can't pull it; direct install from iuroc/bilidown (GoReleaser tar.gz).
-if ! command -v bilidown &>/dev/null; then
-    __bd_arch="x86_64"; [[ "$(uname -m)" == "arm64" ]] && __bd_arch="arm64"
-    __bd_tag=$(curl -fsSL https://api.github.com/repos/iuroc/bilidown/releases/latest | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1)
-    if [ -n "$__bd_tag" ]; then
+        # ── no Homebrew: cloud/HPC — official per-user installers and
+        # distro-command aliases. System scope owns rg/fzf/bat packages; do not
+        # guess GitHub asset names here (those URLs change between releases).
+        echo "probing core tools into ~/.local/bin (no brew)"
         mkdir -p "$HOME/.local/bin"
-        __bd_tmp=$(mktemp -d)
-        curl -fsSL "https://github.com/iuroc/bilidown/releases/download/${__bd_tag}/bilidown_Darwin_${__bd_arch}.tar.gz" | tar xzf - -C "$__bd_tmp" 2>/dev/null
-        __bd_bin=$(find "$__bd_tmp" -type f -name bilidown | head -1)
-        if [ -n "$__bd_bin" ]; then cp "$__bd_bin" "$HOME/.local/bin/bilidown" && chmod +x "$HOME/.local/bin/bilidown"; else echo "Warning: bilidown binary not found in archive"; fi
-        rm -rf "$__bd_tmp"
+        if ! command -v starship &>/dev/null; then
+            curl -fsSL https://starship.rs/install.sh \
+                | sh -s -- -y -b "$HOME/.local/bin" \
+                || echo "Warning: starship install failed"
+        fi
+        if ! command -v zoxide &>/dev/null; then
+            curl -fsSL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh \
+                | sh -s -- --bin-dir "$HOME/.local/bin" --man-dir "$HOME/.local/share/man" \
+                || echo "Warning: zoxide install failed"
+        fi
+        if ! command -v fd &>/dev/null && command -v fdfind &>/dev/null; then
+            ln -sf "$(command -v fdfind)" "$HOME/.local/bin/fd"
+        fi
+        if ! command -v bat &>/dev/null && command -v batcat &>/dev/null; then
+            ln -sf "$(command -v batcat)" "$HOME/.local/bin/bat"
+        fi
+    fi
+}
+
+# ───────────────────────────────────────────────────────────────
+# MAIN — deploy matrix by identity
+# ───────────────────────────────────────────────────────────────
+if [[ "$(id -u)" -eq 0 ]]; then
+    # (a) root/system user: ONLY the system scope (deploy=system or system+user)
+    if [[ "$RUN_SYSTEM" -eq 1 ]]; then
+        if [[ "${SKIP_SYSTEM:-0}" == "1" ]]; then
+            echo "=== [skip-system] system scope skipped (root) ==="
+        else
+            system_scope
+        fi
+        echo "=== system scope done — user scope runs as default uid (bootstrap-l1.sh drop) ==="
     else
-        echo "Warning: bilidown tag lookup failed"
+        echo "=== deploy=${DEPLOY} as root: no system scope — user scope is for the default uid ==="
+    fi
+    exit 0
+fi
+
+if [[ "$RUN_USER" -eq 1 ]]; then
+    user_scope
+fi
+
+if [[ "$RUN_SYSTEM" -eq 1 ]]; then
+    if [[ "${SKIP_SYSTEM:-0}" == "1" ]]; then
+        echo "=== [skip-system] system scope skipped ==="
+    else
+        system_scope
     fi
 fi
-{{- end }}
-
-{{- end }}
-
-# ── Level 3: Develop (tier=develop) ───────────────────────────
-{{- if eq .tier "develop" }}
-echo "Installing Level 3: develop tools..."
-
-# Advanced tools (pre-commit moved up to Level 2 — it's a python dev tool)
-brew_install trivy lefthook just
-
-# SDK / platform tools (cross-platform)
-brew_install supabase azure-cli
-
-# Reverse engineering / binary analysis (optional, cross-platform)
-brew_install radare2 binwalk lief
-brew install --cask ghidra 2>/dev/null || echo "Warning: ghidra cask (optional) failed"
-
-# macOS develop: VM tools (tart = formula in openai/tools tap, NOT a cask)
-{{- if eq .chezmoi.os "darwin" }}
-brew tap openai/tools 2>/dev/null || true
-brew install openai/tools/tart 2>/dev/null || echo "Warning: tart (openai/tools) install failed"
-brew_install lima
-{{- end }}
-
-# Per-user language toolchains (NOT via brew)
-if ! command -v go &>/dev/null; then
-    echo "Installing go (per-user)..."
-    GO_VERSION="1.24.5"
-    curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" | tar xz -C "$HOME" 2>/dev/null || echo "Warning: go install failed"
-fi
-if ! command -v cargo &>/dev/null; then
-    echo "Installing rustup (per-user)..."
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y 2>/dev/null || echo "Warning: rustup install failed"
-fi
-
-{{- end }}
-
-# ── Auto-create dev and cal users (personal Linux) ────────────
-{{- if and (eq .chezmoi.os "linux") (eq .profile "personal") }}
-for u in dev cal; do
-    if ! id -u "$u" &>/dev/null; then
-        echo "Creating user: $u"
-        home_dir="/$u"
-        [ "$u" = "dev" ] && home_dir="/develop"
-        sudo useradd -m -d "$home_dir" -s /home/linuxbrew/.linuxbrew/bin/zsh "$u" 2>/dev/null || echo "Warning: failed to create $u"
-        sudo usermod -aG dev "$u" 2>/dev/null || true
-    fi
-    sudo chsh -s /home/linuxbrew/.linuxbrew/bin/zsh "$u" 2>/dev/null || true
-done
-{{- end }}
-
-{{- end }}
 
 echo "=== Bootstrap Complete ==="
 {{- end -}}

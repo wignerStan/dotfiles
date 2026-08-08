@@ -1,8 +1,16 @@
-# .npmrc — managed by chezmoi (develop profile only)
+# .npmrc — managed by chezmoi (dev facet)
+{{- /* shared multi-user cache root, per-machine (machine.toml) */ -}}
+{{- $shared := "" -}}
+{{- if and (hasKey . "machine") (hasKey .machine .chezmoi.hostname) -}}
+{{-   $shared = index (index .machine .chezmoi.hostname) "shared_workspace" | default "" -}}
+{{- end -}}
 {{- if .use_china_mirrors }}
 registry=https://registry.npmmirror.com
 {{- end }}
-{{- if not (eq .profile "work") }}
+# npm cache lives outside the default ~/.npm: shared multi-user dir on the
+# Linux box, ~/.cache/npm everywhere else
+cache={{- if $shared }}{{ $shared }}/.cache/npm{{ else }}${HOME}/.cache/npm{{ end }}
+{{- if not (eq .ownership "work") }}
 # Redirect npm global installs to a read-only dir (blocks npm -g pollution)
 prefix=${HOME}/.npm-global-blocked
 {{- end }}

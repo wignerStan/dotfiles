@@ -59,14 +59,21 @@ All three are production-capable. The difference is what production values:
 
 ### Base environment: mamba (conda-forge)
 
-`/develop/mamba` (or `~/mamba` on macOS/Windows) is the shared base Python.
-Installed via `mamba-sync-base.sh` — conda-forge for the scientific stack
-(numpy, scipy, pandas, matplotlib, etc).
+`<shared_workspace>/mamba` (or `~/mamba` on macOS/Windows) is the shared
+base Python. `shared_workspace` comes from `machine.toml` (only the personal
+Linux box sets it, e.g. `/develop`); other machines default to `~/mamba`.
+Installed via `mamba-sync-base.sh` — the **scientific stack lives on the
+conda-forge channel** (numpy, scipy, gensim, …): conda is the base-env package
+manager for native/scientific pieces. Pure-python and well-wheeled packages
+(non-scientific pip list in `mamba_base.toml` core) install via pip/uv into the
+same base. Anything without a cp314 wheel (e.g. the former spaCy backend
+thinc/blis/cymem/…) is NOT installable on the current base python (3.14) and is
+kept out of the list.
 
-Currently pivoting to **pip-first**: all packages installed via pip/uv into
-mamba base, since PyPI wheels now provide complete coverage including
-numpy/scipy/rdkit. Conda-forge only needed when a package has no wheel or
-requires specific native library coordination.
+**L4 facet envs** (`[mamba_base.<facet>]`): each facet gets its OWN env, not a
+base merge — e.g. dev → `develop` env (python 3.12 + `ta-lib` + dev pip list),
+created by the mamba-sync dev branch. `mamba_sections` is always `["core"]`
+(base only).
 
 ### Project environments: pixi
 
@@ -160,11 +167,14 @@ For pure-Python projects with no conda dependencies, use `uv` directly:
 
 ## Cache sharing
 
+Cache sharing (only where `machine.toml` sets `shared_workspace`, e.g. `/develop`):
 ```
-/develop/.cache/uv         ← shared by uv + pixi (wheel cache)
-/develop/.cache/rattler    ← pixi conda package cache
-/develop/.cache/kopia      ← backup cache (if applicable)
+<shared_workspace>/.cache/uv         ← shared by uv + pixi (wheel cache)
+<shared_workspace>/.cache/rattler    ← pixi conda package cache
+<shared_workspace>/.cache/npm       ← npm cache redirect
+<shared_workspace>/.cache/kopia     ← backup cache (if applicable)
 ```
+Other machines use default user caches (`~/.cache/uv`, `~/.cache/npm`, …).
 
 Both jacob and dev users share these caches (2770, group dev).
 Reflinks (btrfs CoW) connect cache → project venvs on same filesystem.

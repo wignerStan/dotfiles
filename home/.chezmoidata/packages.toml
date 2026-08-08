@@ -1,0 +1,77 @@
+# Shared package manifest — layers across BOTH local & cloud hosts via the
+# deploy scope (system.* = apt/apk, elevated, run under system/system+user;
+# user tooling = brew/static, run from the user scope). NO local/cloud-isolated
+# lists — overlays only.
+#
+# Nested under [packages] so chezmoi's flat .chezmoidata merge exposes
+# .packages.brew.l2 / .packages.facets.* (matches templates).
+#
+# L1 = self-bootstrap (scripts/bootstrap-l1.sh — NOT chezmoi-rendered).
+# L2 = basic — all non-simple tiers (shell/dir tools; NO language stack).
+# L3 = standard — bootstrap=full: language base (uv/mamba/node) +
+#     dev-tooling/services; pnpm/bun live in the dev facet overlay (pixi = research facet)
+# facets.* = stackable capability overlays (dev/proxy/ai/hpc/research), any tier.
+# system.* = root/system-scoped (install only when running as root/system).
+
+[packages.brew]
+l2 = [
+  "zsh", "zsh-autosuggestions", "zsh-syntax-highlighting", "zsh-history-substring-search",
+  "autossh", "fish", "nushell", "fisher", "tmux",
+  "starship", "zoxide", "eza", "bat", "carapace",
+  "ripgrep", "fd", "fzf", "jq", "yq", "jo",
+  "coreutils", "direnv", "htop", "tree", "wget",
+  "age", "gnupg", "fastfetch",
+  "vim", "shellcheck", "shfmt", "stylua",
+  "p7zip", "sevenzip", "perl", "chezmoi", "parallel",
+]
+l3 = [
+  "uv", "micromamba", "node",
+  "ruff", "luarocks",
+  "biome", "pyright", "typescript-language-server", "pre-commit",
+  "neovim", "aria2",
+  "ffmpeg", "imagemagick",
+  "lazygit", "lazydocker", "yazi",
+  "gh", "glab", "git-delta", "git-filter-repo", "gitleaks",
+  "pandoc",
+  "cc-switch-cli", "beads", "cliproxyapi", "opencode",
+  "wireshark", "tcpdump", "ast-grep", "bazel",
+  "docker", "docker-compose", "docker-credential-helper",
+  "kopia", "cloudflared", "wgcf", "syncthing", "rclone", "ngrok",
+  "et",
+]
+
+# system.* = L2 basic system packages (root-scoped, both apt and apk hosts).
+# python3 = the system python (no user-level python install on linux).
+[packages.system.apt]
+l2 = ["git", "curl", "wget", "tmux", "ripgrep", "fd-find", "fzf", "bat", "neovim", "jq", "htop", "tree", "rsync", "bash-completion", "python3", "python3-pip", "acl"]
+l3 = ["nginx", "kopia", "postgresql", "redis-server", "nftables", "software-properties-common"]
+
+[packages.system.apk]
+l2 = ["bash", "git", "curl", "wget", "tmux", "ripgrep", "fd", "fzf", "bat", "neovim", "jq", "htop", "tree", "rsync", "python3", "py3-pip", "acl"]
+l3 = ["nginx", "kopia", "postgresql", "redis", "nftables"]
+
+# ── Facet overlays (any tier may carry them) ─────────────────────────────
+[packages.facets.dev]
+brew = ["trivy", "lefthook", "just", "supabase", "azure-cli", "radare2", "binwalk", "lief", "pnpm", "bun"]
+apt  = []
+apk  = []
+
+[packages.facets.proxy]
+brew = ["sing-box", "xray-core"]
+apt  = ["xray-core", "sing-box"]
+apk  = ["xray-core", "sing-box"]   # alpine coverage varies; best-effort only
+
+[packages.facets.ai]
+brew = []
+apt  = ["postgresql", "redis-server"]           # sub2api backend needs pg; redis optional
+apk  = ["postgresql", "redis"]
+
+[packages.facets.research]
+brew = ["pixi"]
+apt  = []
+apk  = []
+
+[packages.facets.hpc]
+brew = ["spack"]
+apt  = ["spack"]
+apk  = ["spack"]

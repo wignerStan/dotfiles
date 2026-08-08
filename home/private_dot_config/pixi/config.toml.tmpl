@@ -1,6 +1,14 @@
 # Pixi config — managed by chezmoi
+{{- /* shared multi-user cache root, per-machine (machine.toml) */ -}}
+{{- $shared := "" -}}
+{{- if and (hasKey . "machine") (hasKey .machine .chezmoi.hostname) -}}
+{{-   $shared = index (index .machine .chezmoi.hostname) "shared_workspace" | default "" -}}
+{{- end -}}
+{{- if $shared }}
+# pixi wheels reuse the shared uv cache (same btrfs → reflinks with project venvs)
 [cache]
-pypi-wheels = "/develop/.cache/uv"
+pypi-wheels = "{{ $shared }}/.cache/uv"
+{{- end }}
 
 {{- if .use_china_mirrors }}
 [repodata-config]

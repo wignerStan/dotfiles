@@ -1,7 +1,21 @@
-# Starship prompt
+# Starship prompt — init generated once into ~/.cache/fish (regenerates when
+# the starship binary is newer); `| source` at every startup costs ~0.4s
+# (binary + fish temp-file pipe overhead), cached source is ~2ms.
 {{- if lookPath "starship" }}
-if command -v starship >/dev/null
-    starship init fish | source
+if command -q starship
+    set -l _ss ~/.cache/fish/starship.init.fish
+    if not test -f "$_ss"; or test "$_ss" -ot (command -s starship)
+        mkdir -p ~/.cache/fish
+        starship init fish --print-full-init > "$_ss" 2>/dev/null
+    end
+    source "$_ss"
+end
+{{- end }}
+
+# Zoxide (smart cd) — init is cheap (~10ms), direct source like the zsh side
+{{- if lookPath "zoxide" }}
+if command -q zoxide
+    zoxide init fish | source
 end
 {{- end }}
 

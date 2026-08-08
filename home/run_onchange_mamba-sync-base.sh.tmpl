@@ -1,14 +1,19 @@
 {{- /* Reconcile mamba base env against .chezmoidata/mamba_base.toml.
      Renders environment.yaml, then mamba env update.
      use_uv: true in .condarc enables uv for pip installs where available. */ -}}
-{{- if and (lookPath "micromamba") (and (ne .tier "calculate") (ne .tier "simple")) -}}
+{{- if and (ne .chezmoi.os "windows") (lookPath "micromamba") (and (ne .tier "simple") (not (has "hpc" .facets))) -}}
+{{- /* shared multi-user cache root, per-machine (machine.toml) */ -}}
+{{- $shared := "" -}}
+{{- if and (hasKey . "machine") (hasKey .machine .chezmoi.hostname) -}}
+{{-   $shared = index (index .machine .chezmoi.hostname) "shared_workspace" | default "" -}}
+{{- end -}}
 #!/bin/sh
 set -eu
 export MAMBA_ROOT_PREFIX="{{ .mamba_root }}"
 export CONDA_PREFIX="{{ .mamba_root }}"
 export UV_SYSTEM_PYTHON=1
-export UV_LINK_MODE=clone
-export UV_CACHE_DIR="{{- if eq .chezmoi.os "linux" -}}/develop/.cache/uv{{- else -}}$HOME/.cache/uv{{- end -}}"
+export UV_LINK_MODE=clone{{- if $shared }}
+export UV_CACHE_DIR="{{ $shared }}/.cache/uv"{{- end }}
 log() { printf '[mamba-sync] %s\n' "$*"; }
 
 MM="$(command -v micromamba 2>/dev/null || command -v mamba 2>/dev/null || command -v conda 2>/dev/null || true)"
@@ -26,34 +31,31 @@ channels:
 {{- end }}
 dependencies:
   - uv
-{{- range .mamba_base.core.conda }}
+{{- range .mamba_sections }}
+{{-   $sec := . }}
+{{-   range (index $.mamba_base $sec).conda }}
   - {{ . }}
+{{-   end }}
 {{- end }}
-{{- $tier_data := dict "conda" (list) "pip" (list) -}}
-{{- if hasKey .mamba_base .tier -}}
-{{-   $tier_data = index .mamba_base .tier -}}
-{{- end -}}
-{{- range $tier_data.conda }}
-  - {{ . }}
+{{- $pip := list -}}
+{{- range .mamba_sections }}
+{{-   $pip = concat $pip (index $.mamba_base .).pip }}
 {{- end }}
-{{- if or .mamba_base.core.pip $tier_data.pip }}
+{{- if $pip }}
   - pip:
-{{- range .mamba_base.core.pip }}
-    - {{ . }}
-{{- end }}
-{{- range $tier_data.pip }}
+{{- range $pip }}
     - {{ . }}
 {{- end }}
 {{- end }}
 YAMLEOF
 
-log "running mamba env update (tier={{ .tier }})..."
+log "running mamba env update (tier={{ .tier }} sections={{ .mamba_sections | join "," }})..."
 "$MM" env update -n base -f "$ENV_YAML" --use-uv 2>&1 || log "mamba env update reported errors"
 
 log "base sync complete (tier={{ .tier }})"
 
-# ── Develop env (separate from base) ───────────────────────────
-{{- if eq .tier "develop" }}
+# ── Develop env (separate from base) — dev facet ───────────────
+{{- if has "dev" .facets }}
 DEV_YAML="$(mktemp /tmp/mamba-dev-env.XXXXXX.yaml)"
 trap 'rm -f "$ENV_YAML" "$DEV_YAML"' EXIT
 cat > "$DEV_YAML" << 'YAMLEOF'
@@ -66,13 +68,13 @@ dependencies:
   - uv
   - python=3.12
   - pip
-{{- if hasKey .mamba_base "develop" }}
-{{- range (index .mamba_base "develop").conda }}
+{{- if hasKey .mamba_base "dev" }}
+{{- range (index .mamba_base "dev").conda }}
   - {{ . }}
 {{- end }}
-{{- if (index .mamba_base "develop").pip }}
+{{- if (index .mamba_base "dev").pip }}
   - pip:
-{{- range (index .mamba_base "develop").pip }}
+{{- range (index .mamba_base "dev").pip }}
     - {{ . }}
 {{- end }}
 {{- end }}

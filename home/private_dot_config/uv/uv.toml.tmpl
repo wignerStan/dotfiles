@@ -1,7 +1,14 @@
 # uv config — managed by chezmoi
-# Shared cache on /develop (same btrfs filesystem as project venvs → reflinks)
-cache-dir = "/develop/.cache/uv"
+{{- /* shared multi-user cache root, per-machine (machine.toml) */ -}}
+{{- $shared := "" -}}
+{{- if and (hasKey . "machine") (hasKey .machine .chezmoi.hostname) -}}
+{{-   $shared = index (index .machine .chezmoi.hostname) "shared_workspace" | default "" -}}
+{{- end -}}
+{{- if $shared }}
+# Shared cache on {{ $shared }}/.cache (same btrfs filesystem as project venvs → reflinks)
+cache-dir = "{{ $shared }}/.cache/uv"
 link-mode = "clone"
+{{- end }}
 
 {{- if .use_china_mirrors }}
 [[index]]

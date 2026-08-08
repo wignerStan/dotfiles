@@ -14,28 +14,29 @@ channels:
 use_uv: true
 always_yes: true
 changeps1: false
-# auto_activate_base: false for develop (activates 'develop' env instead).
+# auto_activate_base: false for dev facet (activates 'develop' env instead).
 # true for personal/work (base is the Python provider).
-{{- if eq .tier "develop" }}
-auto_activate_base: false
-{{- else if or (eq .profile "work") (eq .profile "personal") }}
-auto_activate_base: true
-{{- else }}
-auto_activate_base: false
+{{- if has "dev" .facets }}auto_activate_base: false
+{{- else }}auto_activate_base: true
 {{- end }}
-{{- if eq .chezmoi.os "linux" }}
-# ── Package cache: shared on /develop, fallback to user cache ──
+{{- /* shared multi-user cache root, per-machine (machine.toml) */ -}}
+{{- $shared := "" -}}
+{{- if and (hasKey . "machine") (hasKey .machine .chezmoi.hostname) -}}
+{{-   $shared = index (index .machine .chezmoi.hostname) "shared_workspace" | default "" -}}
+{{- end -}}
+{{- if $shared }}
+# ── Package cache: shared on {{ $shared }}/mamba, fallback to user cache ──
 pkgs_dirs:
-  - /develop/mamba/pkgs
+  - {{ $shared }}/mamba/pkgs
 {{- if eq .chezmoi.username "jacob" }}
   - ~/.cache/conda/pkgs
 {{- else if eq .chezmoi.username "dev" }}
   - ~/.cache/conda/pkgs
 {{- end }}
-# ── Environments: shared base on /develop, user-specific fallback ──
+# ── Environments: shared base on {{ $shared }}/mamba, user-specific fallback ──
 envs_dirs:
-  - /develop/mamba/envs
-{{- if eq .tier "develop" }}
+  - {{ $shared }}/mamba/envs
+{{- if has "dev" .facets }}
   - ~/.conda/envs
 {{- end }}
 {{- end }}

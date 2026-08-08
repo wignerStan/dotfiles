@@ -3,16 +3,24 @@
 # Agent-friendly: ensures env is available in non-login/non-interactive shells
 # (e.g. agent bash tools, SSH commands, CI runners)
 # ═══════════════════════════════════════════════════════════════
+{{- /* shared multi-user cache root, per-machine (machine.toml); unset ⇒ default user caches */ -}}
+{{- $shared := "" -}}
+{{- if and (hasKey . "machine") (hasKey .machine .chezmoi.hostname) -}}
+{{-   $shared = index (index .machine .chezmoi.hostname) "shared_workspace" | default "" -}}
+{{- end -}}
 
 # Prevent PATH from accumulating duplicates
 typeset -U path PATH
 
 # ── Bash/POSIX sh compatibility ────────────────────────────────
-# Only align where zsh's defaults break bash scripts/agents.
-# Zsh improvements (safer defaults, better history, etc.) are kept.
+# Standard tiers (default/advanced) run zsh; keep zsh's safer defaults for
+# history/etc, but align the sharp edges where zsh breaks bash scripts/agents.
 setopt SH_WORD_SPLIT       # Unquoted $var splits on IFS (bash default; breaks scripts without it)
 setopt NO_NOMATCH          # Failed glob passes literally instead of erroring (bash default)
 setopt INTERACTIVE_COMMENTS # Allow # comments in interactive shells (bash default)
+setopt NO_BANG_HIST        # ! history expansion off (bash default)
+setopt KSH_ARRAYS          # 0-indexed arrays like bash/sh
+setopt NO_FLOW_CONTROL     # No ^S/^Q flow control (bash default)
 
 # ── XDG Base Directory ───────────────────────────────────────────
 export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
@@ -30,6 +38,14 @@ if [[ -d "/home/linuxbrew/.linuxbrew" ]]; then
     path=(/home/linuxbrew/.linuxbrew/bin /home/linuxbrew/.linuxbrew/sbin ${path[@]})
 fi
 {{- end }}
+
+# Brew zsh ships autoloadable helpers (is-at-least, add-zsh-hook) that the
+# brew plugins expect. The macOS login shell is /bin/zsh, whose fpath lacks
+# brew's functions dir — expose it so those autoloads resolve. No-op where
+# brew zsh is absent (guarded by dir existence).
+if [[ -d "${HOMEBREW_PREFIX}/share/zsh/functions" ]]; then
+    fpath=("${HOMEBREW_PREFIX}/share/zsh/functions" ${fpath[@]})
+fi
 
 {{- if eq .chezmoi.os "darwin" }}
 # ── tart (macOS VM runner) ────────────────────────────────────
@@ -75,29 +91,34 @@ export API_TIMEOUT_MS="600000"
 # ── HuggingFace & Models ──────────────────────────────────────
 export NANOBANANA_MODEL=gemini-3-pro-image-preview
 
-# ── Cargo (develop profile only) ──────────────────────────────
-{{- if eq .tier "develop" }}
+# ── Cargo (dev facet only) ──────────────────────────────────────
+{{- if has "dev" .facets }}
 [[ -d "$HOME/.cargo" && -f "$HOME/.cargo/env" ]] && . "$HOME/.cargo/env"
 {{- end }}
 
-{{- if and (or (eq .profile "work") (eq .profile "personal")) (and (ne .tier "calculate") (ne .tier "simple")) }}
-# ── Mamba (global Python base environment) ─────────────────
+{{- if eq .bootstrap "full" }}
+# ── Mamba (global Python base environment; L3 standard) ───────
 export MAMBA_EXE="${HOMEBREW_PREFIX:-/home/linuxbrew/.linuxbrew}/opt/micromamba/bin/mamba"
-export MAMBA_ROOT_PREFIX="{{- if eq .chezmoi.os "linux" -}}/develop/mamba{{- else -}}$HOME/mamba{{- end -}}"
+export MAMBA_ROOT_PREFIX="{{- if $shared -}}{{ $shared }}/mamba{{- else -}}$HOME/mamba{{- end -}}"
 path=("$MAMBA_ROOT_PREFIX/bin" ${path[@]})
 {{- end }}
 
-# ── Pixi (project Python environments) ──────────────────────
-{{- if eq .tier "develop" }}
+# ── Pixi (project Python environments; research facet) ────────────────
+{{- if has "research" .facets }}
 export PIXI_HOME="${HOME}/.pixi"
 path+=("${PIXI_HOME}/bin")
+{{- /* pixi wheels reuse the shared uv cache (multi-user); unset ⇒ pixi defaults */}}
+{{- if $shared }}
+export PIXI_CACHE_PYPI_WHEELS_DIR="{{ $shared }}/.cache/uv"
+export PIXI_CACHE_DIR="{{ $shared }}/.cache/rattler"
+{{- end }}
 {{- end }}
 
-# ── Shared uv/rattler cache on /develop (reflinks with project venvs)
-export UV_CACHE_DIR="/develop/.cache/uv"
+# ── Shared uv/rattler cache on <shared_workspace> (reflinks with venvs) ──
+{{- if $shared }}
+export UV_CACHE_DIR="{{ $shared }}/.cache/uv"
 export UV_LINK_MODE=clone
-export PIXI_CACHE_PYPI_WHEELS_DIR="/develop/.cache/uv"
-export PIXI_CACHE_DIR="/develop/.cache/rattler"
+{{- end }}
 
 # ── Direnv (auto-load project-level environment) ─────────────
 {{- if lookPath "direnv" }}
@@ -116,14 +137,14 @@ command_not_found_handler() {
 
 # ── PATH (appended last so all above env is available first) ──
 
-# Go (develop profile only)
-{{- if eq .tier "develop" }}
+# Go (dev facet only)
+{{- if has "dev" .facets }}
 [[ -d "$HOME/go/bin" ]] && path+=("$HOME/go/bin")
 {{- end }}
 
-# ── Node/Bun ecosystem (Level 2 — all platforms) ─────────────
-# Installed at Level 1; expose the pnpm/bun PATH for every full-setup machine.
-{{- if eq .setup_mode "full" }}
+# ── Node/Bun ecosystem (L3 standard, dev facet) ───────────────
+# Installed at L3 (bootstrap=full); pnpm/bun are dev-facet-gated.
+{{- if and (eq .bootstrap "full") (has "dev" .facets) }}
 # pnpm
 {{- if eq .chezmoi.os "darwin" }}
 [[ -d "$HOME/Library/pnpm" ]] && export PNPM_HOME="$HOME/Library/pnpm"
@@ -140,8 +161,8 @@ export BUN_CONFIG_REGISTRY="https://registry.npmmirror.com"
 {{- end }}
 {{- end }}
 
-# ── Flutter / Antigravity / Cargo (develop tier only) ────────
-{{- if eq .tier "develop" }}
+# ── Flutter / Antigravity / Cargo (dev facet overlay) ────────
+{{- if has "dev" .facets }}
 # Antigravity
 [[ -d "$HOME/.antigravity/antigravity/bin" ]] && path+=$HOME/.antigravity/antigravity/bin
 
@@ -158,7 +179,7 @@ export PATH
 # ═══════════════════════════════════════════════════════════════
 # Dev tool wrappers (modern replacements) — loaded last
 # ═══════════════════════════════════════════════════════════════
-{{- if and (eq .tier "develop") (lookPath "pnpm") }}
+{{- if and (has "dev" .facets) (lookPath "pnpm") }}
 
 npm() {
   pnpm "$@"
@@ -178,7 +199,7 @@ EOF
 }
 {{- end }}
 
-{{- if and (eq .tier "develop") (lookPath "bun") }}
+{{- if and (has "dev" .facets) (lookPath "bun") }}
 
 npx() {
   bunx "$@"

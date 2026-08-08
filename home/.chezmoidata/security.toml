@@ -1,0 +1,13 @@
+# Host security controls consumed by platform-specific templates.
+#
+# RoxyBrowser modes (sing-box TUN only):
+#   off     - no outbound filtering
+#   archive - block DNS and traffic to Roxy's dedicated OSS profile-cache bucket
+#             (cookie/API payloads can still reach the manager control plane)
+#   strict  - archive mode plus Roxy's manager UI/API control-plane hostnames;
+#             the manager becomes effectively offline
+# Routing checks DNS/FakeIP names, then rechecks after a 1.13-compatible sniff.
+# ECH without usable DNS and private DoH can still hide the hostname. Rotating,
+# potentially shared service IPs are intentionally not pinned. VMs need own rules.
+[security.roxybrowser]
+block_mode = "archive"

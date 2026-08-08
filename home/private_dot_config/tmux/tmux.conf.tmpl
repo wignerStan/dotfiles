@@ -31,7 +31,7 @@ set -g set-titles-string '#T'
 # UseTmuxStatusBar=True in iTerm2 polls status-left/right.
 # Keep plain text — iTerm2 sanitizes #[...] color escapes.
 
-{{- else if eq .profile "hpc" }}
+{{- else if has "hpc" .facets }}
 
 # =============================================================================
 # HPC socket router — basename glob matching

@@ -1,5 +1,5 @@
-{{- /* Windows: reconcile mamba base env. chezmoi run_onchange trigger.
-     Installs core + current-tier add-on. Idempotent. */ -}}
+{{- /* Windows: reconcile the mamba base env and facet-specific envs.
+     chezmoi run_onchange trigger; idempotent. */ -}}
 {{- if and (eq .chezmoi.os "windows") (lookPath "micromamba") -}}
 #powershell
 $ErrorActionPreference = 'SilentlyContinue'
@@ -15,17 +15,33 @@ $mm = $mm.Source
 if (-not (& $mm env list 2>$null | Select-String -Quiet '\bbase\b')) { Log 'base env not present, skipping'; exit 0 }
 
 $channels = @({{- range .mamba_base.channels }} '{{ . }}' {{- end }}) | ForEach-Object { @('-c', $_) }
-# core (always) + current-tier add-on
-$condaPkgs = @({{- range .mamba_base.core.conda }} '{{ . }}' {{- end }}{{- range (index .mamba_base .tier).conda }} '{{ . }}' {{- end }})
-$pipPkgs   = @({{- range .mamba_base.core.pip }} '{{ . }}' {{- end }}{{- range (index .mamba_base .tier).pip }} '{{ . }}' {{- end }})
+# core + facet sections (.mamba_sections from .chezmoi.toml.tmpl)
+$condaPkgs = @({{- range .mamba_sections }}{{- range (index $.mamba_base .).conda }} '{{ . }}' {{- end }}{{- end }})
+$pipPkgs   = @({{- range .mamba_sections }}{{- range (index $.mamba_base .).pip }} '{{ . }}' {{- end }}{{- end }})
 
 if ($condaPkgs.Count -gt 0) {
-    Log "ensuring conda packages (tier={{ .tier }}): $($condaPkgs -join ' ')"
+    Log "ensuring conda packages (tier={{ .tier }} sections={{ .mamba_sections | join "," }}): $($condaPkgs -join ' ')"
     & $mm install -y -n base @channels @condaPkgs 2>&1 | Out-Null
 }
 if ($pipPkgs.Count -gt 0) {
     Log "ensuring pip packages: $($pipPkgs -join ' ')"
     & $mm run -n base python -m pip install --upgrade @pipPkgs 2>&1 | Out-Null
 }
-Log "sync complete (tier={{ .tier }})"
-{{- end -}}
+{{- if has "dev" .facets }}
+# The dev facet owns a separate Python 3.12 environment; never merge it into
+# base, whose scientific stack follows the current conda-forge Python.
+$devEnv = Join-Path $HOME '.conda\envs\develop'
+$devConda = @({{- range (index .mamba_base "dev").conda }} '{{ . }}' {{- end }})
+$devPip = @({{- range (index .mamba_base "dev").pip }} '{{ . }}' {{- end }})
+if (-not (Test-Path $devEnv)) {
+    Log "creating develop env at $devEnv"
+    & $mm create -y -p $devEnv @channels 'python=3.12' 'pip' 'uv' @devConda 2>&1 | Out-Null
+} elseif ($devConda.Count -gt 0) {
+    & $mm install -y -p $devEnv @channels @devConda 2>&1 | Out-Null
+}
+if ((Test-Path $devEnv) -and $devPip.Count -gt 0) {
+    & $mm run -p $devEnv python -m pip install --upgrade @devPip 2>&1 | Out-Null
+}
+Log 'develop env sync complete'
+{{- end }}
+Log "sync complete (tier={{ .tier }})"{{- end -}}

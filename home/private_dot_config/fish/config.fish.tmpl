@@ -38,8 +38,8 @@ function tm
     TERM=xterm-256color command tmux $argv
 end
 
-{{- if eq .tier "develop" }}
-# ── Develop-only AI tool wrappers ──────────────────────────────
+{{- if has "ai" .facets }}
+# ── AI facet tool wrappers ───────────────────────────────────
 function cc
     term=xterm-256color command claude --settings ~/.claude/settings.org.json $argv
 end

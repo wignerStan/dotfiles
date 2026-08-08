@@ -3,13 +3,13 @@
 #powershell
 # ---------------------------------------------------------------
 # Jacob's Windows Setup
-# Idempotent (safe to re-run via run_onchange). tier={{ .tier }} mode={{ .setup_mode }} geo={{ .geo }}
+# Idempotent (safe to re-run via run_onchange). tier={{ .tier }} bootstrap={{ .bootstrap }} geo={{ .geo }}
 #
-# Install strategy by tier (tier is orthogonal to setup_mode):
-#   simple  (VM/container) -> NO package managers. Remove winget/scoop if present.
+# Install strategy by tier (tier is orthogonal to bootstrap and guest role):
+#   simple  (minimal) -> NO package managers. Remove winget/scoop if present.
 #                             Direct install: git (MinGit, no Bash/GUI), uv, micromamba.
 #                             NO sing-box (rides host proxy).
-#   standard/develop       -> winget + scoop (extras bucket). Via PMs: git (full,
+#   default/advanced       -> winget + scoop (extras bucket). Via PMs: git (full,
 #                             Bash+GUI), uv, micromamba, pixi. Plus sing-box core
 #                             (direct) + Windows Administrator service (start=auto).
 # ---------------------------------------------------------------
@@ -35,7 +35,7 @@ function Test-Cmd($n) { return [bool](Get-Command $n -ErrorAction SilentlyContin
 $__arch = '64-bit'
 if ($env:PROCESSOR_ARCHITECTURE -match 'ARM|aarch64') { $__arch = 'arm64' }
 
-Write-Step "Starting Windows Setup (tier={{ .tier }} mode={{ .setup_mode }} geo={{ .geo }} arch=$__arch)"
+Write-Step "Starting Windows Setup (tier={{ .tier }} bootstrap={{ .bootstrap }} geo={{ .geo }} arch=$__arch)"
 
 # ---------------------------------------------------------------
 # Helpers
@@ -314,11 +314,11 @@ if (Test-Cmd 'scoop') {
 {{- end }}
 
 # ---------------------------------------------------------------
-# Level 2: Extra (setup_mode=full, non-simple) — desktop dev/media tools.
+# Level 3: Extra (bootstrap=full, non-simple) — desktop dev/media tools.
 # Mirrors the Unix bootstrap's Level 2: terminal emulator + downloaders.
 # ---------------------------------------------------------------
-{{- if and (eq .setup_mode "full") (ne .tier "simple") }}
-Write-Step "Level 2: extra tools (setup_mode=full)"
+{{- if and (eq .bootstrap "full") (ne .tier "simple") }}
+Write-Step "Level 2: extra tools (bootstrap=full)"
 
 # Terminal emulator. WezTerm is the windows terminal (ghostty/iterm2 on mac).
 Install-Tool -WingetId 'wez.wezterm' -ScoopName 'wezterm' -BinName 'wezterm' -Label 'WezTerm'
@@ -336,7 +336,7 @@ Install-Tool -WingetId 'Syncthing.Syncthing'     -ScoopName 'syncthing' -BinName
 Install-Tool -WingetId 'Cloudflare.cloudflared'  -ScoopName 'cloudflared' -BinName 'cloudflared' -Label 'cloudflared'
 
 # Desktop apps (mac+win personal casks, winget equivalents)
-{{- if and (eq .profile "personal") (not .is_headless) }}
+{{- if and (eq .ownership "personal") (not .is_headless) }}
 Write-Step "Personal desktop apps (winget)"
 $__desktopApps = @(
     @{Id='Obsidian.Obsidian';          Label='Obsidian'},
@@ -354,7 +354,7 @@ foreach ($app in $__desktopApps) {
 }
 {{- end }}
 
-{{- if and (eq .profile "personal") (not .is_headless) }}
+{{- if and (eq .ownership "personal") (not .is_headless) }}
 # Downloaders — windows personal desktop only (brew can't pull these reliably).
 Install-Tool -WingetId 'yt-dlp.yt-dlp' -ScoopName 'yt-dlp' -BinName 'yt-dlp' -Label 'yt-dlp'
 
@@ -374,7 +374,7 @@ if ($__bdTag) {
 # the personal WSL (linux), NOT native windows; native gets only the basic
 # frontend/UI/package tools installed above. WSL internals are personal/separate.
 # ---------------------------------------------------------------
-{{- if eq .tier "develop" }}
+{{- if has "dev" .facets }}
 Write-Step "develop: enable WSL (rust/go/C++ toolchains live in the personal WSL)"
 try {
     & wsl --install --no-distribution 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
@@ -384,13 +384,12 @@ try {
 
 # ---------------------------------------------------------------
 # sing-box CORE + Windows Administrator service — personal mac/windows ONLY
-# (standard/develop tiers). sing-box installs when profile=personal AND tier is
-# NOT simple. The core binary (SagerNet/sing-box) is downloaded directly (not a
+# sing-box installs on a personal non-guest. The core binary is downloaded directly (not a
 # GUI app; winget id unreliable), and registered as a Windows Service (start=auto,
-# runs as LocalSystem == Admin) so the TUN proxy is up at boot. Linux personal uses
-# the "system" tier instead (no sing-box); simple tier (VM/container) rides the host.
+# runs as LocalSystem == Admin) so the TUN proxy is up at boot. Explicit guests
+# ride the host; tier controls install depth only.
 # ---------------------------------------------------------------
-{{- if and (eq .profile "personal") (not (eq .tier "simple")) }}
+{{- if and (eq .ownership "personal") (not .is_guest) }}
 $sbTag = Get-LatestRelease 'SagerNet/sing-box'
 if ($sbTag) {
     $sbVer = $sbTag -replace '^v',''   # v1.13.16 -> 1.13.16
@@ -422,7 +421,7 @@ if ($sbTag) {
     }
 }
 {{- else }}
-Write-Skip 'sing-box (not personal, or simple — rides host proxy)'
+Write-Skip 'sing-box (not personal, or guest rides host proxy)'
 {{- end }}
 
 # ---------------------------------------------------------------
@@ -450,7 +449,7 @@ if (Test-Cmd 'micromamba') {
 #    default tier (personal desktop) skips it.
 #    Python source: simple -> uv (no mamba); develop/work -> mamba base.
 # ---------------------------------------------------------------
-{{- if or (or (eq .tier "simple") (eq .tier "develop")) (eq .profile "work") }}
+{{- if or (or (eq .tier "simple") (has "dev" .facets)) (eq .ownership "work") }}
 {{- if eq .tier "simple" }}
 # simple: uv is the python — install pywinauto into uv's managed python.
 # On ARM64, resolve the native aarch64 python explicitly (uv's default is the
@@ -496,7 +495,7 @@ if ((Test-Cmd 'micromamba') -and (Test-Path "$mambaRoot\python.exe")) {
 }
 {{- end }}
 {{- else }}
-Write-Skip 'pywinauto (tier={{ .tier }} profile={{ .profile }})'
+Write-Skip 'pywinauto (tier={{ .tier }} ownership={{ .ownership }})'
 {{- end }}
 
 Write-Step "Windows Setup Complete"

@@ -1,59 +1,160 @@
-{{- /* Machine Configuration Logic — three independent axes */ -}}
+{{- /* Machine Configuration Logic — orthogonal axes:
+     ownership (personal|work)         — who owns it (work = stub gate for now)
+     platform  (local|cloud)           — where it runs (own hardware vs 3rd-party cloud platform)
+     tier      (simple|default|advanced) — resource/install depth (develop renamed advanced)
+     facets    (dev|proxy|ai|hpc|research) — stackable capability overlays, ANY tier
+     bootstrap (basic|full)            — L2 basic vs L3 full (renamed from setup_mode)
+     deploy    (user|system|system+user) — deploy scope: user (default), system,
+                                           or both (system+user); plain-user system ops
+                                           elevate via sudo; bootstrap-l1 drops root → uid
+                                        (drop privileges to default uid 1000/501)
 
-{{- /* Axis 1: profile (primary identity — exactly one) */ -}}
-{{- $profile := "personal" -}}
-{{- if or (env "CODESPACES") (env "REMOTE_CONTAINERS_IPC") (eq .chezmoi.username "root" "ubuntu") -}}
-{{-   $profile = "vps" -}}
-{{- end -}}
-{{- /* HPC cluster (has apptainer/singularity on host) */ -}}
-{{- if or (lookPath "apptainer") (lookPath "singularity") -}}
-{{-   $profile = "hpc" -}}
+     At `chezmoi init`, precedence per axis is CHEZMOI_* env > machine.toml
+     (by hostname) > auto-detect. The generated config is persistent; for a
+     one-off apply use --override-data instead of expecting env to re-render it.
+     Legacy CHEZMOI_TIER=develop is translated to tier=advanced + facets+=dev. */ -}}
+
+{{- /* hostname (needed for machine.toml lookup) */ -}}
+{{- $hostname := .chezmoi.hostname -}}
+{{- if eq .chezmoi.os "darwin" -}}
+{{-   $hostname = output "scutil" "--get" "LocalHostName" | trim -}}
 {{- end -}}
 
-{{- /* tier: default | system | develop | calculate | simple
-     - default:   fallback when no explicit tier applies (jacob on personal boxes, etc.)
-     - system:    explicit-only — a box designated to own system-level settings (proxy, etc.)
-     - develop:   dev user — full dev workspace
-     - calculate: cal user — user-isolated workspace (Linux only)
-     - simple:    VM/container — minimal
-     Auto-detect dev/cal/simple by identity/VM; if none match, tier stays "default".
-     "system" is never auto-detected — set it explicitly via CHEZMOI_TIER=system on the
-     designated box (env override wins over auto-detection; persists across inits). */ -}}
+{{- /* machine.toml is parsed directly because .chezmoidata is loaded only
+     after config generation; `.machine` is not available at init time. */ -}}
+{{- $machine_data := include ".chezmoidata/machine.toml" | fromToml -}}
+{{- $machine_cfg := dict -}}
+{{- if and (hasKey $machine_data "machine") (hasKey $machine_data.machine $hostname) -}}
+{{-   $machine_cfg = index $machine_data.machine $hostname -}}
+{{- end -}}
+
+{{- /* guest role: separate from tier (resource depth). Explicit machine data
+     wins; Linux/Windows VM models are a fallback. */ -}}
+{{- $is_guest := false -}}
+{{- if hasKey $machine_cfg "is_guest" -}}
+{{-   $is_guest = $machine_cfg.is_guest -}}
+{{- else if and (eq .chezmoi.os "linux") (stat "/sys/class/dmi/id/product_name") -}}
+{{-   $pn := output "cat" "/sys/class/dmi/id/product_name" | trim -}}
+{{-   if or (contains "Virtual" $pn) (contains "KVM" $pn) (contains "QEMU" $pn) (contains "Parallels" $pn) -}}
+{{-     $is_guest = true -}}
+{{-   end -}}
+{{- else if and (eq .chezmoi.os "windows") (lookPath "powershell") -}}
+{{-   $pn := output "powershell" "-NoProfile" "-NonInteractive" "-Command" "(Get-CimInstance Win32_ComputerSystem).Model" | trim -}}
+{{-   if or (contains "Virtual" $pn) (contains "VMware" $pn) (contains "QEMU" $pn) (contains "Parallels" $pn) (contains "VirtualBox" $pn) -}}
+{{-     $is_guest = true -}}
+{{-   end -}}
+{{- end -}}
+
+{{- /* ownership: who the machine belongs to (personal|work). default: personal. */ -}}
+{{- $ownership := "personal" -}}
+{{- if env "CHEZMOI_OWNERSHIP" -}}
+{{-   $ownership = env "CHEZMOI_OWNERSHIP" -}}
+{{- else if hasKey $machine_cfg "ownership" -}}
+{{-   $ownership = $machine_cfg.ownership -}}
+{{- end -}}
+
+{{- /* platform: local (own hardware) vs cloud (3rd-party platform: VPS/HPC/codespace). */ -}}
+{{- $platform := "local" -}}
+{{- if env "CHEZMOI_PLATFORM" -}}
+{{-   $platform = env "CHEZMOI_PLATFORM" -}}
+{{- else if hasKey $machine_cfg "platform" -}}
+{{-   $platform = $machine_cfg.platform -}}
+{{- else if or (env "CODESPACES") (env "REMOTE_CONTAINERS_IPC") -}}
+{{-   $platform = "cloud" -}}
+{{- else if or (lookPath "apptainer") (lookPath "singularity") -}}
+{{-   $platform = "cloud" -}}
+{{- end -}}
+
+{{- /* tier: simple | default | advanced
+     - simple:   minimal/1C1G resource depth; primary_shell = bash
+     - default:  fallback — standard zsh
+     - advanced: dev user (formerly "develop") — standard zsh
+     Auto-detect dev/cal/simple by identity/VM; if none match, tier stays "default". */ -}}
 {{- $tier := "default" -}}
 {{- if env "CHEZMOI_TIER" -}}
 {{-   $tier = env "CHEZMOI_TIER" -}}
+{{- else if hasKey $machine_cfg "tier" -}}
+{{-   $tier = $machine_cfg.tier -}}
 {{- else if eq .chezmoi.username "dev" -}}
-{{-   $tier = "develop" -}}
-{{- else if and (eq .chezmoi.username "cal") (eq .chezmoi.os "linux") -}}
-{{-   $tier = "calculate" -}}
-{{- else if or (env "CODESPACES") (env "REMOTE_CONTAINERS_IPC") (eq .chezmoi.username "root" "ubuntu") -}}
+{{-   $tier = "advanced" -}}
+{{- else if or (env "CODESPACES") (env "REMOTE_CONTAINERS_IPC") $is_guest -}}
 {{-   $tier = "simple" -}}
-{{- else if stat "/sys/class/dmi/id/product_name" -}}
-{{-   $pn := output "cat" "/sys/class/dmi/id/product_name" | trim -}}
-{{-   if or (contains "Virtual" $pn) (contains "KVM" $pn) (contains "QEMU" $pn) (contains "Parallels" $pn) -}}
-{{-     $tier = "simple" -}}
-{{-   end -}}
-{{- else if eq .chezmoi.os "windows" -}}
-{{- /* Windows has no /sys DMI path — query Win32_ComputerSystem.Model via PowerShell. */ -}}
-{{-   if lookPath "powershell" -}}
-{{-     $pn := output "powershell" "-NoProfile" "-NonInteractive" "-Command" "(Get-CimInstance Win32_ComputerSystem).Model" | trim -}}
-{{-     if or (contains "Virtual" $pn) (contains "VMware" $pn) (contains "QEMU" $pn) (contains "Parallels" $pn) (contains "VirtualBox" $pn) -}}
-{{-       $tier = "simple" -}}
-{{-     end -}}
-{{-   end -}}
+{{- end -}}
+{{- /* legacy CHEZMOI_TIER=develop → advanced + dev facet */ -}}
+{{- $legacyDevelop := eq $tier "develop" -}}
+{{- if eq $tier "develop" -}}
+{{-   $tier = "advanced" -}}
 {{- end -}}
 
-{{- /* setup_mode: full | basic. Orthogonal axis to tier/profile — controls
-     the breadth of the base-env package set and heavier tooling, independent of
-     where the machine sits (simple/standard/develop) or its profile. */ -}}
-{{- $setup_mode := "basic" -}}
-{{- if or (eq $profile "personal") (eq $tier "develop") -}}
-{{-   $setup_mode = "full" -}}
+{{- /* facets: stackable capability overlays (dev|proxy|ai|hpc|research), ANY tier may carry
+     them. Sources: CHEZMOI_FACETS env (space/comma list) > machine.toml.
+     Auto-added: hpc on apptainer/singularity hosts or cal user; dev for dev user
+     (or legacy "develop" tier). */ -}}
+{{- $facets := list -}}
+{{- if env "CHEZMOI_FACETS" -}}
+{{-   range (replace "," " " (env "CHEZMOI_FACETS") | splitList " ") -}}
+{{-     if ne . "" -}}{{- $facets = append $facets . -}}{{- end -}}
+{{-   end -}}
+{{- else if hasKey $machine_cfg "facets" -}}
+{{-   $facets = $machine_cfg.facets -}}
 {{- end -}}
+{{- if or (lookPath "apptainer") (lookPath "singularity") -}}
+{{-   if not (has "hpc" $facets) -}}{{- $facets = append $facets "hpc" -}}{{- end -}}
+{{- end -}}
+{{- if and (eq .chezmoi.username "cal") (eq .chezmoi.os "linux") -}}
+{{-   if not (has "hpc" $facets) -}}{{- $facets = append $facets "hpc" -}}{{- end -}}
+{{- end -}}
+{{- if or (eq .chezmoi.username "dev") $legacyDevelop -}}
+{{-   if not (has "dev" $facets) -}}{{- $facets = append $facets "dev" -}}{{- end -}}
+{{- end -}}
+
+{{- /* bootstrap: basic | full. L2 = basic breadth, L3 = full (packages + services).
+     Orthogonal to ownership/platform/tier. */ -}}
+{{- $bootstrap := "basic" -}}
+{{- if env "CHEZMOI_BOOTSTRAP" -}}
+{{-   $bootstrap = env "CHEZMOI_BOOTSTRAP" -}}
+{{- else if hasKey $machine_cfg "bootstrap" -}}
+{{-   $bootstrap = $machine_cfg.bootstrap -}}
+{{- else if and (eq $ownership "personal") (ne $tier "simple") -}}
+{{-   $bootstrap = "full" -}}
+{{- end -}}
+
+{{- /* deploy: user (default) | system | system+user — orthogonal axis over
+     package/service deployment scope.
+       user        → user scope only (brew, mamba, shell, home configs)
+       system      → system scope only (system packages, /etc services);
+                     a plain user runs it via sudo elevation
+       system+user → both scopes: a plain user runs user then sudo system;
+                     root runs system only (bootstrap-l1 owns privilege drop).
+     Init precedence: CHEZMOI_DEPLOY env > machine.toml > "user" (default).
+     Per-apply override: --override-data '{"deploy":"..."}'. */ -}}
+{{- $deploy := "user" -}}
+{{- if env "CHEZMOI_DEPLOY" -}}
+{{-   $deploy = env "CHEZMOI_DEPLOY" -}}
+{{- else if hasKey $machine_cfg "deploy" -}}
+{{-   $deploy = $machine_cfg.deploy -}}
+{{- end -}}
+{{- $is_root := false -}}
+{{- if eq .chezmoi.uid "0" -}}
+{{-   $is_root = true -}}
+{{- end -}}
+{{- $default_uid := "1000" -}}
+{{- if eq .chezmoi.os "darwin" -}}{{- $default_uid = "501" -}}{{- end -}}
+
+{{- /* primary_shell: simple → bash everywhere; standard (default/advanced) → zsh */ -}}
+{{- $primary_shell := "zsh" -}}
+{{- if eq $tier "simple" -}}
+{{-   $primary_shell = "bash" -}}
+{{- end -}}
+
+{{- /* mamba envs (L3 base + facet envs). Base env composition = core only;
+     facet-env manifests (dev→develop etc.) are separate envs, created by
+     mamba-sync-base.{sh,ps1} per facet — NOT merged into base. */ -}}
+{{- $mamba_sections := list "core" -}}
 
 {{- /* headless: no real desktop session */ -}}
 {{- $headless := false -}}
-{{- if or (eq $profile "vps") (eq $profile "hpc") -}}
+{{- if eq $platform "cloud" -}}
 {{-   $headless = true -}}
 {{- else if eq .chezmoi.os "linux" -}}
 {{-   if not (or (env "DISPLAY") (env "WAYLAND_DISPLAY")) -}}
@@ -64,14 +165,15 @@
 {{- end -}}
 
 {{- /* Derived */ -}}
-{{- $ephemeral := or (eq $profile "vps") (eq $profile "hpc") -}}
+{{- $ephemeral := eq $platform "cloud" -}}
 
-{{- /* Platform: detect WSL2 (chezmoi reports "linux" for WSL2) */ -}}
-{{- $platform := .chezmoi.os -}}
+{{- /* OS platform: detect WSL2 (chezmoi reports "linux" for WSL2).
+     Distinct from the local/cloud platform axis — this is the OS kind. */ -}}
+{{- $os_platform := .chezmoi.os -}}
 {{- if and (eq .chezmoi.os "linux") (stat "/proc/version") -}}
 {{-   $procver := lower (output "cat" "/proc/version") -}}
 {{-   if contains "microsoft" $procver -}}
-{{-     $platform = "wsl" -}}
+{{-     $os_platform = "wsl" -}}
 {{-   end -}}
 {{- end -}}
 
@@ -102,10 +204,8 @@
 {{-   $has_age = true -}}
 {{- end -}}
 
-{{- $hostname := .chezmoi.hostname -}}
-{{- if eq .chezmoi.os "darwin" -}}
-{{-   $hostname = output "scutil" "--get" "LocalHostName" | trim -}}
-{{- end -}}
+{{- /* Reject invalid machine/env declarations before persisting them. */ -}}
+{{- $axesValidated := includeTemplate "validate-axes" (dict "ownership" $ownership "platform" $platform "tier" $tier "bootstrap" $bootstrap "deploy" $deploy "facets" $facets "is_guest" $is_guest) -}}
 
 {{- /* Custom Prompts — only prompt during interactive chezmoi init */ -}}
 {{- $github_user := "" -}}
@@ -130,14 +230,21 @@ encryption = "age"
     email = {{ $email | quote }}
     github_user = {{ $github_user | quote }}
     hostname = {{ $hostname | quote }}
-    primary_shell = "zsh"
+    ownership = {{ $ownership | quote }}
+    platform = {{ $platform | quote }}
+    os_platform = {{ $os_platform | quote }}
+    tier = {{ $tier | quote }}
+    facets = {{ $facets | toJson }}
+    bootstrap = {{ $bootstrap | quote }}
+    deploy = {{ $deploy | quote }}
+    is_root = {{ $is_root }}
+    is_guest = {{ $is_guest }}
+    default_uid = {{ $default_uid | quote }}
+    primary_shell = {{ $primary_shell | quote }}
     is_ephemeral = {{ $ephemeral }}
     is_headless = {{ $headless }}
-    tier = {{ $tier | quote }}
-    platform = {{ $platform | quote }}
+    mamba_sections = {{ $mamba_sections | toJson }}
     use_china_mirrors = {{ $use_china_mirrors }}
     geo = {{ $geo | quote }}
-    profile = {{ $profile | quote }}
-    setup_mode = {{ $setup_mode | quote }}
-    mamba_root = {{ if eq .chezmoi.os "linux" }}"/develop/mamba"{{ else }}{{ joinPath .chezmoi.homeDir "mamba" | quote }}{{ end }}
+    mamba_root = {{ if hasKey $machine_cfg "shared_workspace" }}{{ joinPath (index $machine_cfg "shared_workspace") "mamba" | quote }}{{ else }}{{ joinPath .chezmoi.homeDir "mamba" | quote }}{{ end }}
     arch = {{ .chezmoi.arch | quote }}

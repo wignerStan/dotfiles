@@ -1,11 +1,18 @@
 # ── Completions ─────────────────────────────────────────────────
 
-# Carapace: multi-shell completion (replaces native fish completions)
+# Carapace: multi-shell completion (replaces native fish completions).
+# Init generated once into ~/.cache/fish (regenerates when the carapace binary
+# is newer) — cached source is ~2ms vs ~0.6s of `carapace _carapace | source`.
 if command -q carapace
     set -gx CARAPACE_BRIDGES 'fish,bash,zsh,inshellisense'
-    carapace _carapace | source
+    set -l _cc ~/.cache/fish/carapace.init.fish
+    if not test -f "$_cc"; or test "$_cc" -ot (command -s carapace)
+        mkdir -p ~/.cache/fish
+        carapace _carapace > "$_cc" 2>/dev/null
+    end
+    source "$_cc"
 else
-{{- if eq .tier "develop" }}
+{{- if has "dev" .facets }}
     # Bun completions (fallback when carapace not installed)
     if test -f ~/.bun/completions/bun.fish
         source ~/.bun/completions/bun.fish

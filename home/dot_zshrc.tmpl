@@ -33,6 +33,15 @@ else
     fi
 fi
 
+# Brew zsh ships autoloadable helpers (is-at-least, add-zsh-hook) that the
+# brew plugins expect. compinit prunes fpath, and the login shell is the
+# system /bin/zsh (not brew zsh), so re-add brew's functions dir here —
+# AFTER compinit — so the plugins' autoloads resolve. Guarded so a missing
+# brew prefix or non-brew host is a silent no-op.
+if [[ -n "$_brew_prefix" && -d "${_brew_prefix}/share/zsh/functions" ]]; then
+    fpath=("${_brew_prefix}/share/zsh/functions" $fpath)
+fi
+
 # Custom zsh functions
 fpath=(~/.zsh/functions $fpath)
 if [[ -d $HOME/.zsh/functions ]]; then
@@ -79,17 +88,25 @@ bindkey -M viins '^e' end-of-line
 bindkey -M vicmd '^a' beginning-of-line
 bindkey -M vicmd '^e' end-of-line
 
-# FZF bindings (both modes)
-bindkey -M vicmd '^r' fzf-history-widget
-bindkey -M viins '^r' fzf-history-widget
-bindkey -M vicmd '^t' fzf-file-widget
-bindkey -M viins '^t' fzf-file-widget
+# FZF bindings (both modes) — only when fzf widgets actually loaded
+if (( $+functions[fzf-history-widget] )); then
+    bindkey -M vicmd '^r' fzf-history-widget
+    bindkey -M viins '^r' fzf-history-widget
+fi
+if (( $+functions[fzf-file-widget] )); then
+    bindkey -M vicmd '^t' fzf-file-widget
+    bindkey -M viins '^t' fzf-file-widget
+fi
 
-# History substring search on arrow keys (both modes)
-bindkey -M vicmd '^[[A' history-substring-search-up
-bindkey -M vicmd '^[[B' history-substring-search-down
-bindkey -M viins '^[[A' history-substring-search-up
-bindkey -M viins '^[[B' history-substring-search-down
+# History substring search on arrow keys (both modes) — only when the
+# plugin actually loaded (brew zsh-history-substring-search; a missing/
+# stale install must degrade to the plain line editor, not error).
+if (( $+functions[history-substring-search-up] )); then
+    bindkey -M vicmd '^[[A' history-substring-search-up
+    bindkey -M vicmd '^[[B' history-substring-search-down
+    bindkey -M viins '^[[A' history-substring-search-up
+    bindkey -M viins '^[[B' history-substring-search-down
+fi
 
 unset _brew_prefix
 
@@ -213,8 +230,8 @@ tm() {
     TERM=xterm-256color command tmux "$@"
 }
 
-{{- if eq .tier "develop" }}
-# ── Develop-only AI tool wrappers ──────────────────────────────
+{{- if has "ai" .facets }}
+# ── AI facet tool wrappers ────────────────────────────────────
 cc() {
     term=xterm-256color command claude --settings ~/.claude/settings.org.json "$@"
 }
