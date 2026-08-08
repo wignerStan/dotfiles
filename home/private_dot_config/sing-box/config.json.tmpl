@@ -12,6 +12,10 @@
 {{- end -}}
 {{- $sbParts := split "." (trimPrefix "version " (regexFind "version [0-9]+\\.[0-9]+" $sbVersionLine)) -}}
 {{- $newSchema := ge (atoi $sbParts._1) 14 -}}
+{{- $minVersion := "1.11.0" -}}
+{{- if or (lt (atoi $sbParts._0) 1) (and (eq (atoi $sbParts._0) 1) (lt (atoi $sbParts._1) 11)) -}}
+{{-   fail (printf "sing-box %s is too old: config requires %s+ (rule action/DNS action fields)" (trimPrefix "sing-box " $sbVersionLine) $minVersion) -}}
+{{- end -}}
 {{- $roxyBlockMode := "off" -}}
 {{- if and (hasKey . "security") (hasKey .security "roxybrowser") (hasKey .security.roxybrowser "block_mode") -}}
 {{-   $roxyBlockMode = .security.roxybrowser.block_mode -}}
@@ -621,11 +625,14 @@
        - profile cache: lumibrowser.oss-cn-shenzhen.aliyuncs.com ->
          47.113.74.114:443 (60-second DNS TTL)
         - manager API: hz.gate/api.roxybrowser.cn -> 121.43.36.215:443
-        NOTE: these are ROUTE rules. In route rules sing-box has no
-        "domain_full" field — "domain" is exact-hostname match and
-        "domain_suffix" is suffix match (domain_full exists only in DNS
-        rules). Using "domain_full" here is silently ignored, which leaves
-        a zero-condition reject rule that matches EVERY connection. */}}
+        Schema note (verified against option/rule.go and option/rule_dns.go,
+        v1.11.11 → v1.14.0-beta): NO rule type (route or DNS) has a
+        "domain_full" field. "domain" is the exact-hostname match in both;
+        "domain_suffix" is the suffix match. Using "domain_full" in either
+        is silently ignored, which leaves a zero-condition reject rule that
+        matches EVERY connection (the 2026-08-08 incident). The "action"
+        option ("reject"/"sniff"/"predefined") requires sing-box >= 1.11.0,
+        enforced by the $minVersion gate below. */}}
   {{- /* First pass: DNS/FakeIP/reverse-mapped or already-sniffed hostname. */}}
 {{- if or (eq $roxyBlockMode "archive") (eq $roxyBlockMode "strict") }}
        {
