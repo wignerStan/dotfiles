@@ -1,11 +1,11 @@
 {{- /* macOS-only VM host setup — tart/lima. Renders empty on non-darwin so chezmoi skips it.
-     Gated to develop tier to match where tart/lima are installed (run_once_setup Level 3);
+     Gated to the dev facet to match where tart/lima are installed (run_once_setup dev overlay);
      a manually-installed tart on a default/basic-tier Mac is fine but not auto-managed here. */ -}}
-{{- if and (eq .chezmoi.os "darwin") (eq .tier "develop") -}}
+{{- if and (eq .chezmoi.os "darwin") (has "dev" .facets) -}}
 #!/usr/bin/env bash
 # -------------------------------------------------------------------------------
 # Jacob's tart (macOS-only VM host) setup
-# Idempotent (safe to re-run via run_onchange). tier={{ .tier }} mode={{ .setup_mode }} geo={{ .geo }}
+# Idempotent (safe to re-run via run_onchange). tier={{ .tier }} bootstrap={{ .bootstrap }} geo={{ .geo }}
 #
 # tart manages macOS VMs on Apple Silicon via the Virtualization.framework.
 #   - installs: tart (brew), lima (brew) if missing
@@ -21,16 +21,15 @@ set -uo pipefail
 
 GREEN=$'\033[0;32m'; YELLOW=$'\033[0;33m'; RED=$'\033[0;31m'; RESET=$'\033[0m'
 log()  { printf '%s\n' "$*"; }
-ok()   { printf '%s   %s%s\n' "${GREEN}ok:$RESET" "$*"; }
-warn() { printf '%s   %s%s\n' "${YELLOW}warn:$RESET" "$*"; }
-die()  { printf '%s   %s%s\n' "${RED}fail:$RESET" "$*" >&2; exit 1; }
+ok()   { printf '%s   %s\n' "${GREEN}ok:$RESET" "$*"; }
+warn() { printf '%s   %s\n' "${YELLOW}warn:$RESET" "$*"; }
+die()  { printf '%s   %s\n' "${RED}fail:$RESET" "$*" >&2; exit 1; }
 
 is_cmd()   { command -v "$1" >/dev/null 2>&1; }
 brew_keg() { /opt/homebrew/bin/brew keg-only 2>/dev/null >/dev/null; }
 
 # ARCH -> asset suffix is handled by brew; nothing to compute here.
 
-SAFE_MIN_GB=60
 resolve_tart_home() {
     # Prefer external; fall back to ~/.tart (matches .zshenv / 00-env).
     if [[ -d /Volumes/External/tart ]]; then
@@ -40,7 +39,7 @@ resolve_tart_home() {
     fi
 }
 
-log "==> macOS tart setup (tier={{ .tier }} mode={{ .setup_mode }} geo={{ .geo }})"
+log "==> macOS tart setup (tier={{ .tier }} bootstrap={{ .bootstrap }} geo={{ .geo }})"
 
 # 1) brew present?
 if ! is_cmd brew && ! [[ -x /opt/homebrew/bin/brew ]]; then
@@ -61,7 +60,11 @@ fi
 
 # 3) lima (helper) — optional, not fatal
 if ! is_cmd lima; then
-    "$BREW" install lima >/dev/null 2>&1 && ok "lima installed" || warn "lima not installed (optional)"
+    if "$BREW" install lima >/dev/null 2>&1; then
+        ok "lima installed"
+    else
+        warn "lima not installed (optional)"
+    fi
 else
     ok "lima present"
 fi
@@ -89,16 +92,17 @@ fi
 # 6) persist for this session + document for shell (fish/zsh already wired via dotfiles)
 log "    (TART_HOME persisted at shell scope by dotfiles; add to /etc or launchd only if you want system-wide.)"
 
-# 7) optional: pull a base image so first VM create is not network-blocked.
-if ! tart list --format json 2>/dev/null | grep -q .; then
-    log "    no VM yet — pulling base image (sonoma base)..."
-    if tart pull ghcr.io/cirruslabs/macos-sonoma-base:latest 2>/dev/null; then
+# 7) optional: pull a base image so first VM clone is not network-blocked.
+BASE_IMAGE=ghcr.io/cirruslabs/macos-sonoma-base:latest
+if ! tart list --source oci --quiet 2>/dev/null | grep -Fqx "$BASE_IMAGE"; then
+    log "    base image not cached — pulling Sonoma base..."
+    if tart pull "$BASE_IMAGE" 2>/dev/null; then
         ok "pulled base image"
     else
-        warn "image pull failed (network/Virtualization.framework); create a VM later with tart create"
+        warn "image pull failed (network/Virtualization.framework); create a VM later with tart-create.sh"
     fi
 else
-    ok "existing VM(s) found; skipping base pull"
+    ok "base image already cached"
 fi
 
 log "==> done"

@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
 # -------------------------------------------------------------------------------
 # tart base-image staging + VM create — mac-only VM host
-# Idempotent. Creates a macOS guest VM from a base image under TART_HOME.
+# Idempotent. Clones a macOS guest VM from an OCI image under TART_HOME.
 #
 # Usage:
 #   tart-create.sh            # use default name/image
-#   VM_NAME=win macos SONOMA_IMG=ghcr.io/cirruslabs/macos-sonoma-base:latest tart-create.sh
-#   tart-create.sh --name win --image ghcr.io/cirruslabs/macos-sonoma-base:latest --cpus 4 --ram 8
+#   VM_NAME=win SONOMA_IMG=ghcr.io/cirruslabs/macos-sonoma-base:latest tart-create.sh
+#   tart-create.sh --name win --image ghcr.io/cirruslabs/macos-sonoma-base:latest --cpus 4 --ram 8 --disk 60
 #
-# Mirrors winvm/env/bootstrap-win.ps1's staging approach: pull once, offline create.
+# Mirrors winvm/env/bootstrap-win.ps1's staging approach: pull once, offline clone.
 # Managed by Chezmoi — do not edit in place.
 # -------------------------------------------------------------------------------
-set -uo pipefail
+set -euo pipefail
 
 VM_NAME="${VM_NAME:-win}"
 SONOMA_IMG="${SONOMA_IMG:-ghcr.io/cirruslabs/macos-sonoma-base:latest}"
 CPUS="${CPUS:-4}"
 RAM_GB="${RAM_GB:-8}"
-DISK_GB="${DISK_GB:-40}"
+DISK_GB="${DISK_GB:-}"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -47,16 +47,16 @@ export TART_HOME="$TH"
 
 log "==> tart VM create ($VM_NAME)"
 log "    TART_HOME=$TH"
-log "    image=$SONOMA_IMG  cpus=$CPUS ram=${RAM_GB}G disk=${DISK_GB}G"
+log "    image=$SONOMA_IMG  cpus=$CPUS ram=${RAM_GB}G${DISK_GB:+ disk=${DISK_GB}G}"
 
-# 1) base image cached?
-if tart list --format json 2>/dev/null | grep -q "\"$VM_NAME\""; then
+# 1) guest already exists?
+if tart list --source local --quiet 2>/dev/null | grep -Fqx "$VM_NAME"; then
     ok "VM '$VM_NAME' already exists — nothing to create"
     exit 0
 fi
 
-log "    ensuring base image is pulled (offline-create path)..."
-if ! tart image list 2>/dev/null | grep -qi "sonoma"; then
+log "    ensuring base image is pulled (offline-clone path)..."
+if ! tart list --source oci --quiet 2>/dev/null | grep -Fqx "$SONOMA_IMG"; then
     tart pull "$SONOMA_IMG" || die "image pull failed — check network + Virtualization.framework"
     ok "base image pulled"
 else
@@ -71,15 +71,36 @@ if [[ "$TH" != /Volumes/External/* && avail_gb -lt SAFE_GB ]]; then
     die "$TH has only ${avail_gb}G free; need >= ${SAFE_GB}G. Mount /Volumes/External."
 fi
 
-# 3) create
-log "    creating VM..."
-if ! tart create "$VM_NAME" --from "$SONOMA_IMG" \
-        --cpu "$CPUS" --memory "$RAM_GB" \
-        --disk-size "$DISK_GB" 2>/dev/null; then
-    die "tart create failed for '$VM_NAME'"
+# 3) clone and configure. Tart 2.x configures cloned VMs with `tart set`;
+# `tart create --from/--cpu/--memory` is not a supported CLI.
+[[ "$CPUS" =~ ^[1-9][0-9]*$ ]] || die "invalid CPU count: $CPUS"
+[[ "$RAM_GB" =~ ^[1-9][0-9]*$ ]] || die "invalid RAM size: $RAM_GB"
+[[ -z "$DISK_GB" || "$DISK_GB" =~ ^[1-9][0-9]*$ ]] || die "invalid disk size: $DISK_GB"
+
+log "    cloning VM..."
+created=0
+cleanup_failed_clone() {
+    local status=$?
+    trap - EXIT
+    if (( status != 0 && created == 1 )); then
+        warn "configuration failed — deleting incomplete VM '$VM_NAME'"
+        tart delete "$VM_NAME" >/dev/null 2>&1 || true
+    fi
+    exit "$status"
+}
+trap cleanup_failed_clone EXIT
+tart clone "$SONOMA_IMG" "$VM_NAME" || die "tart clone failed for '$VM_NAME'"
+created=1
+tart set "$VM_NAME" --cpu "$CPUS" --memory "$((RAM_GB * 1024))" \
+    || die "failed to configure CPU/RAM for '$VM_NAME'"
+if [[ -n "$DISK_GB" ]]; then
+    tart set "$VM_NAME" --disk-size "$DISK_GB" \
+        || die "failed to grow '$VM_NAME' disk to ${DISK_GB}G (Tart cannot shrink disks)"
 fi
+created=0
+trap - EXIT
 ok "VM '$VM_NAME' created"
 
 # 4) confirm
-tart list 2>/dev/null
-log "==> done. Run 'tart run $VM_NAME' or 'tart ip $VM_NAME' to boot/ssh."
+tart list --source local 2>/dev/null
+log "==> done. Run 'tart run --no-graphics $VM_NAME'; use 'tart exec $VM_NAME ...' for commands."

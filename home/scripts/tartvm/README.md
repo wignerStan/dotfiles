@@ -10,11 +10,11 @@ idempotent idempotency, and fail-loud space guards.
 
 ```
 scripts/tartvm/
-  create/    tart-create.sh          pull base image (once) + create a guest VM
+  create/    tart-create.sh          pull base image (once) + clone a guest VM
   env/       tart-bootstrap.sh       host-side: ensure VM, boot, copy+run guest script
              tart-guest-bootstrap.sh guest-side: install chezmoi, place age key, apply
   verify/    tart-verify.sh          health check (tart, TART_HOME, guest state)
-  maintenance/tart-maint.sh          list | budget snapshots | snapshot | prune base images
+  maintenance/tart-maint.sh          list VM configs | prune caches/old VMs
 ```
 
 Recurring code lives in `run_onchange_macos-tart-setup.sh.tmpl` (darwin-gated),
@@ -38,12 +38,13 @@ partial state.
 
 1. `chezmoi apply` on the Mac runs `run_onchange_macos-tart-setup.sh.tmpl` once:
    installs tart/lima, mkdir `TART_HOME`, pulls a base image.
-2. `scripts/tartvm/create/tart-create.sh --name win` creates the guest from a base
+2. `scripts/tartvm/create/tart-create.sh --name win` clones the guest from a base
    image (offline if already pulled).
 3. `scripts/tartvm/env/tart-bootstrap.sh win` boots the guest and, via
-   `tart ssh` (which authenticates itself — no pinned username), stages + runs
+   `tart exec` and the guest agent (no SSH dependency), stages + runs
    `tart-guest-bootstrap.sh`. That script clones the dotfiles repo, installs
-   chezmoi (+ age), decrypts `secrets.toml.age` with the guest's age identity,
+   chezmoi, decrypts `secrets.toml.age` with the host identity transferred over
+   the guest-agent channel,
    and runs `chezmoi apply`.
 
 > Note: the base macOS images ship no Homebrew by default. `tart-guest-bootstrap.sh`
@@ -61,7 +62,7 @@ breakage so it can gate later steps.
 
 ## Hardening applied
 
-- **No hardcoded usernames** — `tart ssh` authenticates as the guest user; all
+- **No hardcoded usernames** — `tart exec` uses the guest agent; all
   guest paths are `$HOME`-relative (same sweep we ran on `scripts/winvm/`).
 - **mount/space-aware** — external drive preferred; internal floor enforced
   (currently 60 GB) with a clear error instead of silent overflow.

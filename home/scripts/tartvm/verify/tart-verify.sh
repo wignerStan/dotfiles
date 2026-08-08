@@ -36,15 +36,18 @@ else
 fi
 
 # 3) base image cached (so create is offline-capable)
-if tart image list 2>/dev/null | grep -qiE "sonoma|sequoia|ventura"; then
+if tart list --source oci --quiet 2>/dev/null | grep -q .; then
     ok "base image cached"
 else
     warn "no base image cached yet — VM create will need network"
 fi
 
-# 4) guest state
-state=$(tart list 2>/dev/null | awk -v n="$VM_NAME" '$1==n{print $NF}')
-if tart list 2>/dev/null | awk '{print $1}' | grep -qx "$VM_NAME"; then
+# 4) guest state. `tart list` includes a Source column in Tart 2.35, so use the
+# structured per-VM output rather than depending on table columns.
+state=""
+if tart list --source local --quiet 2>/dev/null | grep -Fqx "$VM_NAME"; then
+    state=$(tart get "$VM_NAME" --format json 2>/dev/null \
+        | /usr/bin/plutil -extract State raw -o - - 2>/dev/null)
     ok "guest '$VM_NAME' state: $state"
 else
     die "guest '$VM_NAME' not found — run tart-create.sh"

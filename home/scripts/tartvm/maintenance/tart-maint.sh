@@ -1,16 +1,15 @@
 #!/usr/bin/env bash
 # -------------------------------------------------------------------------------
 # tart VM maintenance — mac-only host. Idempotent.
-# Encapsulates the tart equivalents of winvm/maintenance/vm-trim.ps1:
-#   budget <n>   prune VM snapshots to keep budget (default: keep newest 3)
-#   reclaim      reclaim free space from base images (tart prune advertised images)
-#   snapshot NAME -n LABEL   create a snapshot (mirrors winvm backup point)
-#   list         show VMs + snapshots
+# Encapsulates the supported Tart 2.x maintenance operations:
+#   list                  show local VMs and their configuration
+#   prune [days]          prune OCI/IPSW cache entries older than N days
+#   prune-vms [days]      prune local VMs older than N days (explicit/destructive)
 #
 # All ops run through `tart` so the external-drive/TART_HOME policy is inherited.
 # Managed by Chezmoi — do not edit in place.
 # -------------------------------------------------------------------------------
-set -uo pipefail
+set -euo pipefail
 
 CMD="${1:-list}"
 GREEN=$'\033[0;32m'; RED=$'\033[0;31m'; RESET=$'\033[0m'
@@ -24,37 +23,28 @@ is_cmd tart || die "tart missing"
 case "$CMD" in
     list)
         log "==> VMs:"
-        tart list 2>/dev/null
-        log "==> Snapshots (per VM):"
-        tart list 2>/dev/null | awk '{print $1}' | grep -v '^$' | while read -r v; do
-            snap=$(tart snapshot "$v" --list 2>/dev/null)
-            [ -n "$snap" ] && { log "  $v:"; snap | sed 's/^/    /'; }
+        tart list --source local 2>/dev/null
+        log "==> Configuration (per VM):"
+        tart list --source local --quiet 2>/dev/null | while read -r v; do
+            [[ -n "$v" ]] || continue
+            log "  $v:"
+            tart get "$v" 2>/dev/null | /usr/bin/sed 's/^/    /'
         done
         exit 0
         ;;
-    budget)
-        KEEP="${2:-6}"
-        tart list 2>/dev/null | awk '{print $1}' | grep -v '^$' | while read -r v; do
-            tart snapshot "$v" --list 2>/dev/null \
-            | tail -n +2 | head -n -"$KEEP" | while read -r snap; do
-                log "  pruning $v@$snap"
-                tart snapshot "$v" --delete "$snap" 2>/dev/null
-            done
-        done
-        ok "snapshot budget applied (keep newest $KEEP)"
-        ;;
-    snapshot)
-        NAME="${2:?usage: tart-maint.sh snapshot <name>}"
-        tart snapshot "$NAME" --create "$(date +%Y%m%d-%H%M%S)" 2>/dev/null && ok "snapshot of $NAME created"
-        ;;
     prune)
-        if tart image prune 2>/dev/null; then
-            ok "pruned advertised/untagged base images"
-        else
-            die "prune failed"
-        fi
+        DAYS="${2:-30}"
+        [[ "$DAYS" =~ ^[0-9]+$ ]] || die "invalid day count: $DAYS"
+        tart prune --entries caches --older-than "$DAYS"
+        ok "pruned cache entries older than $DAYS days"
+        ;;
+    prune-vms)
+        DAYS="${2:?usage: tart-maint.sh prune-vms <days>}"
+        [[ "$DAYS" =~ ^[0-9]+$ ]] || die "invalid day count: $DAYS"
+        tart prune --entries vms --older-than "$DAYS"
+        ok "pruned local VMs older than $DAYS days"
         ;;
     *)
-        die "unknown cmd: $CMD (list|budget|snapshot|prune)"
+        die "unknown cmd: $CMD (list|prune|prune-vms)"
         ;;
 esac
