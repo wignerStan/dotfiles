@@ -1,0 +1,59 @@
+{{- $pf := .firewall.macos_pf -}}
+# macOS host firewall. Loaded only inside com.apple/999.chezmoi-firewall.
+# Outbound traffic is allowed and stateful; unsolicited inbound and forwarding
+# are denied unless an exception below matches.
+# The installer requires macOS Application Firewall for application-identity
+# enforcement inside Apple link-local and trusted-interface exceptions.
+
+table <chezmoi_lan_v4> const { {{ $pf.lan_ipv4 | join ", " }} }
+table <chezmoi_lan_v6> const { {{ $pf.lan_ipv6 | join ", " }} }
+
+pass in quick on lo0 all keep state label "chezmoi-pf-loopback"
+# Keep IPv6 path-MTU discovery and error reporting functional even when echo
+# handling is disabled. Neighbor/router discovery and multicast-listener
+# control are type-scoped so link-local peers do not receive a blanket ICMPv6
+# exception. Numeric types avoid parser-name differences across macOS releases.
+pass in quick inet6 proto icmp6 from any to self icmp6-type { 1, 2, 3, 4 } keep state label "chezmoi-pf-ipv6-errors"
+pass in quick inet6 proto icmp6 from any to { self, ff02::/16 } icmp6-type { 130, 131, 132, 133, 134, 135, 136, 137, 143 } keep state label "chezmoi-pf-ipv6-control"
+{{- if $pf.allow_icmp }}
+pass in quick inet proto icmp from any to self keep state label "chezmoi-pf-icmp4"
+pass in quick inet6 proto icmp6 from any to self keep state label "chezmoi-pf-icmp6"
+{{- end }}
+{{- if $pf.allow_apple_discovery }}
+# Bonjour is multicast and therefore does not target an address in `self`.
+pass in quick inet proto udp from any port 5353 to 224.0.0.251 port 5353 keep state label "chezmoi-pf-mdns4"
+pass in quick inet6 proto udp from fe80::/10 port 5353 to ff02::fb port 5353 keep state label "chezmoi-pf-mdns6"
+{{- end }}
+{{- if $pf.allow_apple_continuity }}
+# identityservicesd uses ports at the start of the unprivileged range while
+# rapportd/sharingd allocate dynamic high ports. Limit this broad exception to
+# observed Apple peer interfaces; ALF remains the application-identity layer.
+pass in quick on { {{ $pf.apple_continuity_interfaces | join ", " }} } inet6 proto tcp from fe80::/10 to self port 1024:65535 flags S/SA keep state label "chezmoi-pf-continuity-tcp"
+pass in quick on { {{ $pf.apple_continuity_interfaces | join ", " }} } inet6 proto udp from fe80::/10 to self port 1024:65535 keep state label "chezmoi-pf-continuity-udp"
+{{- end }}
+{{- if $pf.allow_airplay_lan }}
+pass in quick inet proto tcp from <chezmoi_lan_v4> to self port { 5000, 7000 } flags S/SA keep state label "chezmoi-pf-airplay-tcp4"
+pass in quick inet6 proto tcp from <chezmoi_lan_v6> to self port { 5000, 7000 } flags S/SA keep state label "chezmoi-pf-airplay-tcp6"
+{{- end }}
+{{- if $pf.allow_file_sharing_lan }}
+# SMB/Kerberos are disabled on ordinary LANs by default. The current shares
+# permit guest writes, so this must remain an explicit policy decision.
+pass in quick inet proto tcp from <chezmoi_lan_v4> to self port { 88, 445 } flags S/SA keep state label "chezmoi-pf-files-tcp4"
+pass in quick inet6 proto tcp from <chezmoi_lan_v6> to self port { 88, 445 } flags S/SA keep state label "chezmoi-pf-files-tcp6"
+pass in quick inet proto udp from <chezmoi_lan_v4> to self port { 88, 137, 138 } keep state label "chezmoi-pf-files-udp4"
+pass in quick inet6 proto udp from <chezmoi_lan_v6> to self port 88 keep state label "chezmoi-pf-files-udp6"
+{{- end }}
+{{- if gt (len $pf.lan_tcp_ports) 0 }}
+pass in quick inet proto tcp from <chezmoi_lan_v4> to self port { {{ $pf.lan_tcp_ports | join ", " }} } flags S/SA keep state label "chezmoi-pf-lan-tcp4"
+pass in quick inet6 proto tcp from <chezmoi_lan_v6> to self port { {{ $pf.lan_tcp_ports | join ", " }} } flags S/SA keep state label "chezmoi-pf-lan-tcp6"
+{{- end }}
+{{- if gt (len $pf.lan_udp_ports) 0 }}
+pass in quick inet proto udp from <chezmoi_lan_v4> to self port { {{ $pf.lan_udp_ports | join ", " }} } keep state label "chezmoi-pf-lan-udp4"
+pass in quick inet6 proto udp from <chezmoi_lan_v6> to self port { {{ $pf.lan_udp_ports | join ", " }} } keep state label "chezmoi-pf-lan-udp6"
+{{- end }}
+{{- if $pf.log_blocked }}
+block drop in quick log all label "chezmoi-pf-input-default"
+{{- else }}
+block drop in quick all label "chezmoi-pf-input-default"
+{{- end }}
+pass out all keep state label "chezmoi-pf-output-default"

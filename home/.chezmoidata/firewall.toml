@@ -1,0 +1,53 @@
+# Cross-platform host-firewall policy. Product/domain filtering belongs to the
+# application or proxy layer, not here.
+
+[firewall.macos_pf]
+# Resource classification: system scope, personal ownership, Darwin only,
+# L2/basic baseline (therefore also present when bootstrap=full). Tier and guest
+# role do not disable a security baseline.
+enabled = true
+allow_icmp = true
+log_blocked = false
+require_application_firewall = true
+
+# Preserve Apple networking without opening every fixed listener. Bonjour,
+# AirPlay, and Continuity are separate controls. Continuity's dynamic-port PF
+# exception is link-local/interface-wide; macOS Application Firewall remains
+# the application-identity enforcement layer.
+allow_apple_discovery = true
+allow_apple_continuity = true
+# Restrict Continuity's broad unprivileged-port exception to the interfaces
+# observed carrying Apple peer traffic. utun4 currently carries
+# identityservicesd; high custom interfaces (sing-box utun100/utun101), physical
+# uplinks, VM bridges, and future third-party tunnels are deliberately excluded.
+apple_continuity_interfaces = ["awdl0", "llw0", "utun4"]
+allow_airplay_lan = true
+# Keep false: File Sharing was found with guest-writable SMB shares. Campus AP
+# isolation is not a firewall boundary; trusted-mesh access remains separate.
+allow_file_sharing_lan = false
+
+# No inbound application service is exposed by default. Add ports deliberately.
+lan_ipv4 = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
+# Do not treat every link-local IPv6 neighbor on the campus uplink as LAN.
+# AirPlay still works over private IPv4 and ULA IPv6 networks.
+lan_ipv6 = ["fc00::/7"]
+lan_tcp_ports = []
+lan_udp_ports = []
+
+# The interface is cryptographically authenticated and pinned by this host's
+# mesh configuration. This mirrors the Linux nft policy that trusts tailnet
+# input; macOS Application Firewall still enforces application identity.
+trusted_interface = "utun101"
+trusted_allow_all = true
+# Keep SMB/Kerberos blocked even inside the otherwise trusted tailnet while the
+# host has guest-writable shares. Set true only after fixing the share policy.
+allow_file_sharing_trusted = false
+trusted_ipv4 = ["100.64.0.0/10"]
+trusted_ipv6 = ["fd7a:115c:a1e0::/48"]
+trusted_tcp_ports = []
+trusted_udp_ports = []
+
+# The embedded tsnet server leaves its UDP Port at zero, so Tailscale selects a
+# dynamic underlay port. Outbound PF state handles that transport; do not add a
+# fixed UDP 41641 input exception. This trusted overlay governs decrypted
+# tailnet traffic after it enters utun101.

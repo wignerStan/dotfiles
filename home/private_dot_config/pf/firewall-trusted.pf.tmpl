@@ -1,0 +1,29 @@
+{{- $pf := .firewall.macos_pf -}}
+# Trusted-interface overlay. Loaded into com.apple/998.chezmoi-firewall-trusted
+# only after the configured interface exists; the base firewall is independent.
+
+table <chezmoi_trusted_v4> const { {{ $pf.trusted_ipv4 | join ", " }} }
+table <chezmoi_trusted_v6> const { {{ $pf.trusted_ipv6 | join ", " }} }
+
+{{- if not $pf.allow_file_sharing_trusted }}
+# Preserve the trusted-mesh model without exposing the current guest-writable
+# SMB shares. These quick blocks precede the trusted allow-all rule.
+block drop in quick on {{ $pf.trusted_interface }} inet proto tcp from <chezmoi_trusted_v4> to self port { 88, 445 } label "chezmoi-pf-trusted-files-tcp4"
+block drop in quick on {{ $pf.trusted_interface }} inet6 proto tcp from <chezmoi_trusted_v6> to self port { 88, 445 } label "chezmoi-pf-trusted-files-tcp6"
+block drop in quick on {{ $pf.trusted_interface }} inet proto udp from <chezmoi_trusted_v4> to self port { 88, 137, 138 } label "chezmoi-pf-trusted-files-udp4"
+block drop in quick on {{ $pf.trusted_interface }} inet6 proto udp from <chezmoi_trusted_v6> to self port 88 label "chezmoi-pf-trusted-files-udp6"
+{{- end }}
+
+{{- if $pf.trusted_allow_all }}
+pass in quick on {{ $pf.trusted_interface }} inet from <chezmoi_trusted_v4> to self keep state label "chezmoi-pf-trusted-all4"
+pass in quick on {{ $pf.trusted_interface }} inet6 from <chezmoi_trusted_v6> to self keep state label "chezmoi-pf-trusted-all6"
+{{- else }}
+{{- if gt (len $pf.trusted_tcp_ports) 0 }}
+pass in quick on {{ $pf.trusted_interface }} inet proto tcp from <chezmoi_trusted_v4> to self port { {{ $pf.trusted_tcp_ports | join ", " }} } flags S/SA keep state label "chezmoi-pf-trusted-tcp4"
+pass in quick on {{ $pf.trusted_interface }} inet6 proto tcp from <chezmoi_trusted_v6> to self port { {{ $pf.trusted_tcp_ports | join ", " }} } flags S/SA keep state label "chezmoi-pf-trusted-tcp6"
+{{- end }}
+{{- if gt (len $pf.trusted_udp_ports) 0 }}
+pass in quick on {{ $pf.trusted_interface }} inet proto udp from <chezmoi_trusted_v4> to self port { {{ $pf.trusted_udp_ports | join ", " }} } keep state label "chezmoi-pf-trusted-udp4"
+pass in quick on {{ $pf.trusted_interface }} inet6 proto udp from <chezmoi_trusted_v6> to self port { {{ $pf.trusted_udp_ports | join ", " }} } keep state label "chezmoi-pf-trusted-udp6"
+{{- end }}
+{{- end }}

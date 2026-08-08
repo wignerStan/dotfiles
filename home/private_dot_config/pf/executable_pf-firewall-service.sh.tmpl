@@ -1,0 +1,218 @@
+#!/bin/bash
+set -euo pipefail
+
+PATH=/usr/bin:/bin:/usr/sbin:/sbin
+PFCTL=/sbin/pfctl
+BASE_ANCHOR=com.apple/999.chezmoi-firewall
+TRUSTED_ANCHOR=com.apple/998.chezmoi-firewall-trusted
+BASE_RULES=/etc/pf.anchors/chezmoi-firewall
+TRUSTED_RULES=/etc/pf.anchors/chezmoi-firewall-trusted
+TRUSTED_INTERFACE={{ .firewall.macos_pf.trusted_interface | quote }}
+TOKEN_FILE=/var/run/local.chezmoi-pf-firewall.token
+LOG_TAG=chezmoi-pf
+POLL_INTERVAL=5
+
+token=""
+last_network_signature=""
+trusted_loaded=0
+
+log() {
+    /usr/bin/logger -t "$LOG_TAG" -- "$*"
+    printf '%s\n' "$*"
+}
+
+release_stale_token() {
+    local stale_token
+
+    [[ -s "$TOKEN_FILE" ]] || return 0
+    stale_token="$(<"$TOKEN_FILE")"
+    if [[ "$stale_token" =~ ^[0-9]+$ ]]; then
+        "$PFCTL" -X "$stale_token" >/dev/null 2>&1 || true
+    fi
+    /bin/rm -f "$TOKEN_FILE"
+}
+
+cleanup() {
+    local status=$?
+    trap - EXIT INT TERM
+
+    "$PFCTL" -q -a "$TRUSTED_ANCHOR" -F rules >/dev/null 2>&1 || true
+    "$PFCTL" -q -a "$TRUSTED_ANCHOR" -F Tables >/dev/null 2>&1 || true
+    "$PFCTL" -q -a "$BASE_ANCHOR" -F rules >/dev/null 2>&1 || true
+    "$PFCTL" -q -a "$BASE_ANCHOR" -F Tables >/dev/null 2>&1 || true
+    if [[ "$token" =~ ^[0-9]+$ ]]; then
+        "$PFCTL" -X "$token" >/dev/null 2>&1 || true
+    fi
+    /bin/rm -f "$TOKEN_FILE"
+    log "firewall anchors unloaded and PF token released"
+    exit "$status"
+}
+
+enable_pf() {
+    local output
+
+    output="$($PFCTL -E 2>&1)"
+    token="$(/usr/bin/sed -nE 's/.*Token[[:space:]]*:[[:space:]]*([0-9]+).*/\1/p' <<<"$output" | /usr/bin/head -n 1)"
+    if [[ ! "$token" =~ ^[0-9]+$ ]]; then
+        printf 'chezmoi-pf: unable to parse PF token: %s\n' "$output" >&2
+        exit 1
+    fi
+    umask 077
+    printf '%s\n' "$token" > "$TOKEN_FILE"
+}
+
+pf_is_enabled() {
+    "$PFCTL" -s info 2>/dev/null \
+        | /usr/bin/grep -E '^Status:[[:space:]]+Enabled' >/dev/null
+}
+
+renew_pf_token() {
+    if [[ "$token" =~ ^[0-9]+$ ]]; then
+        "$PFCTL" -X "$token" >/dev/null 2>&1 || true
+    fi
+    token=""
+    /bin/rm -f "$TOKEN_FILE"
+    enable_pf
+}
+
+network_signature() {
+    /sbin/ifconfig -a | /usr/bin/awk '
+        /^[^[:space:]].*: flags=/ { print; next }
+        /^[[:space:]]+(inet|inet6)[[:space:]]/ { print }
+    ' | /usr/bin/cksum
+}
+
+trusted_interface_exists() {
+    /sbin/ifconfig "$TRUSTED_INTERFACE" >/dev/null 2>&1
+}
+
+base_rules_active() {
+    "$PFCTL" -a "$BASE_ANCHOR" -sr 2>/dev/null \
+        | /usr/bin/grep 'chezmoi-pf-input-default' >/dev/null
+}
+
+trusted_rules_active() {
+    "$PFCTL" -a "$TRUSTED_ANCHOR" -sr 2>/dev/null \
+        | /usr/bin/grep 'chezmoi-pf-trusted-' >/dev/null
+}
+
+flush_trusted_rules() {
+    "$PFCTL" -q -a "$TRUSTED_ANCHOR" -F rules >/dev/null 2>&1 || true
+    "$PFCTL" -q -a "$TRUSTED_ANCHOR" -F Tables >/dev/null 2>&1 || true
+}
+
+run_pfctl_rules() {
+    local output
+    local status=0
+
+    # macOS prints a generic "Use of -f option" warning even for a named
+    # anchor. Suppress that successful-path noise, but retain every real parser
+    # or load error with its original exit status.
+    output="$("$PFCTL" "$@" 2>&1)" || status=$?
+    if (( status != 0 )); then
+        printf '%s\n' "$output" >&2
+        return "$status"
+    fi
+}
+
+load_base_rules() {
+    run_pfctl_rules -q -a "$BASE_ANCHOR" -f "$BASE_RULES"
+}
+
+load_trusted_rules() {
+    run_pfctl_rules -q -a "$TRUSTED_ANCHOR" -f "$TRUSTED_RULES"
+}
+
+reconcile_rules() {
+    local signature_after
+    local signature_before
+
+    # Validate every ruleset that will be used before replacing either active
+    # anchor, so a bad trusted overlay cannot disturb the working base policy.
+    run_pfctl_rules -q -n -a "$BASE_ANCHOR" -f "$BASE_RULES" || return 1
+    run_pfctl_rules -q -n -a "$TRUSTED_ANCHOR" -f "$TRUSTED_RULES" || return 1
+
+    # If an address changes while `self` is being expanded, repeat against the
+    # stable topology rather than recording a signature newer than the rules.
+    for _ in 1 2 3; do
+        signature_before="$(network_signature)"
+        load_base_rules || return 1
+        if trusted_interface_exists; then
+            load_trusted_rules || return 1
+            trusted_loaded=1
+        else
+            flush_trusted_rules
+            trusted_loaded=0
+        fi
+        signature_after="$(network_signature)"
+        if [[ "$signature_before" == "$signature_after" ]]; then
+            last_network_signature="$signature_after"
+            return 0
+        fi
+    done
+    return 1
+}
+
+rules_need_reconcile() {
+    local current_signature
+
+    current_signature="$(network_signature)"
+    [[ "$current_signature" != "$last_network_signature" ]] && return 0
+    base_rules_active || return 0
+    if trusted_interface_exists; then
+        trusted_rules_active || return 0
+    else
+        trusted_rules_active && return 0
+    fi
+    return 1
+}
+
+if (( EUID != 0 )); then
+    printf 'chezmoi-pf must run as root\n' >&2
+    exit 1
+fi
+if ! /usr/bin/grep -Eq '^[[:space:]]*anchor[[:space:]]+"com\.apple/\*"' /etc/pf.conf; then
+    printf 'chezmoi-pf: /etc/pf.conf has no com.apple/* anchor point\n' >&2
+    exit 1
+fi
+for rules in "$BASE_RULES" "$TRUSTED_RULES"; do
+    [[ -r "$rules" ]] || { printf 'chezmoi-pf: missing %s\n' "$rules" >&2; exit 1; }
+done
+
+run_pfctl_rules -q -n -a "$BASE_ANCHOR" -f "$BASE_RULES"
+run_pfctl_rules -q -n -a "$TRUSTED_ANCHOR" -f "$TRUSTED_RULES"
+trap cleanup EXIT INT TERM
+release_stale_token
+enable_pf
+reconcile_rules
+log "base stateful host firewall loaded in $BASE_ANCHOR"
+
+if (( trusted_loaded == 1 )); then
+    log "trusted overlay loaded on $TRUSTED_INTERFACE"
+else
+    log "trusted interface $TRUSTED_INTERFACE is absent; base firewall remains active"
+fi
+
+while :; do
+    /bin/sleep "$POLL_INTERVAL" &
+    wait $!
+
+    if ! pf_is_enabled; then
+        log "PF became disabled; renewing the service token"
+        renew_pf_token
+    fi
+
+    if rules_need_reconcile; then
+        previously_trusted=$trusted_loaded
+        if reconcile_rules; then
+            log "firewall anchors reconciled after a network or ruleset change"
+            if (( trusted_loaded == 1 && previously_trusted == 0 )); then
+                log "trusted overlay loaded on $TRUSTED_INTERFACE"
+            elif (( trusted_loaded == 0 && previously_trusted == 1 )); then
+                log "trusted interface $TRUSTED_INTERFACE disappeared; overlay unloaded"
+            fi
+        else
+            log "unable to reconcile firewall anchors; retaining the last valid rules"
+        fi
+    fi
+done

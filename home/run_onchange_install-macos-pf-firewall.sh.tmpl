@@ -1,0 +1,264 @@
+{{- /* Resource classification:
+       scope=system, ownership=personal, os=darwin, layer=basic.
+       `full` includes the L2/basic baseline. Both system and system+user
+       reconcile this root resource; a plain user elevates through sudo. */ -}}
+{{- $axesValidated := includeTemplate "validate-axes" . -}}
+{{- $systemPass := or (eq .deploy "system") (eq .deploy "system+user") -}}
+{{- $basicLayer := or (eq .bootstrap "basic") (eq .bootstrap "full") -}}
+{{- if and (eq .chezmoi.os "darwin") $systemPass -}}
+#!/bin/bash
+# rules-sha256: {{ includeTemplate "private_dot_config/pf/firewall.pf.tmpl" . | sha256sum }}
+# trusted-rules-sha256: {{ includeTemplate "private_dot_config/pf/firewall-trusted.pf.tmpl" . | sha256sum }}
+# service-sha256: {{ includeTemplate "private_dot_config/pf/executable_pf-firewall-service.sh.tmpl" . | sha256sum }}
+# plist-sha256: {{ include "private_dot_config/pf/local.chezmoi-pf-firewall.plist" | sha256sum }}
+set -euo pipefail
+
+PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+LABEL=local.chezmoi-pf-firewall
+OLD_LABEL=local.sing-box-pf-killswitch
+PF_ENABLED={{ if and (eq .ownership "personal") $basicLayer (hasKey . "firewall") (hasKey .firewall "macos_pf") (hasKey .firewall.macos_pf "enabled") .firewall.macos_pf.enabled }}1{{ else }}0{{ end }}
+REQUIRE_APPLICATION_FIREWALL={{ if and (hasKey . "firewall") (hasKey .firewall "macos_pf") (index .firewall.macos_pf "require_application_firewall") }}1{{ else }}0{{ end }}
+SRC="{{ .chezmoi.homeDir }}/.config/pf"
+RULES_DST=/etc/pf.anchors/chezmoi-firewall
+TRUSTED_RULES_DST=/etc/pf.anchors/chezmoi-firewall-trusted
+SERVICE_DST=/usr/local/libexec/chezmoi-pf-firewall
+PLIST_DST=/Library/LaunchDaemons/local.chezmoi-pf-firewall.plist
+OLD_BOOTSTRAP=/etc/pf.anchors/com.apple.sing-box-killswitch.bootstrap
+OLD_RULES=/etc/pf.anchors/com.apple.sing-box-killswitch
+OLD_SERVICE=/usr/local/libexec/sing-box-pf-killswitch
+OLD_PLIST=/Library/LaunchDaemons/local.sing-box-pf-killswitch.plist
+LEGACY_MIHOMO=/etc/pf.anchors/mihomo_security
+LEGACY_MIHOMO_SHA256=90a9e33fe4f516606f3e152a07fbd8d203a6039afb0c2b390ce70aa529e866e6
+BACKUP_DIR=""
+PREVIOUS_LABEL_LOADED=0
+PREVIOUS_OLD_LABEL_LOADED=0
+
+as_root() {
+    if (( EUID == 0 )); then
+        "$@"
+    else
+        sudo "$@"
+    fi
+}
+
+validate_pf_rules() {
+    local anchor=$1
+    local rules=$2
+    local output
+    local status=0
+
+    # Successful named-anchor loads still emit macOS's generic main-ruleset
+    # warning. Keep real parser diagnostics while leaving normal installs quiet.
+    output="$(as_root /sbin/pfctl -q -n -a "$anchor" -f "$rules" 2>&1)" || status=$?
+    if (( status != 0 )); then
+        printf '%s\n' "$output" >&2
+        return "$status"
+    fi
+}
+
+is_loaded() {
+    /bin/launchctl print "system/$1" >/dev/null 2>&1
+}
+
+bootout_if_loaded() {
+    local label=$1
+
+    if is_loaded "$label"; then
+        as_root /bin/launchctl bootout "system/$label"
+    fi
+}
+
+verify_firewall_service() {
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+        if /bin/launchctl print "system/$LABEL" 2>/dev/null | /usr/bin/grep 'state = running' >/dev/null && \
+           as_root /sbin/pfctl -s info 2>/dev/null | /usr/bin/grep -E '^Status:[[:space:]]+Enabled' >/dev/null && \
+           as_root /sbin/pfctl -a com.apple/999.chezmoi-firewall -sr 2>/dev/null | /usr/bin/grep 'chezmoi-pf-input-default' >/dev/null; then
+            return 0
+        fi
+        /bin/sleep 1
+    done
+    return 1
+}
+
+cleanup_backup() {
+    [[ -n "$BACKUP_DIR" ]] || return 0
+    case "$BACKUP_DIR" in
+        /var/tmp/chezmoi-pf-firewall.*)
+            as_root /bin/rm -rf "$BACKUP_DIR"
+            ;;
+        *)
+            echo "chezmoi-pf: refusing to remove unexpected backup path $BACKUP_DIR" >&2
+            return 1
+            ;;
+    esac
+    BACKUP_DIR=""
+}
+
+backup_destination() {
+    local source=$1
+    local name=$2
+
+    if as_root /bin/test -e "$source"; then
+        as_root /bin/cp -p "$source" "$BACKUP_DIR/$name"
+    fi
+}
+
+restore_destination() {
+    local backup=$1
+    local destination=$2
+
+    if as_root /bin/test -e "$backup"; then
+        as_root /bin/cp -p "$backup" "$destination"
+    else
+        as_root /bin/rm -f "$destination"
+    fi
+}
+
+create_backup() {
+    BACKUP_DIR="$(as_root /usr/bin/mktemp -d /var/tmp/chezmoi-pf-firewall.XXXXXX)"
+    trap cleanup_backup EXIT
+    backup_destination "$RULES_DST" rules
+    backup_destination "$TRUSTED_RULES_DST" trusted-rules
+    backup_destination "$SERVICE_DST" service
+    backup_destination "$PLIST_DST" plist
+}
+
+rollback_install() {
+    local rollback_failed=0
+
+    echo "chezmoi-pf: replacement failed; restoring the previous firewall installation" >&2
+    if ! bootout_if_loaded "$LABEL"; then
+        rollback_failed=1
+    fi
+
+    restore_destination "$BACKUP_DIR/rules" "$RULES_DST" || rollback_failed=1
+    restore_destination "$BACKUP_DIR/trusted-rules" "$TRUSTED_RULES_DST" || rollback_failed=1
+    restore_destination "$BACKUP_DIR/service" "$SERVICE_DST" || rollback_failed=1
+    restore_destination "$BACKUP_DIR/plist" "$PLIST_DST" || rollback_failed=1
+
+    if (( PREVIOUS_LABEL_LOADED == 1 )); then
+        if ! as_root /bin/launchctl enable "system/$LABEL" || \
+           ! as_root /bin/launchctl bootstrap system "$PLIST_DST" || \
+           ! verify_firewall_service; then
+            rollback_failed=1
+        fi
+    fi
+    if (( PREVIOUS_OLD_LABEL_LOADED == 1 )) && as_root /bin/test -f "$OLD_PLIST"; then
+        if ! as_root /bin/launchctl enable "system/$OLD_LABEL" || \
+           ! as_root /bin/launchctl bootstrap system "$OLD_PLIST"; then
+            rollback_failed=1
+        fi
+    fi
+
+    if (( rollback_failed == 1 )); then
+        echo "chezmoi-pf: CRITICAL: automatic rollback was incomplete" >&2
+        return 1
+    fi
+    echo "chezmoi-pf: previous firewall installation restored" >&2
+}
+
+fail_with_rollback() {
+    local reason=$1
+
+    echo "chezmoi-pf: $reason" >&2
+    rollback_install || true
+    exit 1
+}
+
+cleanup_old_design() {
+    local actual_hash
+
+    bootout_if_loaded "$OLD_LABEL"
+    if [[ -e "$OLD_BOOTSTRAP" || -e "$OLD_RULES" || -e "$OLD_SERVICE" || -e "$OLD_PLIST" ]]; then
+        as_root /bin/rm -f "$OLD_BOOTSTRAP" "$OLD_RULES" "$OLD_SERVICE" "$OLD_PLIST"
+    fi
+    if [[ -f "$LEGACY_MIHOMO" ]]; then
+        actual_hash="$(/usr/bin/shasum -a 256 "$LEGACY_MIHOMO" | /usr/bin/awk '{print $1}')"
+        if [[ "$actual_hash" == "$LEGACY_MIHOMO_SHA256" ]]; then
+            as_root /bin/rm -f "$LEGACY_MIHOMO"
+        else
+            echo "chezmoi-pf: preserving modified legacy $LEGACY_MIHOMO" >&2
+        fi
+    fi
+}
+
+if (( PF_ENABLED == 0 )); then
+    bootout_if_loaded "$LABEL"
+    if [[ -e "$RULES_DST" || -e "$TRUSTED_RULES_DST" || -e "$SERVICE_DST" || -e "$PLIST_DST" ]]; then
+        as_root /bin/rm -f "$RULES_DST" "$TRUSTED_RULES_DST" "$SERVICE_DST" "$PLIST_DST"
+    fi
+    cleanup_old_design
+    echo "chezmoi-pf: disabled"
+    exit 0
+fi
+
+if (( REQUIRE_APPLICATION_FIREWALL == 1 )); then
+    firewall_state="$(/usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate)"
+    block_all_state="$(/usr/libexec/ApplicationFirewall/socketfilterfw --getblockall)"
+    signed_state="$(/usr/libexec/ApplicationFirewall/socketfilterfw --getallowsigned)"
+    if ! /usr/bin/grep -Eq 'State[[:space:]]*=[[:space:]]*1' <<<"$firewall_state"; then
+        echo "chezmoi-pf: macOS Application Firewall must be enabled" >&2
+        exit 1
+    fi
+    if ! /usr/bin/grep -Eqi 'block all.*disabled' <<<"$block_all_state"; then
+        echo "chezmoi-pf: Application Firewall block-all must be disabled" >&2
+        exit 1
+    fi
+    if ! /usr/bin/grep -Eq 'Automatically allow (signed built-in|built-in signed) software ENABLED' <<<"$signed_state"; then
+        echo "chezmoi-pf: built-in signed software allowance must be enabled" >&2
+        exit 1
+    fi
+    if ! /usr/bin/grep -Eq 'Automatically allow downloaded( signed)? software DISABLED' <<<"$signed_state"; then
+        echo "chezmoi-pf: automatic allowance for downloaded signed software must be disabled" >&2
+        exit 1
+    fi
+fi
+
+sharing_state="$(/usr/sbin/sharing -l 2>/dev/null || true)"
+if /usr/bin/grep -Eq 'guest access:[[:space:]]*1' <<<"$sharing_state" && \
+   /usr/bin/grep -Eq 'read-only:[[:space:]]*0' <<<"$sharing_state"; then
+    echo "chezmoi-pf: WARNING guest-writable SMB sharing is enabled; PF blocks it on ordinary LAN and the trusted interface" >&2
+fi
+
+for source_file in "$SRC/firewall.pf" "$SRC/firewall-trusted.pf" "$SRC/pf-firewall-service.sh" "$SRC/local.chezmoi-pf-firewall.plist"; do
+    [[ -r "$source_file" ]] || { echo "chezmoi-pf: missing $source_file" >&2; exit 1; }
+done
+
+/bin/bash -n "$SRC/pf-firewall-service.sh"
+/usr/bin/plutil -lint "$SRC/local.chezmoi-pf-firewall.plist" >/dev/null
+validate_pf_rules com.apple/999.chezmoi-firewall "$SRC/firewall.pf"
+validate_pf_rules com.apple/998.chezmoi-firewall-trusted "$SRC/firewall-trusted.pf"
+
+as_root /usr/bin/install -d -o root -g wheel -m 0755 /usr/local/libexec
+if is_loaded "$LABEL"; then
+    PREVIOUS_LABEL_LOADED=1
+fi
+if is_loaded "$OLD_LABEL"; then
+    PREVIOUS_OLD_LABEL_LOADED=1
+fi
+create_backup
+
+as_root /usr/bin/install -o root -g wheel -m 0644 "$SRC/firewall.pf" "$RULES_DST" \
+    || fail_with_rollback "unable to install the base rules"
+as_root /usr/bin/install -o root -g wheel -m 0644 "$SRC/firewall-trusted.pf" "$TRUSTED_RULES_DST" \
+    || fail_with_rollback "unable to install the trusted rules"
+as_root /usr/bin/install -o root -g wheel -m 0755 "$SRC/pf-firewall-service.sh" "$SERVICE_DST" \
+    || fail_with_rollback "unable to install the firewall service"
+as_root /usr/bin/install -o root -g wheel -m 0644 "$SRC/local.chezmoi-pf-firewall.plist" "$PLIST_DST" \
+    || fail_with_rollback "unable to install the LaunchDaemon plist"
+validate_pf_rules com.apple/999.chezmoi-firewall "$RULES_DST" \
+    || fail_with_rollback "installed base rules failed validation"
+validate_pf_rules com.apple/998.chezmoi-firewall-trusted "$TRUSTED_RULES_DST" \
+    || fail_with_rollback "installed trusted rules failed validation"
+
+bootout_if_loaded "$OLD_LABEL" || fail_with_rollback "unable to stop legacy $OLD_LABEL"
+bootout_if_loaded "$LABEL" || fail_with_rollback "unable to stop existing $LABEL"
+as_root /bin/launchctl enable "system/$LABEL" || fail_with_rollback "unable to enable system/$LABEL"
+as_root /bin/launchctl bootstrap system "$PLIST_DST" || fail_with_rollback "unable to bootstrap system/$LABEL"
+verify_firewall_service || fail_with_rollback "service registered but PF or the base anchor did not become active"
+
+cleanup_old_design
+cleanup_backup
+trap - EXIT
+echo "chezmoi-pf: installed, running, and verified as system/$LABEL"
+{{- end -}}
