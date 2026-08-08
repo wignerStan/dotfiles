@@ -1,4 +1,12 @@
 # ── Homebrew ──────────────────────────────────────────────────
+# fish 4.8 queries the terminal (Primary Device Attribute) at startup and
+# waits up to 10s for a reply; terminals that don't respond (tmux/ssh/script/
+# agents) hang at init and then print a warning. Disable the query — fish
+# falls back to sane defaults. Persisted via universal var (once).
+if not contains -- no-query-term $fish_features
+    set -U fish_features $fish_features no-query-term
+end
+
 if test -x /opt/homebrew/bin/brew
     set -gx HOMEBREW_PREFIX /opt/homebrew
 else if test -x /home/linuxbrew/.linuxbrew/bin/brew
