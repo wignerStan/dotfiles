@@ -14,7 +14,6 @@ set -euo pipefail
 PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
 LABEL=local.chezmoi-sing-box
 CFG="{{ .chezmoi.homeDir }}/.config/sing-box/config.json"
-LOG_DIR=/opt/homebrew/var/log/sing-box
 PLIST_SRC="{{ .chezmoi.homeDir }}/.config/sing-box/local.chezmoi-sing-box.plist"
 PLIST_DST=/Library/LaunchDaemons/local.chezmoi-sing-box.plist
 OLD_LABEL=homebrew.mxcl.sing-box
@@ -52,7 +51,6 @@ if ! sing-box check -c "$CFG" 2>&1; then
 fi
 
 /usr/bin/plutil -lint "$PLIST_SRC" >/dev/null
-as_root /usr/bin/install -d -o root -g wheel -m 0755 "$LOG_DIR"
 as_root /usr/bin/install -o root -g wheel -m 0644 "$PLIST_SRC" "$PLIST_DST"
 
 # retire the brew-managed service (plist + registration)
@@ -66,6 +64,10 @@ fi
 # drop stale config from the brew-prefix era
 if [[ -e "/opt/homebrew/etc/sing-box/config.json" ]]; then
     as_root /bin/rm -f "/opt/homebrew/etc/sing-box/config.json"
+fi
+# unified-log era: remove the stale file-redirect leftovers
+if [[ -e "/opt/homebrew/var/log/sing-box/sing-box.log" ]]; then
+    as_root /bin/rm -f "/opt/homebrew/var/log/sing-box/sing-box.log"
 fi
 
 bootout_if_loaded "$LABEL"

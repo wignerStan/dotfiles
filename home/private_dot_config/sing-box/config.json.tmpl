@@ -1,7 +1,7 @@
 {{- if hasKey . "singbox_server" -}}
 {{- $singbox_dir := "" -}}
 {{- if eq .chezmoi.os "darwin" -}}
-{{-   $singbox_dir = printf "%s/.config/sing-box" .chezmoi.homeDir -}}
+{{- $singbox_dir = "/opt/homebrew/etc/sing-box" -}}
 {{- else -}}
 {{-   $singbox_dir = "/etc/sing-box" -}}
 {{- end -}}
@@ -70,6 +70,12 @@
         "detour": "VLESS"
       }
     ],
+{{- if $newSchema }}
+    "optimistic": {
+      "enabled": true,
+      "timeout": "3d"
+    },
+{{- end }}
     "rules": [
 {{- /* Deny normal intercepted DNS lookups before they reach an upstream resolver.
        Route rules below remain necessary for cached names and visible TLS/HTTP
@@ -896,7 +902,8 @@
     "cache_file": {
       "enabled": true,
       "path": "cache.db",
-      "store_fakeip": true
+      "store_fakeip": true{{- if $newSchema }},
+      "store_dns": true{{- end }}
     },
     "clash_api": {
       "external_controller": "127.0.0.1:9091",
