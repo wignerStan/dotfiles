@@ -1,0 +1,45 @@
+# Facet registry — canonical capability overlays (stackable, ANY tier incl. simple).
+# Nested under [facet_registry] so the flat .chezmoidata merge exposes
+# .facet_registry.variant / .facet_registry.pgredis / .facet_registry.order.
+# Package install lists live in packages.toml [packages.facets.*]; this file
+# declares the registry semantics, the slim/full variant table, service install
+# order, and the pg/redis tier scaling.
+
+[facet_registry.facet.dev]
+description = "Developer workspace tooling (formerly the 'develop' tier)"
+
+[facet_registry.facet.proxy]
+description = "Proxy server: xray-core / sing-box"
+
+[facet_registry.facet.ai]
+description = "AI gateway: sub2api (+ backend pg/redis)"
+
+[facet_registry.facet.hpc]
+description = "HPC cluster host (spack/fortran/cuda; formerly the 'calculate' tier)"
+
+[facet_registry.facet.research]
+description = "Research workspace: project Python via pixi (env shells/fish only; installs via L3/dev overlay)"
+
+# Package variant table (slim/full) — conflict-warning scope in the cloud
+# services script: a non-managed override (different variant or custom install)
+# is left alone but reported as a warning. These are the only packages with a
+# meaningful slim/full split today.
+[facet_registry.variant]
+nginx = "slim"          # full → nginx-full
+ripgrep = "slim"        # full → ripgrep-full
+ffmpeg = "slim"         # full → ffmpeg-full
+imagemagick = "slim"    # full → imagemagick-full
+
+# Cloud-services install order (fixed layers of provisioning, not facets):
+# tailscale → nft → sysctl → nginx → kopia → pg/redis → proxy → ai
+[facet_registry.order]
+layers = ["tailscale", "nft", "sysctl", "nginx", "kopia", "pgredis", "proxy", "ai"]
+
+# pg/redis install depth is scaled by tier, NOT by facet:
+#   simple   → single instance (sub2api on a 1C1G box)
+#   default  → single instance
+#   advanced → multi instance (primary + replica)
+[facet_registry.pgredis]
+simple = "single"
+default = "single"
+advanced = "multi"

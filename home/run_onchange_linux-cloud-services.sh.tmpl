@@ -1,0 +1,403 @@
+{{- /* Cloud (platform=cloud, Linux, non-HPC) services — ordered, idempotent.
+     Fixed layer order (facet_registry.order.layers):
+       tailscale → nft → sysctl → nginx → kopia → pg/redis → proxy → ai
+     Rules:
+       - requires root access; SKIP_SYSTEM=1 skips all system provisioning.
+       - conflict-warning: packages with a slim/full variant (facet_registry.variant)
+         or a non-managed override are left alone and reported, never overwritten.
+       - pg/redis depth is tier-scaled (facet_registry.pgredis):
+         single (simple/default) vs multi (advanced).
+       - HPC hosts (shared clusters, no systemd control) are excluded. */ -}}
+{{- $axesValidated := includeTemplate "validate-axes" . -}}
+{{- $systemDeploy := or (eq .deploy "system") (eq .deploy "system+user") -}}
+{{- if and $systemDeploy (eq .platform "cloud") (eq .chezmoi.os "linux") (not (has "hpc" .facets)) -}}
+#!/bin/bash
+set -euo pipefail
+
+# ── helpers ────────────────────────────────────────────────────────────────
+ok()   { printf 'ok:   %s\n' "$*"; }
+warn() { printf 'WARN: %s\n' "$*" >&2; }
+step() { printf '── %s\n' "$*"; }
+as_root() {
+    if (( EUID == 0 )); then
+        "$@"
+    else
+        sudo "$@"
+    fi
+}
+need_root() {
+    if (( EUID != 0 )); then
+        command -v sudo >/dev/null 2>&1 \
+            || { warn "sudo is required for system provisioning"; exit 1; }
+        sudo -v || { warn "needs root — re-run via sudo"; exit 1; }
+    fi
+}
+detect_init() {
+    [[ -d /run/systemd/system ]] && { echo systemd; return; }
+    command -v rc-service >/dev/null 2>&1 && { echo openrc; return; }
+    echo unknown
+}
+has_authorized_keys() {
+    local account_home
+
+    while IFS= read -r account_home; do
+        as_root test -s "$account_home/.ssh/authorized_keys" && return 0
+    done < <(awk -F: '$3 == 0 || $3 >= 1000 { print $6 }' /etc/passwd)
+    return 1
+}
+
+# ── conflict-warning: variant mismatches & non-managed overrides ──────────
+# Only warns — never overwrites a custom/user-managed install.
+check_variant_conflicts() {
+{{- range $pkg, $want := .facet_registry.variant }}
+    if command -v {{ $pkg }} >/dev/null 2>&1; then
+        warn "{{ $pkg }}: managed variant is '{{ $want }}' but a non-managed install exists — leaving as-is (custom override)"
+    fi
+{{- end }}
+}
+
+# ── 1. tailscale (mesh) ───────────────────────────────────────────────────
+install_tailscale() {
+    step "tailscale"
+    command -v tailscale >/dev/null 2>&1 && { ok "tailscale present"; return; }
+    case "$(detect_init)" in
+        openrc)
+            as_root apk add --no-cache --repository=https://dl-cdn.alpinelinux.org/alpine/edge/community tailscale 2>/dev/null || true
+            as_root rc-update add tailscale default 2>/dev/null || true
+            as_root rc-service tailscale start 2>/dev/null || true
+            ;;
+        *)
+            curl -fsSL https://tailscale.com/install.sh | as_root sh 2>/dev/null || true
+            as_root systemctl enable --now tailscaled 2>/dev/null || true
+            ;;
+    esac
+    if command -v tailscale >/dev/null 2>&1; then
+        if ! tailscale status &>/dev/null 2>&1; then
+            warn "tailscale not authenticated: run: sudo tailscale up --accept-dns=false"
+        else
+            __ts_dns=$(tailscale debug prefs 2>/dev/null | grep -c '"AcceptDNS":\[false\]' || echo 0)
+            if [[ "$__ts_dns" == "0" ]]; then
+                as_root tailscale up --accept-dns=false --reset=false 2>/dev/null || true
+                ok "tailscale --accept-dns=false applied"
+            fi
+        fi
+    fi
+}
+
+# ── 2. nftables firewall (tailscale CGNAT + ssh/http allowed) ─────────────
+NFT_CONF=/etc/nftables.conf
+install_nft() {
+    step "nftables"
+    command -v nft >/dev/null 2>&1 || {
+        case "$(detect_init)" in
+            openrc) as_root apk add --no-cache nftables 2>/dev/null || true ;;
+            *) as_root apt-get update -qq && as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y nftables 2>/dev/null || true ;;
+        esac
+    }
+    if command -v nft >/dev/null 2>&1; then
+        if [[ -f "$NFT_CONF" ]]; then
+            warn "$NFT_CONF already exists — not overwriting an existing firewall policy"
+            return 0
+        fi
+        if as_root nft list ruleset 2>/dev/null | grep -E '^[[:space:]]*table[[:space:]]' >/dev/null; then
+            warn "an active nftables ruleset already exists — refusing to flush or replace it"
+            return 0
+        fi
+        __nft_tmp="$(mktemp /tmp/chezmoi-nft.XXXXXX)"
+        cat > "$__nft_tmp" << 'EOF'
+# Managed by chezmoi run_onchange_linux-cloud-services.sh
+flush ruleset
+table inet filter {
+    chain input {
+        type filter hook input priority filter; policy drop;
+        ct state invalid drop
+        ct state established,related accept
+        iif lo accept
+        iifname "tailscale0" accept
+        udp dport 41641 accept
+        tcp dport { 22, 80, 443 } accept
+        icmp type { echo-request } accept
+        meta l4proto ipv6-icmp accept
+        counter drop
+    }
+    chain forward { type filter hook forward priority filter; policy drop; }
+    chain output { type filter hook output priority filter; policy accept; }
+}
+EOF
+        if as_root nft -c -f "$__nft_tmp" 2>/dev/null; then
+            as_root install -o root -g root -m 0644 "$__nft_tmp" "$NFT_CONF"
+            unlink "$__nft_tmp"
+            as_root nft -f "$NFT_CONF"
+            case "$(detect_init)" in
+                systemd) as_root systemctl enable --now nftables 2>/dev/null || true ;;
+                openrc)  as_root rc-update add nftables default 2>/dev/null || true ;;
+            esac
+            ok "nftables ruleset applied (drop by default, tailscale+22/80/443)"
+        else
+            warn "nft ruleset failed validation — leaving firewall untouched"
+            unlink "$__nft_tmp"
+        fi
+    fi
+}
+
+# ── 3. sysctl tuning (kernel mods/dns fall under the same layer) ──────────
+SYSCTL_CONF=/etc/sysctl.d/99-chezmoi.conf
+install_sysctl() {
+    step "sysctl/kernel"
+    if [[ -f "$SYSCTL_CONF" ]]; then
+        warn "custom $SYSCTL_CONF exists — not overwriting (user-managed)"
+        return 0
+    fi
+    __sysctl_tmp="$(mktemp /tmp/chezmoi-sysctl.XXXXXX)"
+    cat > "$__sysctl_tmp" << 'EOF'
+net.core.default_qdisc=fq
+net.ipv4.tcp_congestion_control=bbr
+net.ipv4.tcp_fastopen=3
+net.ipv4.tcp_keepalive_time=60
+net.ipv4.tcp_keepalive_intvl=10
+net.ipv4.tcp_keepalive_probes=6
+EOF
+    as_root install -o root -g root -m 0644 "$__sysctl_tmp" "$SYSCTL_CONF"
+    unlink "$__sysctl_tmp"
+    as_root sysctl -p "$SYSCTL_CONF" >/dev/null 2>&1 || true
+    ok "sysctl applied (bbr + keepalive)"
+}
+
+# ── 4. nginx (Restart=always drop-in — the racknerd fix, now managed) ──────
+install_nginx() {
+    step "nginx"
+    command -v nginx >/dev/null 2>&1 || {
+        case "$(detect_init)" in
+            openrc) as_root apk add --no-cache nginx 2>/dev/null || true ;;
+            *) as_root apt-get update -qq && as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y nginx 2>/dev/null || true ;;
+        esac
+    }
+    command -v nginx >/dev/null 2>&1 || { warn "nginx install failed — skipping"; return 0; }
+    if [[ "$(detect_init)" == "systemd" ]]; then
+        __drop=/etc/systemd/system/nginx.service.d/restart.conf
+        __want='[Service]
+Restart=always
+RestartSec=3'
+        if [[ -f "$__drop" ]]; then
+            warn "custom $__drop exists — leaving as-is"
+        else
+            as_root mkdir -p /etc/systemd/system/nginx.service.d
+            printf '%s\n' "$__want" | as_root tee "$__drop" >/dev/null
+            as_root systemctl daemon-reload
+            ok "nginx Restart=always drop-in written"
+        fi
+        as_root systemctl enable --now nginx 2>/dev/null || true
+    elif [[ "$(detect_init)" == "openrc" ]]; then
+        as_root rc-update add nginx default 2>/dev/null || true
+        as_root rc-service nginx start 2>/dev/null || true
+    else
+        warn "unknown init system — nginx installed but not enabled"
+    fi
+}
+
+# ── 5. kopia (backup) ──────────────────────────────────────────────────────
+install_kopia() {
+    step "kopia"
+    command -v kopia >/dev/null 2>&1 && { ok "kopia present"; return; }
+    case "$(detect_init)" in
+        openrc)
+            __ver=$(curl -fsSL https://api.github.com/repos/kopia/kopia/releases/latest | sed -n 's/.*"tag_name": "v\([^"]*\)".*/\1/p' | head -1)
+            [[ -n "$__ver" ]] && curl -fsSL "https://github.com/kopia/kopia/releases/download/v${__ver}/kopia-${__ver}-linux-x86_64.tar.gz" \
+                | as_root tar xz -C /usr/local/bin --strip-components=1 "kopia-${__ver}-linux-x86_64/kopia" 2>/dev/null || true
+            ;;
+        *)
+            curl -fsSL https://kopia.io/signing-key | as_root gpg --batch --yes --dearmor -o /usr/share/keyrings/kopia-keyring.gpg 2>/dev/null || true
+            echo "deb [signed-by=/usr/share/keyrings/kopia-keyring.gpg] https://packages.kopia.io/apt/ stable main" \
+                | as_root tee /etc/apt/sources.list.d/kopia.list >/dev/null 2>&1
+            as_root apt-get update -qq && as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y kopia 2>/dev/null || true
+            ;;
+    esac
+    if command -v kopia >/dev/null 2>&1; then
+        ok "kopia installed"
+    else
+        warn "kopia install failed"
+    fi
+}
+
+# ── 6. pg/redis — tier-scaled (single vs multi) ────────────────────────────
+PG_MODE="{{ index .facet_registry.pgredis .tier }}"
+install_pgredis() {
+    step "pg/redis (mode=$PG_MODE)"
+    if [[ "$PG_MODE" == "multi" ]]; then
+        warn "advanced tier: multi-instance pg/redis (primary+replica) is declared but the replica setup is manual — install primary only"
+    fi
+    case "$(detect_init)" in
+        openrc)
+            as_root apk add --no-cache postgresql redis 2>/dev/null || true
+            as_root rc-update add postgresql default 2>/dev/null || true
+            as_root rc-update add redis default 2>/dev/null || true
+            as_root rc-service postgresql start 2>/dev/null || true
+            as_root rc-service redis start 2>/dev/null || true
+            ;;
+        *)
+            as_root apt-get update -qq && as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y postgresql redis-server 2>/dev/null || true
+            as_root systemctl enable --now postgresql 2>/dev/null || true
+            as_root systemctl enable --now redis-server 2>/dev/null || true
+            ;;
+    esac
+    ok "pg/redis single-instance enabled ($PG_MODE)"
+}
+
+# ── 7. proxy facet: xray-core / sing-box server ───────────────────────────
+install_proxy_facet() {
+    step "proxy facet (xray-core / sing-box)"
+{{- if has "proxy" .facets }}
+    case "$(detect_init)" in
+        openrc) as_root apk add --no-cache xray-core sing-box 2>/dev/null || true ;;
+        *) as_root apt-get update -qq && as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y xray-core sing-box 2>/dev/null || true ;;
+    esac
+    if [[ -d /etc/sing-box ]] && [[ -f /etc/sing-box/config.json ]]; then
+        case "$(detect_init)" in
+            systemd) as_root systemctl enable --now sing-box 2>/dev/null || true ;;
+            openrc)
+                as_root rc-update add sing-box default 2>/dev/null || true
+                as_root rc-service sing-box start 2>/dev/null || true
+                ;;
+            *) warn "unknown init system — sing-box installed but not enabled" ;;
+        esac
+        ok "sing-box configured with /etc/sing-box/config.json"
+    else
+        warn "proxy facet enabled but no /etc/sing-box/config.json — config is user-managed (socks inbound on 127.0.0.1:32637 etc.)"
+    fi
+{{- else }}
+    skip "proxy facet not enabled"
+{{- end }}
+}
+
+# ── 8. ai facet: sub2api gateway (env from age-decrypted /etc/sub2api/env) ─
+install_ai_facet() {
+    step "ai facet (sub2api)"
+{{- if has "ai" .facets }}
+    SUB2API_DIR="${SUB2API_DIR:-/opt/sub2api}"
+    SUB2API_PORT="${SUB2API_PORT:-8317}"
+    if [[ "$SUB2API_DIR" != /* || "$SUB2API_DIR" =~ [[:space:]] ]]; then
+        warn "SUB2API_DIR must be an absolute path without whitespace"
+        return 0
+    fi
+    if [[ ! "$SUB2API_PORT" =~ ^[0-9]+$ ]] || (( SUB2API_PORT < 1 || SUB2API_PORT > 65535 )); then
+        warn "invalid SUB2API_PORT=$SUB2API_PORT"
+        return 0
+    fi
+    if [[ "$(detect_init)" != "systemd" ]]; then
+        warn "sub2api service management currently requires systemd — skipping"
+        return 0
+    fi
+    if [[ ! -d "$SUB2API_DIR" ]]; then
+        if command -v git >/dev/null 2>&1 && [[ -n "${SUB2API_REPO:-}" ]]; then
+            as_root git clone --depth 1 "$SUB2API_REPO" "$SUB2API_DIR" 2>/dev/null || true
+        else
+            warn "SUB2API_REPO not set — place sub2api at $SUB2API_DIR manually (user-managed)"
+        fi
+    fi
+    if [[ -d "$SUB2API_DIR" ]]; then
+        __uv_bin="$(command -v uv 2>/dev/null || true)"
+        if [[ -z "$__uv_bin" ]]; then
+            warn "uv is missing — cannot create sub2api.service"
+            return 0
+        fi
+        as_root mkdir -p /etc/sub2api
+        as_root tee /etc/systemd/system/sub2api.service >/dev/null << EOF
+[Unit]
+Description=sub2api (AI gateway)
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=$SUB2API_DIR
+ExecStart=$__uv_bin run --directory $SUB2API_DIR uvicorn main:app --host 0.0.0.0 --port $SUB2API_PORT
+EnvironmentFile=-/etc/sub2api/env
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+        as_root systemctl daemon-reload
+        if [[ -f /etc/sub2api/env ]]; then
+            if as_root systemctl enable --now sub2api 2>/dev/null; then
+                ok "sub2api.service enabled"
+            else
+                warn "sub2api.service failed to start"
+            fi
+        else
+            warn "/etc/sub2api/env missing (age-decrypt it here) — sub2api not started"
+        fi
+    fi
+{{- else }}
+    skip "ai facet not enabled"
+{{- end }}
+}
+
+skip() { printf 'skip: %s\n' "$*"; }
+
+# ── main ───────────────────────────────────────────────────────────────────
+check_variant_conflicts
+if [[ "${SKIP_SYSTEM:-0}" == "1" ]]; then
+    skip "SKIP_SYSTEM=1: cloud system provisioning disabled"
+    exit 0
+fi
+need_root
+install_tailscale
+install_nft
+install_sysctl
+install_nginx
+install_kopia
+install_pgredis
+install_proxy_facet
+install_ai_facet
+
+# ── ssh hardening (validated drop-in; never edit the main file in place) ───
+__sshd=/etc/ssh/sshd_config
+__sshd_drop=/etc/ssh/sshd_config.d/90-chezmoi-hardening.conf
+if [[ -f "$__sshd" ]] && command -v sshd >/dev/null 2>&1; then
+    step "sshd hardening"
+    if ! grep -Eqi '^[[:space:]]*Include[[:space:]]+/etc/ssh/sshd_config\.d/\*\.conf' "$__sshd"; then
+        warn "sshd_config does not include /etc/ssh/sshd_config.d/*.conf — leaving it untouched"
+    elif ! has_authorized_keys; then
+        warn "no non-empty authorized_keys found — refusing to disable password authentication"
+    elif [[ -e "$__sshd_drop" ]] && ! grep -Fq '# Managed by chezmoi' "$__sshd_drop"; then
+        warn "custom $__sshd_drop exists — leaving it untouched"
+    else
+        __sshd_tmp="$(mktemp /tmp/chezmoi-sshd.XXXXXX)"
+        cat > "$__sshd_tmp" << 'EOF'
+# Managed by chezmoi run_onchange_linux-cloud-services.sh
+PermitRootLogin prohibit-password
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PubkeyAuthentication yes
+MaxAuthTries 3
+EOF
+        __sshd_backup=""
+        if [[ -f "$__sshd_drop" ]]; then
+            __sshd_backup="$(mktemp /tmp/chezmoi-sshd-backup.XXXXXX)"
+            as_root cp -p "$__sshd_drop" "$__sshd_backup"
+        fi
+        as_root install -d -o root -g root -m 0755 /etc/ssh/sshd_config.d
+        as_root install -o root -g root -m 0644 "$__sshd_tmp" "$__sshd_drop"
+        unlink "$__sshd_tmp"
+        if as_root sshd -t; then
+            [[ -z "$__sshd_backup" ]] || as_root unlink "$__sshd_backup"
+            case "$(detect_init)" in
+                systemd) as_root systemctl reload sshd 2>/dev/null || as_root systemctl reload ssh 2>/dev/null || true ;;
+                openrc)  as_root rc-service sshd reload 2>/dev/null || true ;;
+            esac
+            ok "sshd hardened with validated drop-in"
+        else
+            warn "sshd validation failed — restoring the previous configuration"
+            if [[ -n "$__sshd_backup" ]]; then
+                as_root cp -p "$__sshd_backup" "$__sshd_drop"
+                as_root unlink "$__sshd_backup"
+            else
+                as_root unlink "$__sshd_drop"
+            fi
+        fi
+    fi
+fi
+
+echo "=== cloud services complete ({{ .facet_registry.order.layers | join " → " }}) ==="
+{{- end -}}
