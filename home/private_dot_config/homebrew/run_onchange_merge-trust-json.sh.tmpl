@@ -13,12 +13,13 @@ TRUST=~/.config/homebrew/trust.json
 mkdir -p "$(dirname "$TRUST")"
 
 # Managed entries: user/REPO taps and fully-qualified tap/formula trust records.
+# sing-box now ships in homebrew/core; the wignerstan/singbox tap was dropped
+# (2026-08-08) because brew 6 ignores formula log_path keys on macOS and the
+# tap only existed to carry log_path/error_log_path in its service block.
 MANAGED_TAPS=$(cat <<'EOF'
-wignerstan/singbox
 EOF
 )
 MANAGED_FORMULAE=$(cat <<'EOF'
-wignerstan/singbox/sing-box
 EOF
 )
 

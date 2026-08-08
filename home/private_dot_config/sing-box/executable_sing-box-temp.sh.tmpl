@@ -1,0 +1,46 @@
+{{- if hasKey . "singbox_server" -}}
+#!/bin/bash
+# on-demand, ephemeral sing-box instance: render config -> inject subscription
+# -> strip TUN / rebind localhost -> run in foreground, cleanup on exit.
+# Requires a subscription URL. Does NOT touch the main root daemon.
+set -euo pipefail
+
+SRC="{{ .chezmoi.homeDir }}/.config/sing-box"
+TMP="$(mktemp -d /tmp/sing-box-temp.XXXXXX)"
+trap 'rm -rf "$TMP"' EXIT
+
+if [[ $# -lt 1 || -z "$1" ]]; then
+    echo "usage: sing-box-temp.sh <subscription-url> [port]" >&2
+    exit 1
+fi
+SUB_URL="$1"
+PORT="${2:-10810}"
+
+TMPL_SRC="{{ .chezmoi.sourceDir }}/private_dot_config/sing-box/config.json.tmpl"
+chezmoi execute-template < "$TMPL_SRC" > "$TMP/base.json"
+python3 "$SRC/inject-sub.py" -s "$SUB_URL" -o "$TMP/config.json" < "$TMP/base.json"
+
+# strip TUN + system bits, rebind to localhost on the given port
+python3 - "$TMP/config.json" "$PORT" <<'PY'
+import json, sys
+path, port = sys.argv[1], int(sys.argv[2])
+cfg = json.load(open(path))
+cfg["inbounds"] = [i for i in cfg.get("inbounds", []) if i.get("type") != "tun"]
+for i in cfg.get("inbounds", []):
+    i["listen"] = "127.0.0.1"
+    if "listen_port" in i:
+        i["listen_port"] = port
+cfg.pop("services", None)
+cfg.pop("experimental", None)
+cfg["log"] = {"level": "debug", "timestamp": True}
+json.dump(cfg, open(path, "w"), indent=2)
+PY
+
+if ! sing-box check -c "$TMP/config.json" 2>&1; then
+    echo "sing-box-temp: config validation FAILED" >&2
+    exit 1
+fi
+
+echo "sing-box-temp: listening on 127.0.0.1:$PORT (Ctrl-C to stop)"
+sing-box run -c "$TMP/config.json" --directory "$TMP"
+{{- end -}}

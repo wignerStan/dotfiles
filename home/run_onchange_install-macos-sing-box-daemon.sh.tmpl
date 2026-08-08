@@ -1,0 +1,89 @@
+{{- /* Resource classification:
+       scope=system, ownership=personal, os=darwin, layer=basic.
+       `full` includes the L2/basic baseline. Both system and system+user
+       reconcile this root resource; a plain user elevates through sudo. */ -}}
+{{- $axesValidated := includeTemplate "validate-axes" . -}}
+{{- $systemPass := or (eq .deploy "system") (eq .deploy "system+user") -}}
+{{- if and (eq .chezmoi.os "darwin") $systemPass (lookPath "sing-box") -}}
+#!/bin/bash
+# installs the singleton root LaunchDaemon for the main sing-box instance.
+# config-sha256: {{ includeTemplate "private_dot_config/sing-box/config.json.tmpl" . | sha256sum }}
+# plist-sha256: {{ includeTemplate "private_dot_config/sing-box/local.chezmoi-sing-box.plist.tmpl" . | sha256sum }}
+set -euo pipefail
+
+PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+LABEL=local.chezmoi-sing-box
+CFG="{{ .chezmoi.homeDir }}/.config/sing-box/config.json"
+LOG_DIR=/opt/homebrew/var/log/sing-box
+PLIST_SRC="{{ .chezmoi.homeDir }}/.config/sing-box/local.chezmoi-sing-box.plist"
+PLIST_DST=/Library/LaunchDaemons/local.chezmoi-sing-box.plist
+OLD_LABEL=homebrew.mxcl.sing-box
+OLD_PLIST_ROOT=/Library/LaunchDaemons/homebrew.mxcl.sing-box.plist
+OLD_PLIST_USER="{{ .chezmoi.homeDir }}/Library/LaunchAgents/homebrew.mxcl.sing-box.plist"
+
+as_root() {
+    if (( EUID == 0 )); then
+        "$@"
+    else
+        sudo "$@"
+    fi
+}
+
+is_loaded() {
+    /bin/launchctl print "system/$1" >/dev/null 2>&1
+}
+
+bootout_if_loaded() {
+    local label=$1
+    if is_loaded "$label"; then
+        as_root /bin/launchctl bootout "system/$label"
+    fi
+}
+
+if [[ ! -r "$CFG" ]]; then
+    echo "chezmoi-sing-box: missing $CFG" >&2
+    exit 1
+fi
+
+# pre-validate the rendered config BEFORE the daemon ever sees it
+if ! sing-box check -c "$CFG" 2>&1; then
+    echo "chezmoi-sing-box: config validation FAILED, deployment aborted" >&2
+    exit 1
+fi
+
+/usr/bin/plutil -lint "$PLIST_SRC" >/dev/null
+as_root /usr/bin/install -d -o root -g wheel -m 0755 "$LOG_DIR"
+as_root /usr/bin/install -o root -g wheel -m 0644 "$PLIST_SRC" "$PLIST_DST"
+
+# retire the brew-managed service (plist + registration)
+bootout_if_loaded "$OLD_LABEL"
+if [[ -e "$OLD_PLIST_ROOT" ]]; then
+    as_root /bin/rm -f "$OLD_PLIST_ROOT"
+fi
+if [[ -e "$OLD_PLIST_USER" ]]; then
+    /bin/rm -f "$OLD_PLIST_USER"
+fi
+# drop stale config from the brew-prefix era
+if [[ -e "/opt/homebrew/etc/sing-box/config.json" ]]; then
+    as_root /bin/rm -f "/opt/homebrew/etc/sing-box/config.json"
+fi
+
+bootout_if_loaded "$LABEL"
+as_root /bin/launchctl enable "system/$LABEL"
+as_root /bin/launchctl bootstrap system "$PLIST_DST"
+/bin/launchctl print "system/$LABEL" >/dev/null
+verified=0
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+    if /bin/launchctl print "system/$LABEL" 2>/dev/null | /usr/bin/grep -q 'state = running' && \
+       /usr/bin/pgrep -f 'sing-box run' >/dev/null; then
+        verified=1
+        break
+    fi
+    /bin/sleep 1
+done
+if (( verified == 0 )); then
+    echo "chezmoi-sing-box: daemon registered but did not become running" >&2
+    exit 1
+fi
+echo "chezmoi-sing-box: installed, running, and verified as system/$LABEL"
+{{- end -}}

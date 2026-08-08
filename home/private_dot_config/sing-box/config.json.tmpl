@@ -1,7 +1,7 @@
 {{- if hasKey . "singbox_server" -}}
 {{- $singbox_dir := "" -}}
 {{- if eq .chezmoi.os "darwin" -}}
-{{-   $singbox_dir = "/opt/homebrew/etc/sing-box" -}}
+{{-   $singbox_dir = printf "%s/.config/sing-box" .chezmoi.homeDir -}}
 {{- else -}}
 {{-   $singbox_dir = "/etc/sing-box" -}}
 {{- end -}}
@@ -20,9 +20,16 @@
 {{- if and (hasKey . "security") (hasKey .security "roxybrowser") (hasKey .security.roxybrowser "block_mode") -}}
 {{-   $roxyBlockMode = .security.roxybrowser.block_mode -}}
 {{- end -}}
+{{- /* macOS main instance: daemon writes to stderr (default); the launchd
+       plist redirects stdout/stderr to /opt/homebrew/var/log/sing-box/... via
+       StandardOutPath/StandardErrorPath (brew 6 drops formula log_path keys,
+       so we manage the plist with launchctl instead of brew services).
+       Level: debug during active schema churn; revert to info once the
+       1.14 native gRPC API (services: [{type:"api"}]) provides runtime
+       control + log streaming. */ -}}
 {
   "log": {
-    "level": "info",
+    "level": "{{ if $newSchema }}info{{ else }}debug{{ end }}",
     "timestamp": true
   },
   "dns": {
@@ -900,5 +907,16 @@
       "default_mode": "rule"
     }
   }
+{{- if $newSchema }},
+  "services": [
+    {
+      "type": "api",
+      "listen": "127.0.0.1",
+      "listen_port": 9092,
+      "secret": {{ .singbox_api_secret | quote }},
+      "access_control_allow_private_network": false
+    }
+  ]
+{{- end }}
 }
 {{- end -}}
