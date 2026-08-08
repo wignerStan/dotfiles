@@ -23,6 +23,17 @@ MANAGED_FORMULAE=$(cat <<'EOF'
 EOF
 )
 
+# Retired entries: previously managed, now intentionally removed. Pruned from
+# the trust json so stale references do not linger after a tap is dropped.
+RETIRED_TAPS=$(cat <<'EOF'
+wignerstan/singbox
+EOF
+)
+RETIRED_FORMULAE=$(cat <<'EOF'
+wignerstan/singbox/sing-box
+EOF
+)
+
 if ! command -v jq &>/dev/null; then
     echo "homebrew/trust.json: jq not found, skipping merge" >&2
     exit 0
@@ -33,20 +44,23 @@ if [ ! -f "$TRUST" ]; then
     echo '{"trustedtaps":[],"trustedformulae":[]}' > "$TRUST"
 fi
 
-# Union managed entries into the existing arrays (order preserved, dups removed).
+# Union managed entries into the existing arrays, prune retired ones
+# (order preserved, dups removed).
 tmp=$(mktemp)
 jq --slurpfile taps <(printf '%s\n' "$MANAGED_TAPS" | jq -R . | jq -s .) \
-   --slurpfile formulae <(printf '%s\n' "$MANAGED_FORMULAE" | jq -R . | jq -s .) '
+   --slurpfile formulae <(printf '%s\n' "$MANAGED_FORMULAE" | jq -R . | jq -s .) \
+   --slurpfile retired_taps <(printf '%s\n' "$RETIRED_TAPS" | jq -R . | jq -s .) \
+   --slurpfile retired_formulae <(printf '%s\n' "$RETIRED_FORMULAE" | jq -R . | jq -s .) '
     (.trustedtaps // []) as $t |
     (.trustedformulae // []) as $f |
     {
-        trustedtaps:      ($t + $taps[0] | unique),
-        trustedformulae:  ($f + $formulae[0] | unique)
+        trustedtaps:      (($t - $retired_taps[0] - [""]) + ($taps[0] | map(select(length > 0))) | unique),
+        trustedformulae:  (($f - $retired_formulae[0] - [""]) + ($formulae[0] | map(select(length > 0))) | unique)
     }
 ' "$TRUST" > "$tmp"
 mv "$tmp" "$TRUST"
 
-echo "homebrew/trust.json: merged managed taps/formulae (additive)"
+echo "homebrew/trust.json: merged managed taps/formulae (additive, retired pruned)"
 {{- else if eq .chezmoi.os "windows" -}}
 {{- /* no-op on windows */ -}}
 {{- else }}
