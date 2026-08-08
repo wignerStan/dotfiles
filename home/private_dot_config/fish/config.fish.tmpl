@@ -21,8 +21,13 @@ if test -f "$HOME/.config/fish/functions/fisher.fish"
     set -gp fish_function_path "$HOME/.config/fish/functions"
 end
 
-# Ensure consistent shell environment
-set -gx SHELL (which fish)
+# Keep SHELL aligned with the chezmoi-selected primary shell. Fish's
+# `fish_path` is not a valid variable; `command -s` is a builtin lookup.
+set -l _primary_shell (command -s {{ .primary_shell }})
+if test -n "$_primary_shell"
+    set -gx SHELL $_primary_shell
+end
+set -e _primary_shell
 
 # ── CLI wrappers (same as .zshrc) ─────────────────────────────
 function cx
