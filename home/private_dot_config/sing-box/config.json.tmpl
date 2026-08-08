@@ -12,6 +12,10 @@
 {{- end -}}
 {{- $sbParts := split "." (trimPrefix "version " (regexFind "version [0-9]+\\.[0-9]+" $sbVersionLine)) -}}
 {{- $newSchema := ge (atoi $sbParts._1) 14 -}}
+{{- $roxyBlockMode := "off" -}}
+{{- if and (hasKey . "security") (hasKey .security "roxybrowser") (hasKey .security.roxybrowser "block_mode") -}}
+{{-   $roxyBlockMode = .security.roxybrowser.block_mode -}}
+{{- end -}}
 {
   "log": {
     "level": "info",
@@ -56,6 +60,31 @@
       }
     ],
     "rules": [
+{{- /* Deny normal intercepted DNS lookups before they reach an upstream resolver.
+       Route rules below remain necessary for cached names and visible TLS/HTTP
+       hostnames. Private DoH and hard-coded IPs cannot be denied by hostname. */}}
+{{- if or (eq $roxyBlockMode "archive") (eq $roxyBlockMode "strict") }}
+      {
+        "domain": "lumibrowser.oss-cn-shenzhen.aliyuncs.com",
+        "action": "predefined",
+        "rcode": "NXDOMAIN"
+      },
+{{- end }}
+{{- if eq $roxyBlockMode "strict" }}
+      {
+        "domain": [
+          "app.roxybrowser.cn",
+          "app.roxybrowser.com",
+          "hz.gate.roxybrowser.cn",
+          "hz.api.roxybrowser.cn",
+          "gate.roxybrowser.net",
+          "sg.gate.roxybrowser.net",
+          "us.gate.roxybrowser.net"
+        ],
+        "action": "predefined",
+        "rcode": "NXDOMAIN"
+      },
+{{- end }}
       {
         "domain_suffix": ".ustc.edu.cn",
         "server": "dns-ustc"
@@ -260,7 +289,6 @@
         "ff00::/8"
       ],
       "route_exclude_address_set": [],
-      "exclude_interface": "utun4",
       "stack": "gvisor"
     },
     {
@@ -589,6 +617,61 @@
         ],
         "outbound": "direct"
       },
+{{- /* Observed 2026-08-07:
+       - profile cache: lumibrowser.oss-cn-shenzhen.aliyuncs.com ->
+         47.113.74.114:443 (60-second DNS TTL)
+        - manager API: hz.gate/api.roxybrowser.cn -> 121.43.36.215:443
+        NOTE: these are ROUTE rules. In route rules sing-box has no
+        "domain_full" field — "domain" is exact-hostname match and
+        "domain_suffix" is suffix match (domain_full exists only in DNS
+        rules). Using "domain_full" here is silently ignored, which leaves
+        a zero-condition reject rule that matches EVERY connection. */}}
+  {{- /* First pass: DNS/FakeIP/reverse-mapped or already-sniffed hostname. */}}
+{{- if or (eq $roxyBlockMode "archive") (eq $roxyBlockMode "strict") }}
+       {
+         "domain": "lumibrowser.oss-cn-shenzhen.aliyuncs.com",
+         "action": "reject"
+       },
+{{- end }}
+{{- if eq $roxyBlockMode "strict" }}
+       {
+         "domain": [
+           "app.roxybrowser.cn",
+          "app.roxybrowser.com",
+          "hz.gate.roxybrowser.cn",
+          "hz.api.roxybrowser.cn",
+          "gate.roxybrowser.net",
+          "sg.gate.roxybrowser.net",
+          "us.gate.roxybrowser.net"
+        ],
+        "action": "reject"
+      },
+{{- end }}
+{{- /* Second pass, matching the iOS telemetry pattern: the generic sniff
+       action is compatible with 1.13, then exact hostnames are tested again. */}}
+{{- if or (eq $roxyBlockMode "archive") (eq $roxyBlockMode "strict") }}
+       {
+         "action": "sniff"
+       },
+       {
+         "domain": "lumibrowser.oss-cn-shenzhen.aliyuncs.com",
+         "action": "reject"
+       },
+{{- end }}
+{{- if eq $roxyBlockMode "strict" }}
+       {
+         "domain": [
+           "app.roxybrowser.cn",
+          "app.roxybrowser.com",
+          "hz.gate.roxybrowser.cn",
+          "hz.api.roxybrowser.cn",
+          "gate.roxybrowser.net",
+          "sg.gate.roxybrowser.net",
+          "us.gate.roxybrowser.net"
+        ],
+        "action": "reject"
+      },
+{{- end }}
       {
         "domain_suffix": [
           "aliyun.com",
@@ -791,8 +874,7 @@
       }
     ],
     "final": "proxy",
-    "auto_detect_interface": false,
-    "default_interface": "en0",
+    "auto_detect_interface": true,
     "default_domain_resolver": "dns-remote"{{- if $newSchema }},
     "default_http_client": "rules-download"{{- end }}
   },
