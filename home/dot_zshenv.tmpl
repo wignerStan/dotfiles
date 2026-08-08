@@ -23,11 +23,11 @@ export XDG_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
 # ── Homebrew (static PATH — no fork, needed before direnv hooks) ───
 {{- if eq .chezmoi.os "darwin" }}
 export HOMEBREW_PREFIX="/opt/homebrew"
-path=(/opt/homebrew/bin /opt/homebrew/sbin $path)
+path=(/opt/homebrew/bin /opt/homebrew/sbin ${path[@]})
 {{- else if eq .chezmoi.os "linux" }}
 if [[ -d "/home/linuxbrew/.linuxbrew" ]]; then
     export HOMEBREW_PREFIX="/home/linuxbrew/.linuxbrew"
-    path=(/home/linuxbrew/.linuxbrew/bin /home/linuxbrew/.linuxbrew/sbin $path)
+    path=(/home/linuxbrew/.linuxbrew/bin /home/linuxbrew/.linuxbrew/sbin ${path[@]})
 fi
 {{- end }}
 
@@ -84,7 +84,7 @@ export NANOBANANA_MODEL=gemini-3-pro-image-preview
 # ── Mamba (global Python base environment) ─────────────────
 export MAMBA_EXE="${HOMEBREW_PREFIX:-/home/linuxbrew/.linuxbrew}/opt/micromamba/bin/mamba"
 export MAMBA_ROOT_PREFIX="{{- if eq .chezmoi.os "linux" -}}/develop/mamba{{- else -}}$HOME/mamba{{- end -}}"
-path=("$MAMBA_ROOT_PREFIX/bin" $path)
+path=("$MAMBA_ROOT_PREFIX/bin" ${path[@]})
 {{- end }}
 
 # ── Pixi (project Python environments) ──────────────────────
@@ -150,7 +150,7 @@ export BUN_CONFIG_REGISTRY="https://registry.npmmirror.com"
 {{- end }}
 
 # Local user binaries (prepended to override system commands)
-path=($HOME/.local/bin $path)
+path=($HOME/.local/bin ${path[@]})
 
 # Fail-safe: ensure PATH is exported regardless of how the shell was started
 export PATH
