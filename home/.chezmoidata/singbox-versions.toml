@@ -1,5 +1,13 @@
-# Sing-box per-device schema flags (not secrets).
-# Set true once the device runs sing-box >= 1.14 (its config schema drops
+# Sing-box non-secret per-device configuration: schema version flags and
+# WARP tunnel addressing. Credentials (keys, passwords, sub tokens) stay in
+# secrets.toml; addressing and version flags are NOT secrets.
+# schema: set true once the device runs sing-box >= 1.14 (drops
 # independent_cache and other pre-1.14 forms). iOS runs beta builds.
 singbox_ios_new_schema = true
 singbox_android_new_schema = false
+
+# WARP tunnel address + reserved bytes (public WireGuard configuration)
+singbox_warp_ipv6 = "2606:4700:110:8df2:436f:8570:7dec:c369"
+singbox_warp_reserved_0 = 91
+singbox_warp_reserved_1 = 176
+singbox_warp_reserved_2 = 241
