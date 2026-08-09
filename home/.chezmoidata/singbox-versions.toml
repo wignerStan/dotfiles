@@ -1,0 +1,5 @@
+# Sing-box per-device schema flags (not secrets).
+# Set true once the device runs sing-box >= 1.14 (its config schema drops
+# independent_cache and other pre-1.14 forms). iOS runs beta builds.
+singbox_ios_new_schema = true
+singbox_android_new_schema = false

@@ -1,0 +1,1118 @@
+{{- /* Shared sing-box config template, rendered for three platforms.
+       The calling (thin) template injects .singbox_platform:
+         "macos"   -> desktop instance (host-detected sing-box version)
+         "ios"     -> iOS instance (schema declared via singbox_ios_new_schema)
+         "android" -> Android instance (singbox_android_new_schema)
+     Common guard: only render when server secrets exist.
+     independent_cache is gated on the sing-box VERSION only (>= 1.14
+     deprecated it), never on the platform. */ -}}
+{{- if hasKey . "singbox_server" -}}
+{{- /* ---- platform selection ---- */ -}}
+{{- $platform := "macos" -}}
+{{- if hasKey . "singbox_platform" -}}{{- $platform = .singbox_platform -}}{{- end -}}
+{{- $isMacOS := eq $platform "macos" -}}
+{{- $isIOS := eq $platform "ios" -}}
+{{- $isAndroid := eq $platform "android" -}}
+{{- /* ---- schema version + platform data ----
+       Desktop: detect the actually-installed sing-box version.
+       Mobile: schema version is a declared data flag (set true once the
+       device runs sing-box >= 1.14). */ -}}
+{{- $singbox_dir := "" -}}
+{{- if $isMacOS -}}
+{{-   if eq .chezmoi.os "darwin" -}}
+{{-     $singbox_dir = "/opt/homebrew/etc/sing-box" -}}
+{{-   else -}}
+{{-     $singbox_dir = "/etc/sing-box" -}}
+{{-   end -}}
+{{- end -}}
+{{- $newSchema := false -}}
+{{- $minVersion := "1.11.0" -}}
+{{- if $isMacOS -}}
+{{-   $sbVersionLine := "sing-box version 0.0.0" -}}
+{{-   if lookPath "sing-box" -}}
+{{-     $sbVersionLine = first (splitList "\n" (output "sing-box" "version")) -}}
+{{-   end -}}
+{{-   $sbParts := split "." (trimPrefix "version " (regexFind "version [0-9]+\\.[0-9]+" $sbVersionLine)) -}}
+{{-   $newSchema = ge (atoi $sbParts._1) 14 -}}
+{{-   if or (lt (atoi $sbParts._0) 1) (and (eq (atoi $sbParts._0) 1) (lt (atoi $sbParts._1) 11)) -}}
+{{-     fail (printf "sing-box %s is too old: config requires %s+ (rule action/DNS action fields)" (trimPrefix "sing-box " $sbVersionLine) $minVersion) -}}
+{{-   end -}}
+{{- else if $isIOS -}}
+{{-   if hasKey . "singbox_ios_new_schema" -}}{{- $newSchema = .singbox_ios_new_schema -}}{{- end -}}
+{{- else -}}
+{{-   if hasKey . "singbox_android_new_schema" -}}{{- $newSchema = .singbox_android_new_schema -}}{{- end -}}
+{{- end -}}
+{{- /* ---- per-device uuid ---- */ -}}
+{{- $uuid := "" -}}
+{{- if $isMacOS -}}
+{{-   $uuid = .singbox_uuid -}}
+{{- else if $isIOS -}}
+{{-   $uuid = .singbox_ios_uuid -}}
+{{- else -}}
+{{-   $uuid = .singbox_android_uuid -}}
+{{- end -}}
+{{- /* ---- roxybrowser blocking (macOS only) ---- */ -}}
+{{- $roxyBlockMode := "off" -}}
+{{- if and $isMacOS (hasKey . "security") (hasKey .security "roxybrowser") (hasKey .security.roxybrowser "block_mode") -}}
+{{-   $roxyBlockMode = .security.roxybrowser.block_mode -}}
+{{- end -}}
+{
+  "log": {
+    "level": "{{ if $isMacOS }}{{ if $newSchema }}info{{ else }}debug{{ end }}{{ else }}info{{ end }}",
+    "timestamp": true
+  },
+  "dns": {
+    "servers": [
+      {
+        "type": "fakeip",
+        "tag": "dns-fakeip",
+        "inet4_range": "198.18.0.0/15",
+        "inet6_range": "fc00::/18"
+      },
+      {
+        "type": "local",
+        "tag": "local"
+      },
+      {
+        "type": "https",
+        "tag": "dns-domestic",
+        "server": "223.5.5.5",
+        "server_port": 443
+      },
+      {
+        "type": "udp",
+        "tag": "dns-ustc",
+        "server": "202.38.64.18",
+        "server_port": 53
+      },
+      {
+        "type": "tailscale",
+        "tag": "dns-tailscale",
+        "endpoint": "ts-ep",
+        "accept_default_resolvers": true
+      },
+      {
+        "type": "https",
+        "tag": "dns-remote",
+        "server": "1.1.1.1",
+        "server_port": 443,
+        "detour": "VLESS"
+      }
+    ],
+{{- if $isMacOS }}
+{{-   if $newSchema }}
+    "optimistic": {
+      "enabled": true,
+      "timeout": "3d"
+    },
+{{-   end }}
+{{- end }}
+    "rules": [
+{{- /* macOS: deny Roxybrowser DNS before any upstream resolver. */ -}}
+{{- if $isMacOS }}
+{{- if or (eq $roxyBlockMode "archive") (eq $roxyBlockMode "strict") }}
+      {
+        "domain": "lumibrowser.oss-cn-shenzhen.aliyuncs.com",
+        "action": "predefined",
+        "rcode": "NXDOMAIN"
+      },
+{{- end }}
+{{- if eq $roxyBlockMode "strict" }}
+      {
+        "domain": [
+          "app.roxybrowser.cn",
+          "app.roxybrowser.com",
+          "hz.gate.roxybrowser.cn",
+          "hz.api.roxybrowser.cn",
+          "gate.roxybrowser.net",
+          "sg.gate.roxybrowser.net",
+          "us.gate.roxybrowser.net"
+        ],
+        "action": "predefined",
+        "rcode": "NXDOMAIN"
+      },
+{{- end }}
+{{- end }}
+      {
+        "domain_suffix": ".ustc.edu.cn",
+        "server": "dns-ustc"
+      },
+      {
+        "domain_suffix": [
+          ".lan",
+          ".local",
+          ".arpa",
+          ".msftconnecttest.com",
+          ".msftncsi.com",
+          "localhost.ptlogin2.qq.com",
+          "localhost.sec.qq.com",
+          "localhost.work.weixin.qq.com"
+        ],
+        "server": "local"
+      },
+      {
+        "domain_suffix": [
+          "openai.com",
+          "chatgpt.com",
+          "claude.ai",
+          "claude.com",
+          "anthropic.com",
+          "google.com",
+          "googleapis.com",
+          "gstatic.com",
+          "googleapis.cn",
+          "youtube.com",
+          "youtu.be",
+          "ytimg.com",
+          "gmail.com",
+          "blogger.com",
+          "blogspot.com",
+          "netflix.com",
+          "spotify.com",
+          "telegram.org",
+          "t.me",
+          "tiktok.com",
+          "github.com",
+          "githubusercontent.com",
+          "githubassets.com",
+          "bing.com",
+          "docker.com",
+          "docker.io",
+          "hub.docker.com",
+          "facebook.com",
+          "fb.com",
+          "fbcdn.net",
+          "instagram.com",
+          "twitter.com",
+          "x.com",
+          "wikipedia.org",
+          "wikimedia.org",
+          "reddit.com",
+          "discord.com",
+          "medium.com",
+          "stackoverflow.com",
+          "stackexchange.com",
+          "linkedin.com",
+          "dropbox.com",
+          "whatsapp.com",
+          "twitch.tv",
+          "imgur.com",
+          "archive.org",
+          "archive.today",
+          "huggingface.co",
+          "nytimes.com",
+          "bbc.com",
+          "reuters.com",
+          "bloomberg.com",
+          "v2rayse.com",
+          "xn--ngstr-lra8j.com",
+          "linux.do"
+        ],
+        "server": "dns-remote"
+      },
+      {
+        "rule_set": "geosite-cn",
+        "server": "dns-domestic"
+      },
+      {
+        "domain_suffix": ".ts.net",
+        "server": "dns-tailscale"
+      },
+{{- if $isAndroid }}
+      {
+        "domain_suffix": "linuxdo.org",
+        "server": "dns-domestic"
+      },
+{{- else }}
+      {
+        "domain_suffix": [
+          "linuxdo.org",
+          "sharedchat.cc"
+        ],
+        "server": "dns-domestic"
+      },
+{{- end }}
+{{- if not $isAndroid }}
+      {
+        "domain": "engage.cloudflareclient.com",
+        "server": "dns-remote"
+      },
+{{- end }}
+{{- if $isMacOS }}
+      {
+        "domain_suffix": [
+          "sugon.com",
+          "scnet.cn"
+        ],
+        "server": "dns-domestic"
+      },
+{{- end }}
+      {
+        "query_type": [
+          "A",
+          "AAAA"
+        ],
+        "server": "dns-fakeip"
+      }
+    ],
+    "final": "dns-remote",
+    "reverse_mapping": true,
+    "strategy": "ipv4_only"{{- if not $newSchema }},
+    "independent_cache": true{{- end }}
+  },
+  "endpoints": [
+    {
+      "type": "tailscale",
+      "tag": "ts-ep",
+{{- if $isMacOS }}
+      "state_directory": "{{ $singbox_dir }}/tailscale-state",
+      "accept_routes": true,
+      "system_interface": true,
+      "system_interface_name": "utun101"
+{{- else }}
+      "state_directory": "tailscale-state",
+      "accept_routes": true,
+      "exit_node": "100.73.12.63",
+      "exit_node_allow_lan_access": true
+{{- end }}
+    },
+    {
+      "type": "wireguard",
+      "tag": "warp-ep",
+      "system": false,
+      "mtu": 1280,
+      "address": [
+        "172.16.0.2/32",
+        "{{ .singbox_warp_ipv6 }}/128"
+      ],
+      "private_key": {{ .singbox_warp_private_key | quote }},
+      "peers": [
+        {
+          "address": "engage.cloudflareclient.com",
+          "port": 2408,
+          "public_key": "bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=",
+          "allowed_ips": ["0.0.0.0/0", "::/0"],
+          "reserved": [{{ .singbox_warp_reserved_0 }}, {{ .singbox_warp_reserved_1 }}, {{ .singbox_warp_reserved_2 }}],
+          "persistent_keepalive_interval": 25
+        }
+      ],
+      "detour": "VLESS-CDN"
+    },
+    {
+      "type": "wireguard",
+      "tag": "warp-direct-ep",
+      "system": false,
+      "mtu": 1280,
+      "address": [
+        "172.16.0.2/32",
+        "{{ .singbox_warp_ipv6 }}/128"
+      ],
+      "private_key": {{ .singbox_warp_private_key | quote }},
+      "peers": [
+        {
+          "address": "engage.cloudflareclient.com",
+          "port": 2408,
+          "public_key": "bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=",
+          "allowed_ips": ["0.0.0.0/0", "::/0"],
+          "reserved": [{{ .singbox_warp_reserved_0 }}, {{ .singbox_warp_reserved_1 }}, {{ .singbox_warp_reserved_2 }}],
+          "persistent_keepalive_interval": 25
+        }
+      ],
+      "detour": "VLESS"
+    }
+  ],
+  "inbounds": [
+{{- if $isMacOS }}
+    {
+      "type": "tun",
+      "tag": "tun-in",
+      "interface_name": "utun100",
+      "mtu": 1500,
+      "address": [
+        "172.19.0.1/30",
+        "fdfe:dcba:9876::1/126"
+      ],
+      "auto_route": true,
+      "route_exclude_address": [
+        "0.0.0.0/8",
+        "10.0.0.0/8",
+        "100.64.0.0/10",
+        "100.100.0.0/16",
+        "127.0.0.0/8",
+        "169.254.0.0/16",
+        "172.16.0.0/12",
+        "192.0.0.0/24",
+        "192.0.2.0/24",
+        "192.88.99.0/24",
+        "192.168.0.0/16",
+        "203.0.113.0/24",
+        "224.0.0.0/4",
+        "240.0.0.0/4",
+        "255.255.255.255/32",
+        "::1/128",
+        "64:ff9b::/96",
+        "fc00::/7",
+        "fe80::/10",
+        "ff00::/8"
+      ],
+      "route_exclude_address_set": [],
+      "stack": "gvisor"
+    },
+    {
+      "type": "mixed",
+      "tag": "mixed-in",
+      "listen": "0.0.0.0",
+      "listen_port": 7897
+    },
+    {
+      "type": "mixed",
+      "tag": "mixed-in-local",
+      "listen": "127.0.0.1",
+      "listen_port": 7899
+    },
+    {
+      "type": "mixed",
+      "tag": "socks-residential-in",
+      "listen": "127.0.0.1",
+      "listen_port": 7898
+    }
+{{- else if $isAndroid }}
+    {
+      "type": "tun",
+      "tag": "tun-in",
+      "address": [
+        "172.19.0.1/30",
+        "fdfe:dcba:9876::1/126"
+      ],
+      "auto_route": true,
+      "stack": "gvisor"
+    }
+{{- else }}
+    {
+      "type": "tun",
+      "tag": "tun-in",
+      "address": [
+        "172.19.0.1/30"
+      ],
+      "auto_route": true,
+      "stack": "gvisor"{{- if $newSchema }},
+      "strict_route": true,
+      "dns_mode": "hijack"{{- end }}
+    }
+{{- end }}
+  ],
+  "outbounds": [
+    {
+      "type": "selector",
+      "tag": "proxy",
+      "outbounds": ["auto-proxy", "VLESS", "VLESS-CDN", "incus-proxy"],
+      "default": "VLESS"
+    },
+    {
+      "type": "urltest",
+      "tag": "auto-proxy",
+      "outbounds": ["VLESS", "VLESS-CDN", "incus-proxy"],
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": "3m",
+      "tolerance": 100,
+      "interrupt_exist_connections": false
+    },
+    {
+      "type": "urltest",
+      "tag": "auto-warp",
+      "outbounds": ["warp-ep", "warp-direct-ep"],
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": "3m",
+      "tolerance": 100,
+      "interrupt_exist_connections": false
+    },
+    {
+      "type": "urltest",
+      "tag": "auto-residential",
+      "outbounds": ["residential", "residential-direct", "incus-residential"],
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": "3m",
+      "tolerance": 100,
+      "interrupt_exist_connections": false
+    },
+    {
+      "type": "selector",
+      "tag": "ai-chain",
+      "outbounds": ["auto-warp", "auto-residential", "auto-proxy"],
+      "default": "auto-warp"
+    },
+    {
+      "type": "selector",
+      "tag": "gpt-chain",
+      "outbounds": ["auto-warp", "auto-residential", "auto-proxy"],
+      "default": "auto-warp"
+    },
+    {
+      "type": "vless",
+      "tag": "VLESS",
+      "server": {{ .singbox_server | quote }},
+      "server_port": 443,
+      "uuid": {{ $uuid | quote }},
+      "flow": "xtls-rprx-vision",
+      "tls": {
+        "enabled": true,
+        "server_name": "www.cisco.com",
+        "utls": {
+          "enabled": true,
+          "fingerprint": "chrome"
+        },
+        "reality": {
+          "enabled": true,
+          "public_key": {{ .singbox_public_key | quote }}
+        }
+      }
+    },
+    {
+      "type": "vless",
+      "tag": "VLESS-CDN",
+      "server": {{ .singbox_cdn_host | quote }},
+      "server_port": {{ .singbox_cdn_port }},
+      "uuid": {{ $uuid | quote }},
+      "tls": {
+        "enabled": true,
+        "server_name": {{ .singbox_cdn_host | quote }},
+        "utls": {
+          "enabled": true,
+          "fingerprint": "chrome"
+        }
+      },
+      "transport": {
+        "type": "ws",
+        "path": {{ .singbox_cdn_path | quote }}
+      }
+    },
+    {
+      "type": "vless",
+      "tag": "residential",
+      "server": {{ .singbox_cdn_host | quote }},
+      "server_port": {{ .singbox_cdn_port }},
+      "uuid": {{ .singbox_residential_uuid | quote }},
+      "tls": {
+        "enabled": true,
+        "server_name": {{ .singbox_cdn_host | quote }},
+        "utls": {
+          "enabled": true,
+          "fingerprint": "chrome"
+        }
+      },
+      "transport": {
+        "type": "ws",
+        "path": {{ .singbox_cdn_path | quote }}
+      }
+    },
+    {
+      "type": "vless",
+      "tag": "residential-direct",
+      "server": {{ .singbox_server | quote }},
+      "server_port": 443,
+      "uuid": {{ .singbox_residential_uuid | quote }},
+      "flow": "xtls-rprx-vision",
+      "tls": {
+        "enabled": true,
+        "server_name": "www.cisco.com",
+        "utls": {
+          "enabled": true,
+          "fingerprint": "chrome"
+        },
+        "reality": {
+          "enabled": true,
+          "public_key": {{ .singbox_public_key | quote }},
+          "short_id": {{ .singbox_residential_short_id | quote }}
+        }
+      }
+    },
+    {
+      "type": "socks",
+      "tag": "incus-proxy",
+      "server": "100.73.12.63",
+      "server_port": 10808,
+      "version": "5",
+      "detour": "ts-ep"
+    },
+    {
+      "type": "socks",
+      "tag": "incus-residential",
+      "server": "100.73.12.63",
+      "server_port": 11081,
+      "version": "5",
+      "detour": "ts-ep"
+    },
+    {
+      "type": "direct",
+      "tag": "direct"
+    }{{- if $isAndroid }},
+    {
+      "type": "block",
+      "tag": "block"
+    }
+{{- end }}
+  ],
+{{- if $newSchema }}
+  "http_clients": [
+    {
+      "tag": "rules-download",
+      "detour": "proxy"
+    }
+  ],
+{{- end }}
+  "route": {
+    "rules": [
+{{- if not $isAndroid }}
+      {
+        "action": "sniff"
+      },
+{{- end }}
+{{- if $isMacOS }}
+      {
+        "inbound": "tun-in",
+        "domain_suffix": ["mumuplayer.com", "mumuglobal.com", "mumu.easebar.com"],
+        "action": "route",
+        "outbound": "direct",
+        "override_address": "127.0.0.1",
+        "override_port": 8888
+      },
+      {
+        "inbound": "socks-residential-in",
+        "outbound": "auto-residential"
+      },
+{{- end }}
+      {
+        "protocol": "dns",
+        "action": "hijack-dns"
+      },
+{{- if $isAndroid }}
+      {
+        "protocol": "stun",
+        "outbound": "direct"
+      },
+      {
+        "domain_suffix": "tailscale.com",
+        "outbound": "direct"
+      },
+      {
+        "domain_suffix": ".ts.net",
+        "outbound": "ts-ep"
+      },
+      {
+        "ip_cidr": "100.64.0.0/10",
+        "outbound": "ts-ep"
+      },
+      {
+        "ip_cidr": ["10.0.0.0/24", "172.16.0.0/24"],
+        "outbound": "ts-ep"
+      },
+{{- else if $isIOS }}
+      {
+        "domain_suffix": ".ts.net",
+        "outbound": "ts-ep"
+      },
+      {
+        "ip_cidr": [
+          "100.64.0.0/10",
+          "fd7a:115c:a1e0::/48"
+        ],
+        "outbound": "ts-ep"
+      },
+      {
+        "ip_cidr": ["10.0.0.0/24", "172.16.0.0/24"],
+        "outbound": "ts-ep"
+      },
+{{- else }}
+      {
+        "ip_cidr": [
+          "100.64.0.0/10",
+          "fd7a:115c:a1e0::/48"
+        ],
+        "outbound": "direct"
+      },
+      {
+        "domain_suffix": ".ts.net",
+        "outbound": "direct"
+      },
+{{- end }}
+      {
+        "ip_cidr": [
+          "172.20.160.0/20",
+          "172.16.0.0/12"
+        ],
+        "outbound": "direct"
+      },
+      {
+        "ip_cidr": [
+          "114.214.211.0/24",
+          "202.38.0.0/16",
+          "210.45.0.0/16"
+        ],
+        "outbound": "direct"
+      },
+      {
+        "domain_suffix": "ustc.edu.cn",
+        "outbound": "direct"
+      },
+      {
+        "ip_cidr": "183.240.210.48/32",
+        "outbound": "direct"
+      },
+      {
+        "rule_set": "geosite-ads",
+        "action": "reject"{{- if and $isIOS $newSchema }},
+        "method": "default",
+        "no_drop": true{{- end }}
+      },
+{{- if and $isIOS $newSchema }}
+      {
+        "action": "sniff",
+        "network": ["tcp"],
+        "port": [80, 443],
+        "sniffer": ["http", "tls"],
+        "timeout": "500ms"
+      },
+      {
+        "network": ["udp"],
+        "port": [443],
+        "action": "sniff",
+        "sniffer": ["quic"],
+        "timeout": "500ms"
+      },
+      {
+        "rule_set": "geosite-ads",
+        "action": "reject",
+        "method": "default",
+        "no_drop": true
+      },
+      {
+        "ip_cidr": [
+          "183.47.121.104/32",
+          "122.9.15.129/32",
+          "119.147.11.57/32",
+          "101.91.140.224/32",
+          "42.192.25.141/32",
+          "122.9.13.79/32",
+          "119.147.19.76/32",
+          "101.91.140.124/32"
+        ],
+        "port": [80, 443, 8080],
+        "action": "reject",
+        "method": "default",
+        "no_drop": true
+      },
+{{- end }}
+      {
+        "domain_suffix": [
+          "openai.com", "chatgpt.com"
+        ],
+        "outbound": "gpt-chain"
+      },
+      {
+        "rule_set": "geosite-openai",
+        "outbound": "gpt-chain"
+      },
+{{- if $isAndroid }}
+      {
+        "domain_suffix": [
+          "claude.ai", "claude.com", "anthropic.com",
+          "gemini.google.com", "aistudio.google.com", "makersuite.google.com",
+          "copilot.microsoft.com", "character.ai", "huggingface.co", "openrouter.ai",
+          "x.ai", "grok.com", "mistral.ai", "midjourney.com"
+        ],
+        "outbound": "ai-chain"
+      },
+{{- else }}
+      {
+        "domain_suffix": [
+          "gemini.google.com", "aistudio.google.com", "makersuite.google.com",
+          "copilot.microsoft.com",
+          "character.ai",
+          "huggingface.co",
+          "openrouter.ai",
+          "x.ai", "grok.com",
+          "mistral.ai",
+          "midjourney.com"
+        ],
+        "outbound": "ai-chain"
+      },
+      {
+        "rule_set": [
+          "geosite-anthropic",
+          "geosite-perplexity",
+          "geosite-cursor",
+          "geosite-poe"
+        ],
+        "outbound": "ai-chain"
+      },
+{{- end }}
+      {
+        "rule_set": "geosite-google",
+        "outbound": "proxy"
+      },
+      {
+        "rule_set": "geosite-youtube",
+        "outbound": "proxy"
+      },
+      {
+        "rule_set": "geosite-netflix",
+        "outbound": "proxy"
+      },
+      {
+        "rule_set": "geosite-spotify",
+        "outbound": "proxy"
+      },
+      {
+        "rule_set": "geosite-telegram",
+        "outbound": "proxy"
+      },
+      {
+        "rule_set": "geosite-tiktok",
+        "outbound": "proxy"
+      },
+      {
+        "rule_set": "geosite-github",
+        "outbound": "proxy"
+      },
+      {
+        "domain_suffix": "bing.com",
+        "outbound": "proxy"
+      },
+      {
+        "domain_suffix": [
+          "docker.com",
+          "docker.io",
+          "hub.docker.com"
+        ],
+        "outbound": "proxy"
+      },
+      {
+        "domain": [
+          "v2rayse.com",
+          "googleapis.cn",
+          "gstatic.com",
+          "xn--ngstr-lra8j.com"
+        ],
+        "outbound": "proxy"
+      },
+      {
+        "domain_suffix": [
+          "microsoft.com",
+          "microsoftonline.com",
+          "live.com",
+          "skype.com",
+          "outlook.com",
+          "office.com",
+          "office.net",
+          "onedrive.com",
+          "onenote.com",
+          "sharepoint.com"
+        ],
+        "outbound": "direct"
+      },
+      {
+        "domain_suffix": [
+          "jetbrains.com",
+          "jetbrains.net",
+          "intellij.net",
+          "vscode-cdn.net",
+          "mozilla.org",
+          "firefox.com",
+          "getpocket.com",
+          "rust-lang.org",
+          "rustup.rs",
+          "static.rust-lang.org",
+          "linuxdo.org",
+          "appstorrent.ru",
+          "deepseek.com"
+        ],
+        "outbound": "direct"
+      },
+{{- if $isMacOS }}
+{{-   if or (eq $roxyBlockMode "archive") (eq $roxyBlockMode "strict") }}
+      {
+        "domain": "lumibrowser.oss-cn-shenzhen.aliyuncs.com",
+        "action": "reject"
+      },
+{{-   end }}
+{{-   if eq $roxyBlockMode "strict" }}
+      {
+        "domain": [
+          "app.roxybrowser.cn",
+          "app.roxybrowser.com",
+          "hz.gate.roxybrowser.cn",
+          "hz.api.roxybrowser.cn",
+          "gate.roxybrowser.net",
+          "sg.gate.roxybrowser.net",
+          "us.gate.roxybrowser.net"
+        ],
+        "action": "reject"
+      },
+{{-   end }}
+{{-   if or (eq $roxyBlockMode "archive") (eq $roxyBlockMode "strict") }}
+      {
+        "action": "sniff"
+      },
+      {
+        "domain": "lumibrowser.oss-cn-shenzhen.aliyuncs.com",
+        "action": "reject"
+      },
+{{-   end }}
+{{-   if eq $roxyBlockMode "strict" }}
+      {
+        "domain": [
+          "app.roxybrowser.cn",
+          "app.roxybrowser.com",
+          "hz.gate.roxybrowser.cn",
+          "hz.api.roxybrowser.cn",
+          "gate.roxybrowser.net",
+          "sg.gate.roxybrowser.net",
+          "us.gate.roxybrowser.net"
+        ],
+        "action": "reject"
+      },
+{{-   end }}
+{{- end }}
+      {
+        "domain_suffix": [
+          "aliyun.com",
+          "aliyuncs.com",
+          "tencentcloudcr.com",
+          "cr.aliyuncs.com"
+        ],
+        "outbound": "direct"
+      },
+{{- if not $isAndroid }}
+      {
+        "domain_suffix": [
+          "fcapp.run",
+          "sharedchat.cc"
+        ],
+        "outbound": "direct"
+      },
+{{- end }}
+      {
+        "domain_suffix": [
+          "azure.com",
+          "miromind.ai",
+          "context7.com",
+          "pairdrop.net",
+          "qwen.ai",
+          "deepwiki.org"
+        ],
+        "outbound": "direct"
+      },
+      {
+        "domain_keyword": [
+          "bohrium",
+          "jina"
+        ],
+        "outbound": "direct"
+      },
+      {
+        "rule_set": "geosite-apple",
+        "outbound": "direct"
+      },
+      {
+        "rule_set": [
+          "geosite-scholar-cn",
+          "geosite-scholar-!cn"
+        ],
+        "outbound": "direct"
+      },
+{{- if $isMacOS }}
+      {
+        "domain_suffix": "sugon.com",
+        "outbound": "direct"
+      },
+{{- end }}
+      {
+        "rule_set": "geosite-geolocation-!cn",
+        "outbound": "proxy"
+      },
+      {
+        "rule_set": "geosite-cn",
+        "outbound": "direct"
+      },
+      {
+        "ip_is_private": true,
+        "outbound": "direct"
+      },
+      {
+        "rule_set": "geoip-cn",
+        "outbound": "direct"
+      }
+    ],
+    "rule_set": [
+      {
+        "type": "remote",
+        "tag": "geosite-openai",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-openai.srs"{{- if not $newSchema }},
+        "download_detour": "proxy"{{- end }}
+      },
+{{- if not $isAndroid }}
+      {
+        "type": "remote",
+        "tag": "geosite-anthropic",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-anthropic.srs"{{- if not $newSchema }},
+        "download_detour": "proxy"{{- end }}
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-perplexity",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-perplexity.srs"{{- if not $newSchema }},
+        "download_detour": "proxy"{{- end }}
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-cursor",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cursor.srs"{{- if not $newSchema }},
+        "download_detour": "proxy"{{- end }}
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-poe",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-poe.srs"{{- if not $newSchema }},
+        "download_detour": "proxy"{{- end }}
+      },
+{{- end }}
+      {
+        "type": "remote",
+        "tag": "geosite-google",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-google.srs"{{- if not $newSchema }},
+        "download_detour": "proxy"{{- end }}
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-youtube",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-youtube.srs"{{- if not $newSchema }},
+        "download_detour": "proxy"{{- end }}
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-netflix",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-netflix.srs"{{- if not $newSchema }},
+        "download_detour": "proxy"{{- end }}
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-spotify",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-spotify.srs"{{- if not $newSchema }},
+        "download_detour": "proxy"{{- end }}
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-telegram",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-telegram.srs"{{- if not $newSchema }},
+        "download_detour": "proxy"{{- end }}
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-tiktok",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-tiktok.srs"{{- if not $newSchema }},
+        "download_detour": "proxy"{{- end }}
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-github",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-github.srs"{{- if not $newSchema }},
+        "download_detour": "proxy"{{- end }}
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-ads",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs"{{- if not $newSchema }},
+        "download_detour": "proxy"{{- end }}
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-apple",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-apple.srs"{{- if not $newSchema }},
+        "download_detour": "proxy"{{- end }}
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-scholar-cn",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-scholar-cn.srs"{{- if not $newSchema }},
+        "download_detour": "proxy"{{- end }}
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-scholar-!cn",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-scholar-!cn.srs"{{- if not $newSchema }},
+        "download_detour": "proxy"{{- end }}
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-geolocation-!cn",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-geolocation-!cn.srs"{{- if not $newSchema }},
+        "download_detour": "proxy"{{- end }}
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-cn",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cn.srs"{{- if not $newSchema }},
+        "download_detour": "proxy"{{- end }}
+      },
+      {
+        "type": "remote",
+        "tag": "geoip-cn",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-cn.srs"{{- if not $newSchema }},
+        "download_detour": "proxy"{{- end }}
+      }
+    ],
+    "final": "proxy",
+    "auto_detect_interface": true,
+    "default_domain_resolver": "dns-remote"{{- if $newSchema }},
+    "default_http_client": "rules-download"{{- end }}
+  },
+  "experimental": {
+    "cache_file": {
+      "enabled": true,
+      "path": "cache.db",
+      "store_fakeip": true{{- if and $isMacOS $newSchema }},
+      "store_dns": true{{- end }}
+    }
+{{- if $isMacOS }},
+    "clash_api": {
+      "external_controller": "127.0.0.1:9091",
+      "external_ui": "{{ $singbox_dir }}/ui",
+      "external_ui_download_url": "https://github.com/MetaCubeX/metacubexd/releases/latest",
+      "external_ui_download_detour": "proxy",
+      "secret": {{ .singbox_api_secret | quote }},
+      "default_mode": "rule"
+    }
+{{- end }}
+  }
+{{- if and $isMacOS $newSchema }},
+  "services": [
+    {
+      "type": "api",
+      "listen": "127.0.0.1",
+      "listen_port": 9092,
+      "secret": {{ .singbox_api_secret | quote }},
+      "access_control_allow_private_network": false
+    }
+  ]
+{{- end }}
+}
+{{- end -}}
