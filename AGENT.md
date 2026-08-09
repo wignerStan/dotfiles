@@ -104,7 +104,9 @@ from a security resource's tier gate.
   tart is **mac-only**; install is gated to the dev facet
   (`run_onchange_macos-tart-setup.sh.tmpl`). A default/basic machine without the
   dev facet must NOT get tart auto-installed — and `TART_HOME` resolves at
-  runtime (external vs ~/.tart).
+  runtime (external vs ~/.tart). Tart's `admins-Virtual-Machine` declaration is
+  an explicit simple/basic guest with system+user deployment; its bootstrap
+  transfers `~/.ssh/id_chezmoi` and the age identity over the guest-agent channel.
 
 ## How to verify safely
 

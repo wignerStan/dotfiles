@@ -15,6 +15,17 @@ bootstrap = "full"
 deploy = "system+user"
 is_guest = false
 
+# Cirrus Labs/Tart base images use this LocalHostName. Keep the guest minimal,
+# but retain system+user deployment so the L2 PF security baseline is installed.
+[machine."admins-Virtual-Machine"]
+ownership = "personal"
+platform = "local"
+tier = "simple"
+facets = []
+bootstrap = "basic"
+deploy = "system+user"
+is_guest = true
+
 [machine."racknerd"]
 ownership = "personal"
 platform = "cloud"

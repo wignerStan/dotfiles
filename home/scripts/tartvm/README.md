@@ -42,10 +42,12 @@ partial state.
    image (offline if already pulled).
 3. `scripts/tartvm/env/tart-bootstrap.sh win` boots the guest and, via
    `tart exec` and the guest agent (no SSH dependency), stages + runs
-   `tart-guest-bootstrap.sh`. That script clones the dotfiles repo, installs
-   chezmoi, decrypts `secrets.toml.age` with the host identity transferred over
-   the guest-agent channel,
-   and runs `chezmoi apply`.
+   `tart-guest-bootstrap.sh`. The wrapper transfers `~/.ssh/id_chezmoi` (the
+   read-only GitHub deploy key) and the chezmoi age identity over that private
+   channel. The guest clones over SSH, initializes the
+   `admins-Virtual-Machine` declaration (`personal/local/simple`, basic,
+   system+user, explicit guest), configures ALF, decrypts `secrets.toml.age`,
+   and runs `chezmoi apply`, including the PF baseline.
 
 > Note: the base macOS images ship no Homebrew by default. `tart-guest-bootstrap.sh`
 > falls back to the official chezmoi install script (`get.chezmoi.io`) when `brew`

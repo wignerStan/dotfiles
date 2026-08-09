@@ -21,8 +21,12 @@ die()  { printf '%s   %s\n' "${RED}fail:${RESET}" "$*" >&2; exit 1; }
 
 is_cmd() { command -v "$1" >/dev/null 2>&1; }
 
-DOTFILES_REPO="${DOTFILES_REPO:-https://github.com/wignerStan/dotfiles.git}"
+DOTFILES_REPO="${DOTFILES_REPO:-git@github.com:wignerStan/dotfiles.git}"
 AGE_IDENT="$HOME/.config/chezmoi/age-key.txt"
+DEPLOY_KEY="$HOME/.ssh/id_chezmoi"
+
+[[ -r "$DEPLOY_KEY" ]] || die "chezmoi deploy key was not seeded by tart-bootstrap.sh"
+export GIT_SSH_COMMAND="/usr/bin/ssh -i $DEPLOY_KEY -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
 
 # 1) clone if missing
 if [ ! -d "$HOME/.local/share/chezmoi" ]; then
@@ -31,6 +35,8 @@ if [ ! -d "$HOME/.local/share/chezmoi" ]; then
 else
     git -C "$HOME/.local/share/chezmoi" pull --ff-only || die "dotfiles update failed"
 fi
+git -C "$HOME/.local/share/chezmoi" config core.sshCommand \
+    "/usr/bin/ssh -i $DEPLOY_KEY -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
 
 # 2) chezmoi binary (brew on this guest; Tart macOS images have no brew by default)
 if ! is_cmd chezmoi; then
@@ -65,6 +71,15 @@ if [ -f "secrets.toml.age" ]; then
         die "secret decryption failed (age key mismatch)"
     fi
 fi
+# The Tart guest is declared as system+user so PF is installed. Match the
+# installer's ALF preconditions before applying any system-scoped resources.
+if ! sudo -n true 2>/dev/null; then
+    die "passwordless sudo is required for Tart system+user deployment"
+fi
+sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setglobalstate on >/dev/null
+sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setblockall off >/dev/null
+sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setallowsigned on >/dev/null
+sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setallowsignedapp off >/dev/null
 chezmoi apply --no-tty || die "chezmoi apply failed"
 
 ok "guest bootstrap complete — dotfiles applied"

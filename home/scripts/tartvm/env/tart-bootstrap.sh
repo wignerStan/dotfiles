@@ -11,7 +11,8 @@
 #   tart-bootstrap.sh [name]     # default guest: win
 #
 # Steps: ensure VM created -> boot -> wait for guest agent -> transfer the host's
-# age identity over the private guest-agent channel -> copy/run guest bootstrap.
+# chezmoi deploy key + age identity over the private guest-agent channel ->
+# copy/run guest bootstrap.
 # Managed by Chezmoi — do not edit in place.
 # -------------------------------------------------------------------------------
 set -euo pipefail
@@ -32,8 +33,11 @@ vm_state() {
 
 is_cmd tart || { die "tart missing"; }
 HOST_AGE_IDENTITY="${TART_AGE_IDENTITY:-$HOME/.config/chezmoi/age-key.txt}"
+HOST_CHEZMOI_DEPLOY_KEY="${TART_CHEZMOI_DEPLOY_KEY:-$HOME/.ssh/id_chezmoi}"
 [[ -r "$HOST_AGE_IDENTITY" ]] \
     || die "host age identity missing: $HOST_AGE_IDENTITY (set TART_AGE_IDENTITY to override)"
+[[ -r "$HOST_CHEZMOI_DEPLOY_KEY" ]] \
+    || die "chezmoi deploy key missing: $HOST_CHEZMOI_DEPLOY_KEY (set TART_CHEZMOI_DEPLOY_KEY to override)"
 
 # 1) ensure VM exists
 if ! tart list --source local --quiet 2>/dev/null | grep -Fqx "$VM_NAME"; then
@@ -63,9 +67,13 @@ for ((i = 0; i < 90; i++)); do
 done
 tart exec "$VM_NAME" /usr/bin/true >/dev/null 2>&1 || die "guest agent unavailable"
 
-# 4) Seed the same private identity used by the repository recipient. This is a
-# deliberate secret transfer to the local VM, carried over Virtualization.framework's
+# 4) Seed the repository deploy key and the private age identity. These are
+# deliberate secret transfers to the local VM, carried over Virtualization.framework's
 # guest-agent channel rather than SSH or a shared on-disk directory.
+# shellcheck disable=SC2016  # $HOME must expand inside the guest, not on the host
+cat "$HOST_CHEZMOI_DEPLOY_KEY" | tart exec -i "$VM_NAME" /bin/sh -c \
+    'umask 077; mkdir -p "$HOME/.ssh"; chmod 700 "$HOME/.ssh"; cat > "$HOME/.ssh/id_chezmoi"; chmod 600 "$HOME/.ssh/id_chezmoi"' \
+    || die "failed to transfer the chezmoi deploy key"
 # shellcheck disable=SC2016  # $HOME must expand inside the guest, not on the host
 cat "$HOST_AGE_IDENTITY" | tart exec -i "$VM_NAME" /bin/sh -c \
     'umask 077; mkdir -p "$HOME/.config/chezmoi"; cat > "$HOME/.config/chezmoi/age-key.txt"' \
