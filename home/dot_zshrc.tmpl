@@ -39,17 +39,17 @@ fi
 # AFTER compinit — so the plugins' autoloads resolve. Guarded so a missing
 # brew prefix or non-brew host is a silent no-op.
 if [[ -n "$_brew_prefix" && -d "${_brew_prefix}/share/zsh/functions" ]]; then
-    fpath=("${_brew_prefix}/share/zsh/functions" $fpath)
+    fpath=("${_brew_prefix}/share/zsh/functions" ${fpath[@]})
 fi
 
 # Custom zsh functions
-fpath=(~/.zsh/functions $fpath)
+fpath=(~/.zsh/functions ${fpath[@]})
 if [[ -d $HOME/.zsh/functions ]]; then
     for func_file in $HOME/.zsh/functions/*(.N); do
         autoload -Uz -- "$func_file:t"
     done
 fi
-fpath=($HOME/.zsh/completions $fpath)
+fpath=($HOME/.zsh/completions ${fpath[@]})
 
 ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE="fg=10"
 zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
@@ -67,8 +67,14 @@ if [[ -n "$_brew_prefix" ]]; then
     [[ -f $_brew_prefix/opt/fzf/shell/key-bindings.zsh ]] && source $_brew_prefix/opt/fzf/shell/key-bindings.zsh
     [[ -f $_brew_prefix/opt/fzf/shell/completion.zsh ]] && source $_brew_prefix/opt/fzf/shell/completion.zsh
 
-    # History substring search
-    [[ -f $_brew_prefix/share/zsh-history-substring-search/zsh-history-substring-search.zsh ]] && source $_brew_prefix/share/zsh-history-substring-search/zsh-history-substring-search.zsh
+    # History substring search (its `$+functions[...]` checks assume standard
+    # zsh semantics; KSH_ARRAYS makes them misparse, so source it with the
+    # option locally off, then restore).
+    if [[ -f $_brew_prefix/share/zsh-history-substring-search/zsh-history-substring-search.zsh ]]; then
+        setopt no_ksh_arrays
+        source $_brew_prefix/share/zsh-history-substring-search/zsh-history-substring-search.zsh
+        setopt ksh_arrays
+    fi
 fi
 
 # ═══════════════════════════════════════════════════════════════
@@ -89,11 +95,11 @@ bindkey -M vicmd '^a' beginning-of-line
 bindkey -M vicmd '^e' end-of-line
 
 # FZF bindings (both modes) — only when fzf widgets actually loaded
-if (( $+functions[fzf-history-widget] )); then
+if (( ${+functions[fzf-history-widget]} )); then
     bindkey -M vicmd '^r' fzf-history-widget
     bindkey -M viins '^r' fzf-history-widget
 fi
-if (( $+functions[fzf-file-widget] )); then
+if (( ${+functions[fzf-file-widget]} )); then
     bindkey -M vicmd '^t' fzf-file-widget
     bindkey -M viins '^t' fzf-file-widget
 fi
@@ -101,7 +107,7 @@ fi
 # History substring search on arrow keys (both modes) — only when the
 # plugin actually loaded (brew zsh-history-substring-search; a missing/
 # stale install must degrade to the plain line editor, not error).
-if (( $+functions[history-substring-search-up] )); then
+if (( ${+functions[history-substring-search-up]} )); then
     bindkey -M vicmd '^[[A' history-substring-search-up
     bindkey -M vicmd '^[[B' history-substring-search-down
     bindkey -M viins '^[[A' history-substring-search-up
