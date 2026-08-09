@@ -5,9 +5,11 @@ PATH=/usr/bin:/bin:/usr/sbin:/sbin
 PFCTL=/sbin/pfctl
 BASE_ANCHOR=com.apple/999.chezmoi-firewall
 TRUSTED_ANCHOR=com.apple/998.chezmoi-firewall-trusted
+ALF_GUARD_ANCHOR=com.apple/997.chezmoi-firewall-alf-guard
 BASE_RULES=/etc/pf.anchors/chezmoi-firewall
 TRUSTED_RULES=/etc/pf.anchors/chezmoi-firewall-trusted
 TRUSTED_INTERFACE={{ .firewall.macos_pf.trusted_interface | quote }}
+SOCKETFILTERFW=/usr/libexec/ApplicationFirewall/socketfilterfw
 TOKEN_FILE=/var/run/local.chezmoi-pf-firewall.token
 LOG_TAG=chezmoi-pf
 POLL_INTERVAL=5
@@ -15,6 +17,7 @@ POLL_INTERVAL=5
 token=""
 last_network_signature=""
 trusted_loaded=0
+alf_guard_loaded=0
 
 log() {
     /usr/bin/logger -t "$LOG_TAG" -- "$*"
@@ -38,6 +41,8 @@ cleanup() {
 
     "$PFCTL" -q -a "$TRUSTED_ANCHOR" -F rules >/dev/null 2>&1 || true
     "$PFCTL" -q -a "$TRUSTED_ANCHOR" -F Tables >/dev/null 2>&1 || true
+    "$PFCTL" -q -a "$ALF_GUARD_ANCHOR" -F rules >/dev/null 2>&1 || true
+    "$PFCTL" -q -a "$ALF_GUARD_ANCHOR" -F Tables >/dev/null 2>&1 || true
     "$PFCTL" -q -a "$BASE_ANCHOR" -F rules >/dev/null 2>&1 || true
     "$PFCTL" -q -a "$BASE_ANCHOR" -F Tables >/dev/null 2>&1 || true
     if [[ "$token" =~ ^[0-9]+$ ]]; then
@@ -64,6 +69,20 @@ enable_pf() {
 pf_is_enabled() {
     "$PFCTL" -s info 2>/dev/null \
         | /usr/bin/grep -E '^Status:[[:space:]]+Enabled' >/dev/null
+}
+
+alf_is_compliant() {
+    local block_all_state
+    local firewall_state
+    local signed_state
+
+    firewall_state="$("$SOCKETFILTERFW" --getglobalstate 2>/dev/null)" || return 1
+    block_all_state="$("$SOCKETFILTERFW" --getblockall 2>/dev/null)" || return 1
+    signed_state="$("$SOCKETFILTERFW" --getallowsigned 2>/dev/null)" || return 1
+    /usr/bin/grep -Eq 'State[[:space:]]*=[[:space:]]*1' <<<"$firewall_state" \
+        && /usr/bin/grep -Eqi 'block all.*disabled' <<<"$block_all_state" \
+        && /usr/bin/grep -Eq 'Automatically allow (signed built-in|built-in signed) software ENABLED' <<<"$signed_state" \
+        && /usr/bin/grep -Eq 'Automatically allow downloaded( signed)? software DISABLED' <<<"$signed_state"
 }
 
 renew_pf_token() {
@@ -96,9 +115,19 @@ trusted_rules_active() {
         | /usr/bin/grep 'chezmoi-pf-trusted-' >/dev/null
 }
 
+alf_guard_active() {
+    "$PFCTL" -a "$ALF_GUARD_ANCHOR" -sr 2>/dev/null \
+        | /usr/bin/grep 'chezmoi-pf-alf-fail-closed' >/dev/null
+}
+
 flush_trusted_rules() {
     "$PFCTL" -q -a "$TRUSTED_ANCHOR" -F rules >/dev/null 2>&1 || true
     "$PFCTL" -q -a "$TRUSTED_ANCHOR" -F Tables >/dev/null 2>&1 || true
+}
+
+flush_alf_guard() {
+    "$PFCTL" -q -a "$ALF_GUARD_ANCHOR" -F rules >/dev/null 2>&1 || true
+    "$PFCTL" -q -a "$ALF_GUARD_ANCHOR" -F Tables >/dev/null 2>&1 || true
 }
 
 run_pfctl_rules() {
@@ -112,6 +141,32 @@ run_pfctl_rules() {
     if (( status != 0 )); then
         printf '%s\n' "$output" >&2
         return "$status"
+    fi
+}
+
+load_alf_guard() {
+    run_pfctl_rules -q -a "$ALF_GUARD_ANCHOR" -f - << 'PFRULES'
+pass in quick on lo0 all keep state label "chezmoi-pf-alf-loopback"
+block drop in quick all label "chezmoi-pf-alf-fail-closed"
+PFRULES
+}
+
+reconcile_alf_guard() {
+    if alf_is_compliant; then
+        if alf_guard_active; then
+            flush_alf_guard
+            log "Application Firewall policy restored; fail-closed PF guard removed"
+        fi
+        alf_guard_loaded=0
+    else
+        if ! alf_guard_active; then
+            load_alf_guard
+            "$PFCTL" -F states >/dev/null 2>&1 || true
+            log "Application Firewall policy is noncompliant; fail-closed PF guard activated"
+        elif (( alf_guard_loaded == 0 )); then
+            log "Application Firewall policy remains noncompliant; fail-closed PF guard is active"
+        fi
+        alf_guard_loaded=1
     fi
 }
 
@@ -185,6 +240,7 @@ trap cleanup EXIT INT TERM
 release_stale_token
 enable_pf
 reconcile_rules
+reconcile_alf_guard
 log "base stateful host firewall loaded in $BASE_ANCHOR"
 
 if (( trusted_loaded == 1 )); then
@@ -201,6 +257,8 @@ while :; do
         log "PF became disabled; renewing the service token"
         renew_pf_token
     fi
+
+    reconcile_alf_guard
 
     if rules_need_reconcile; then
         previously_trusted=$trusted_loaded
