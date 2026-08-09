@@ -12,22 +12,67 @@ Short guide for safe, convention-preserving edits. Read before changing anything
 - Only files with template syntax need the `.tmpl` suffix. Static files tracked
   in `home/` under `scripts/` (winvm, tartvm) ship as-is.
 
-## Variant model (three orthogonal axes — do not conflate)
+## Variant model (six orthogonal axes — do not conflate)
 
-Computed in `home/.chezmoi.toml.tmpl` (data exposed to every template):
+Computed in `home/.chezmoi.toml.tmpl` (data exposed to every template).
+At `chezmoi init`, precedence per axis is `CHEZMOI_*` env >
+`home/.chezmoidata/machine.toml` (keyed by hostname) > auto-detection. The
+generated config persists across applies. Use `--override-data` for a one-off
+apply and re-run `chezmoi init` after changing machine declarations.
 
-- **profile** — exact one: `personal` | `work` | `vps` | `hpc`. Auto-detected
-  (codespaces/root→vps, apptainer→hpc). Identity primary.
-- **tier** — `default` | `system` | `develop` | `calculate` | `simple`.
-  `develop` = dev user; `simple` = VM/container (minimal); `calculate` = cal
-  user (linux); `system` = explicit only. default = fallback. Auto-detect via
-  username + DMI "Virtual/Parallels" or `CHEZMOI_TIER` override.
-- **setup_mode** — `full` | `basic` (orthogonal breadth control: full = CLI +
-  GUI/media/dev tools; basic = minimal).
+- **ownership** — exactly one: `personal` | `work`. Who owns the machine.
+  `work` remains a minimal/reference gate (shared-cluster declarations only;
+  there is no fully managed work workstation yet).
+- **platform** — `local` | `cloud`. Where it runs: own hardware vs a 3rd-party
+  cloud platform (VPS/HPC/codespace). Auto: codespaces/container/apptainer →
+  cloud. (OS kind is a SEPARATE key `.os_platform` = darwin|linux|wsl|windows.)
+- **tier** — `simple` | `default` | `advanced`. Resource/install depth.
+  `simple` = minimal/1C1G → primary_shell bash; `default`/`advanced` → zsh with
+  bash-align setopts (in `.zshenv`). Legacy `CHEZMOI_TIER=develop` translates
+  to advanced + dev facet. The old `system`/`calculate` tiers are gone.
+- **facets** — stackable list: `dev` | `proxy` | `ai` | `hpc` | `research`. Available on ANY
+  tier (simple included). `dev` = former develop tier (bun/pnpm, tart, go/rust,
+  L4 tools); `proxy` = xray-core/sing-box; `ai` = sub2api + CLI wrappers
+  (cc/cc2/oc) — AI is NOT a dev tool, it is its own facet; `hpc` = former
+  calculate tier (spack/fortran/cuda), auto-added for cal/apptainer hosts.
+- **is_guest** — derived role flag, separate from tier. Machine declarations
+  override Linux/Windows VM-model detection. Guest-only network decisions use
+  this flag; low resource depth alone never disables a security baseline.
+- **bootstrap** — `basic` | `full` (renamed from setup_mode). L2 basic vs L3
+  full (packages + services).
+- **deploy** — `user` (default) | `system` | `system+user`. Deploy scope, enforced
+  in `run_once_setup.sh.tmpl` by runtime identity:
+  - root/system user → ONLY the system scope (`system`/`system+user`); the user
+    scope is run by `scripts/bootstrap-l1.sh` after dropping to the default uid
+    (1000 linux / 501 darwin).
+  - plain user + `user` (default) → user scope only.
+  - plain user + `system` → system scope via sudo elevation.
+  - plain user + `system+user` → user scope followed by sudo system scope.
+  - root + `system+user` → system scope only; L1 owns the privilege drop.
 
-Package/tool breadth is level-gated in `home/run_once_setup.sh.tmpl`:
-Level 1 basic (all non-simple tiers), Level 2 extra (`setup_mode=full`),
-Level 3 develop (`tier=develop`).
+Package layers (`home/run_once_setup.sh.tmpl` + `home/.chezmoidata/packages.toml`):
+L1 self-bootstrap → L2 basic (all non-simple tiers; shell/dir tooling only, NO
+language stack) → L3 standard (bootstrap=full: uv/mamba/node + npm
+global-block + tooling/services; pnpm/bun are dev-facet-gated; pixi is research-facet) → facet overlays
+(`facets.*` in packages.toml; dev carries pnpm/bun, research carries pixi). npm cache redirected to
+`~/.cache/npm` (dot_npmrc.tmpl). System commands are ALWAYS sudo-elevated when not
+root (native/plain-user hosts need the password; root runs them directly).
+Local & cloud are NOT isolated package trees;
+overlays live in `home/.chezmoi/overlay/{facets,platform}/`.
+
+Service provisioning (cloud, not HPC): `home/run_onchange_linux-cloud-services.sh.tmpl`
+— fixed order tailscale → nft → sysctl → nginx → kopia → pg/redis (tier-scaled
+single/multi) → proxy → ai; nginx Restart=always drop-in is managed here;
+conflict-warning for non-managed variant overrides (slim/full in
+`.chezmoidata/facet_registry.toml`).
+
+macOS PF host firewall: `home/run_onchange_install-macos-pf-firewall.sh.tmpl`.
+Its resource classification is `scope=system`, `ownership=personal`,
+`os=darwin`, `layer=basic` (and therefore inherited by `bootstrap=full`);
+PF staging is managed for every personal Darwin host at the basic layer.
+System installation reconciles for `deploy=system` and `deploy=system+user`;
+plain users elevate through sudo. Guest role is `.is_guest`, never inferred
+from a security resource's tier gate.
 
 ## Non-negotiables
 
@@ -42,20 +87,24 @@ Level 3 develop (`tier=develop`).
 - **Windows batch files must be pure ASCII (or GBK for Chinese status strings)** —
   guest codepage is GBK(936); stray UTF-8 breaks cmd parsing. Re-encode (not
   just save) when adding non-ASCII.
-- **Shell is zsh-primary, fish-mirror.** A startup/env change should land in BOTH
-  `dot_zshenv.tmpl`/`dot_zshrc.tmpl` AND the `fish/conf.d/`.
+- **Shell follows `.primary_shell`**: zsh-primary with fish-mirror on
+  standard tiers; **bash on tier=simple**. A startup/env change for zsh should
+  land in BOTH `dot_zshenv.tmpl`/`dot_zshrc.tmpl` AND the `fish/conf.d/`;
+  simple/bash hosts get `dot_bashrc.tmpl`+`dot_bash_profile.tmpl` and ignore
+  the zsh/fish files (see `.chezmoiignore.tmpl`).
 - **`run_onchange_*` and `run_once_*` scripts must render EMPTY on platforms where
   they must not run**, or chezmoi will execute them. Always gate by
-  `{{ if eq .chezmoi.os "..." }}` and/or tier, then verify with the render checks below.
+  `{{ if eq .chezmoi.os "..." }}` and/or tier/facets, then verify with the render checks below.
 
 ## VM deploys
 
 - `home/scripts/winvm/` — Windows VM (Parallels) suite: debloat/defender/security/
   restore/runtime/env/verify/winstock/maintenance. Guest entry: `bootstrap-win.ps1`.
 - `home/scripts/tartvm/` — macOS VM (tart) suite: create/verify/env/maintenance.
-  tart is **mac-only**; install is gated to `tier=develop`
-  (`run_onchange_macos-tart-setup.sh.tmpl`). A default/basic-tier Mac must NOT get
-  tart auto-installed — and `TART_HOME` resolves at runtime (external vs ~/.tart).
+  tart is **mac-only**; install is gated to the dev facet
+  (`run_onchange_macos-tart-setup.sh.tmpl`). A default/basic machine without the
+  dev facet must NOT get tart auto-installed — and `TART_HOME` resolves at
+  runtime (external vs ~/.tart).
 
 ## How to verify safely
 
