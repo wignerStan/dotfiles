@@ -391,6 +391,9 @@
       "stack": "gvisor"
     }
 {{- else }}
+{{- /* iOS: strict_route is Linux/Windows-only; include_all_interfaces is a
+       client UI toggle (like Android's "Block connections without VPN"),
+       not a config setting - keep the tun minimal. */ -}}
     {
       "type": "tun",
       "tag": "tun-in",
@@ -399,7 +402,6 @@
       ],
       "auto_route": true,
       "stack": "gvisor"{{- if $newSchema }},
-      "include_all_interfaces": true,
       "dns_mode": "hijack"{{- end }}
     }
 {{- end }}
