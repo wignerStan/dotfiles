@@ -377,6 +377,9 @@
       "listen_port": 7898
     }
 {{- else if $isAndroid }}
+{{- /* Android: no strict_route (not implemented on this build); the client
+       UI toggle "Block connections without VPN" provides the same guard,
+       so the tun config stays minimal. */ -}}
     {
       "type": "tun",
       "tag": "tun-in",
@@ -396,7 +399,7 @@
       ],
       "auto_route": true,
       "stack": "gvisor"{{- if $newSchema }},
-      "strict_route": true,
+      "include_all_interfaces": true,
       "dns_mode": "hijack"{{- end }}
     }
 {{- end }}
