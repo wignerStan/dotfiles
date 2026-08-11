@@ -410,8 +410,8 @@
     {
       "type": "selector",
       "tag": "proxy",
-      "outbounds": ["auto-proxy", "VLESS", "VLESS-CDN", "incus-proxy"],
-      "default": "VLESS"
+      "outbounds": ["auto-proxy", "static-residential", "VLESS", "VLESS-CDN", "incus-proxy"],
+      "default": "auto-proxy"
     },
     {
       "type": "urltest",
@@ -433,7 +433,7 @@
     },
     {
       "type": "urltest",
-      "tag": "auto-residential",
+      "tag": "static-residential",
       "outbounds": ["residential", "residential-direct", "incus-residential"],
       "url": "https://www.gstatic.com/generate_204",
       "interval": "3m",
@@ -443,13 +443,13 @@
     {
       "type": "selector",
       "tag": "ai-chain",
-      "outbounds": ["auto-warp", "auto-residential", "auto-proxy"],
+      "outbounds": ["auto-warp", "static-residential", "auto-proxy"],
       "default": "auto-warp"
     },
     {
       "type": "selector",
       "tag": "gpt-chain",
-      "outbounds": ["auto-warp", "auto-residential", "auto-proxy"],
+      "outbounds": ["auto-warp", "static-residential", "auto-proxy"],
       "default": "auto-warp"
     },
     {
@@ -583,7 +583,7 @@
       },
       {
         "inbound": "socks-residential-in",
-        "outbound": "auto-residential"
+        "outbound": "static-residential"
       },
 {{- end }}
       {
