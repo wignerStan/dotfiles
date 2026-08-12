@@ -1085,8 +1085,8 @@
         "download_detour": "proxy"{{- end }}
       }
     ],
-    "final": "proxy"{{- if $isMacOS }},
-    "auto_detect_interface": true{{- end }},
+    "final": "proxy",
+    "auto_detect_interface": true,
     "default_domain_resolver": "dns-remote"{{- if $newSchema }},
     "default_http_client": "rules-download"{{- end }}
   },
