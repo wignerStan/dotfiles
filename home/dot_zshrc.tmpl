@@ -15,7 +15,7 @@ fi
 
 # Carapace: multi-shell completion (replaces zsh-completions + compinit)
 if command -v carapace &>/dev/null; then
-    autoload -Uz compinit && compinit
+    autoload -Uz compinit && compinit -i
     export CARAPACE_BRIDGES='zsh,fish,bash,inshellisense'
     zstyle ':completion:*' format $'\e[2;37mCompleting %d\e[m'
     source <(carapace _carapace)
@@ -27,7 +27,7 @@ else
     fi
     autoload -Uz compinit
     if [[ ! -f ${ZDOTDIR:-$HOME}/.zcompdump ]]; then
-        compinit
+        compinit -i
     else
         compinit -C
     fi
