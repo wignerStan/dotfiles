@@ -91,7 +91,11 @@ fi
 # ═══════════════════════════════════════════════════════════════
 
 bindkey -v
-export KEYTIMEOUT=1
+# 40ms (4 centiseconds) instead of 1ms. KEYTIMEOUT=1 keeps Escape snappy,
+# but it is too short for zsh to reliably consume Ghostty's bracketed-paste
+# end marker in vi mode; the marker can leak as `ESC` + `~`, which leaves
+# insert mode and toggles the last pasted character.
+export KEYTIMEOUT=4
 
 # Start in insert mode
 function zle-line-init() { zle .reset-prompt; }
@@ -121,6 +125,15 @@ if (( ${+functions[history-substring-search-up]} )); then
     bindkey -M vicmd '^[[B' history-substring-search-down
     bindkey -M viins '^[[A' history-substring-search-up
     bindkey -M viins '^[[B' history-substring-search-down
+fi
+
+# Ghostty paste over SSH + native vi mode: zsh asks the terminal for
+# bracketed-paste framing, but over SSH Ghostty's end marker can be misread
+# as `ESC` then `~`. That switches to normal mode and flips the last
+# character's case. Disable the bracketed-paste request on SSH sessions so
+# Ghostty sends clipboard text directly instead of framed marker sequences.
+if [[ -n "${SSH_CONNECTION:-}" ]]; then
+    unset zle_bracketed_paste
 fi
 
 unset _brew_prefix
