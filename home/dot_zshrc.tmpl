@@ -60,7 +60,16 @@ zstyle ':completion:*:*:*:*:*' menu select
 # ═══════════════════════════════════════════════════════════════
 
 if [[ -n "$_brew_prefix" ]]; then
-    [[ -f $_brew_prefix/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]] && source $_brew_prefix/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+    # zsh-autosuggestions registers its action widgets via `for action in
+    # $actions`; KSH_ARRAYS makes that loop visit only the first element
+    # (only `autosuggest-clear` survives → "No such widget autosuggest-suggest"
+    # on the first keystroke). Source it with standard zsh semantics, then
+    # restore, same as history-substring-search below.
+    if [[ -f $_brew_prefix/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]]; then
+        setopt no_ksh_arrays
+        source $_brew_prefix/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+        setopt ksh_arrays
+    fi
     [[ -f $_brew_prefix/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]] && source $_brew_prefix/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 
     # Fzf (fuzzy finder)
