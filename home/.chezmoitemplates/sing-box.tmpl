@@ -366,7 +366,7 @@
     },
     {
       "type": "mixed",
-      "tag": "mixed-in-local",
+      "tag": "warp-in",
       "listen": "127.0.0.1",
       "listen_port": 7899
     },
@@ -584,6 +584,10 @@
       {
         "inbound": "socks-residential-in",
         "outbound": "static-residential"
+      },
+      {
+        "inbound": "warp-in",
+        "outbound": "auto-warp"
       },
 {{- end }}
       {
