@@ -2,16 +2,16 @@
      Renders environment.yaml, then mamba env update.
      use_uv: true in .condarc enables uv for pip installs where available. */ -}}
 {{- if and (ne .chezmoi.os "windows") (eq .bootstrap "full") (lookPath "micromamba") (and (ne .tier "simple") (not (has "hpc" .facets))) -}}
-{{- /* Resolved per-user machine profile; empty means user-local caches. */ -}}
-{{- $shared := "" -}}
-{{- if hasKey . "shared_workspace" }}{{- $shared = .shared_workspace | default "" }}{{- end -}}
+{{- /* Resolved per-user cache root; empty means user-local caches. */ -}}
+{{- $shared_cache := "" -}}
+{{- if hasKey . "shared_cache" }}{{- $shared_cache = .shared_cache | default "" }}{{- end -}}
 #!/bin/sh
 set -eu
 export MAMBA_ROOT_PREFIX="{{ .mamba_root }}"
 export CONDA_PREFIX="{{ .mamba_root }}"
 export UV_SYSTEM_PYTHON=1
-export UV_LINK_MODE=clone{{- if $shared }}
-export UV_CACHE_DIR="{{ $shared }}/.cache/uv"{{- end }}
+export UV_LINK_MODE=clone{{- if $shared_cache }}
+export UV_CACHE_DIR="{{ $shared_cache }}/uv"{{- end }}
 log() { printf '[mamba-sync] %s\n' "$*"; }
 
 MM="$(command -v micromamba 2>/dev/null || command -v mamba 2>/dev/null || command -v conda 2>/dev/null || true)"

@@ -34,6 +34,12 @@
 {{- if hasKey $machine_cfg "shared_workspace" -}}
 {{-   $shared_workspace = index $machine_cfg "shared_workspace" | default "" -}}
 {{- end -}}
+{{- $shared_cache := "" -}}
+{{- if hasKey $machine_cfg "shared_cache" -}}
+{{-   $shared_cache = index $machine_cfg "shared_cache" | default "" -}}
+{{- else if $shared_workspace -}}
+{{-   $shared_cache = joinPath $shared_workspace ".cache" -}}
+{{- end -}}
 
 {{- /* guest role: separate from tier (resource depth). Explicit machine data
      wins; Linux/Windows VM models are a fallback. */ -}}
@@ -252,6 +258,7 @@ encryption = "age"
     is_headless = {{ $headless }}
     mamba_sections = {{ $mamba_sections | toJson }}
     shared_workspace = {{ $shared_workspace | quote }}
+    shared_cache = {{ $shared_cache | quote }}
     use_china_mirrors = {{ $use_china_mirrors }}
     geo = {{ $geo | quote }}
     mamba_root = {{ if $shared_workspace }}{{ joinPath $shared_workspace "mamba" | quote }}{{ else }}{{ joinPath .chezmoi.homeDir "mamba" | quote }}{{ end }}

@@ -1,10 +1,10 @@
 # uv config — managed by chezmoi
-{{- /* Resolved per-user machine profile; empty means user-local caches. */ -}}
-{{- $shared := "" -}}
-{{- if hasKey . "shared_workspace" }}{{- $shared = .shared_workspace | default "" }}{{- end -}}
-{{- if $shared }}
-# Shared cache on {{ $shared }}/.cache (same btrfs filesystem as project venvs → reflinks)
-cache-dir = "{{ $shared }}/.cache/uv"
+{{- /* Resolved per-user cache root; empty means user-local caches. */ -}}
+{{- $shared_cache := "" -}}
+{{- if hasKey . "shared_cache" }}{{- $shared_cache = .shared_cache | default "" -}}{{- end -}}
+{{- if $shared_cache }}
+# Account-scoped cache under the shared workspace (same filesystem → reflinks)
+cache-dir = "{{ $shared_cache }}/uv"
 link-mode = "clone"
 {{- end }}
 

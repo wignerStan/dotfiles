@@ -1,6 +1,6 @@
-{{- /* Resolved per-user machine profile; unset means user-local caches. */ -}}
-{{- $shared := "" -}}
-{{- if hasKey . "shared_workspace" }}{{- $shared = .shared_workspace | default "" }}{{- end -}}
+{{- /* Resolved per-user cache root; unset means user-local caches. */ -}}
+{{- $shared_cache := "" -}}
+{{- if hasKey . "shared_cache" }}{{- $shared_cache = .shared_cache | default "" }}{{- end -}}
 # ── Mamba (global Python base environment; L3 standard) ────────────────
 {{- if eq .bootstrap "full" }}
 set -gx MAMBA_ROOT_PREFIX {{ .mamba_root | quote }}
@@ -25,15 +25,15 @@ end
 if type -q pixi
     set -gx PIXI_HOME ~/.pixi
     fish_add_path --move $PIXI_HOME/bin
-    {{- /* pixi wheels reuse the shared uv cache; unset ⇒ pixi defaults */}}
-    {{- if $shared }}
-    set -gx PIXI_CACHE_PYPI_WHEELS_DIR {{ $shared }}/.cache/uv
-    set -gx PIXI_CACHE_DIR {{ $shared }}/.cache/rattler
+    {{- /* pixi wheels reuse the account-scoped uv cache; unset ⇒ pixi defaults */}}
+    {{- if $shared_cache }}
+    set -gx PIXI_CACHE_PYPI_WHEELS_DIR {{ $shared_cache }}/uv
+    set -gx PIXI_CACHE_DIR {{ $shared_cache }}/rattler
     {{- end }}
 end
 {{- end }}
-# ── Shared uv cache on <shared_workspace> (reflinks with project venvs) ──
-{{- if $shared }}
-set -gx UV_CACHE_DIR {{ $shared }}/.cache/uv
+# ── Account-scoped uv cache (reflinks with project venvs) ──
+{{- if $shared_cache }}
+set -gx UV_CACHE_DIR {{ $shared_cache }}/uv
 set -gx UV_LINK_MODE clone
 {{- end }}

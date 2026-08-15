@@ -1,11 +1,11 @@
 # Pixi config — managed by chezmoi
-{{- /* Resolved per-user machine profile; empty means user-local caches. */ -}}
-{{- $shared := "" -}}
-{{- if hasKey . "shared_workspace" }}{{- $shared = .shared_workspace | default "" }}{{- end -}}
-{{- if $shared }}
-# pixi wheels reuse the shared uv cache (same btrfs → reflinks with project venvs)
+{{- /* Resolved per-user cache root; empty means user-local caches. */ -}}
+{{- $shared_cache := "" -}}
+{{- if hasKey . "shared_cache" }}{{- $shared_cache = .shared_cache | default "" -}}{{- end -}}
+{{- if $shared_cache }}
+# pixi wheels reuse the account-scoped uv cache (same btrfs → reflinks)
 [cache]
-pypi-wheels = "{{ $shared }}/.cache/uv"
+pypi-wheels = "{{ $shared_cache }}/uv"
 {{- end }}
 
 {{- if .use_china_mirrors }}

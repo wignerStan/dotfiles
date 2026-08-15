@@ -3,9 +3,9 @@
 # Agent-friendly: ensures env is available in non-login/non-interactive shells
 # (e.g. agent bash tools, SSH commands, CI runners)
 # ═══════════════════════════════════════════════════════════════
-{{- /* Resolved per-user machine profile; unset means user-local caches. */ -}}
-{{- $shared := "" -}}
-{{- if hasKey . "shared_workspace" }}{{- $shared = .shared_workspace | default "" }}{{- end -}}
+{{- /* Resolved per-user cache root; unset means user-local caches. */ -}}
+{{- $shared_cache := "" -}}
+{{- if hasKey . "shared_cache" }}{{- $shared_cache = .shared_cache | default "" }}{{- end -}}
 
 # Prevent PATH from accumulating duplicates
 typeset -U path PATH
@@ -97,7 +97,7 @@ export NANOBANANA_MODEL=gemini-3-pro-image-preview
 {{- if eq .bootstrap "full" }}
 # ── Mamba (global Python base environment; L3 standard) ───────
 export MAMBA_EXE="${HOMEBREW_PREFIX:-/home/linuxbrew/.linuxbrew}/opt/micromamba/bin/mamba"
-export MAMBA_ROOT_PREFIX="{{- if $shared -}}{{ $shared }}/mamba{{- else -}}$HOME/mamba{{- end -}}"
+export MAMBA_ROOT_PREFIX="{{ .mamba_root }}"
 path=("$MAMBA_ROOT_PREFIX/bin" ${path[@]})
 {{- end }}
 
@@ -105,16 +105,16 @@ path=("$MAMBA_ROOT_PREFIX/bin" ${path[@]})
 {{- if has "research" .facets }}
 export PIXI_HOME="${HOME}/.pixi"
 path+=("${PIXI_HOME}/bin")
-{{- /* pixi wheels reuse the shared uv cache (multi-user); unset ⇒ pixi defaults */}}
-{{- if $shared }}
-export PIXI_CACHE_PYPI_WHEELS_DIR="{{ $shared }}/.cache/uv"
-export PIXI_CACHE_DIR="{{ $shared }}/.cache/rattler"
+{{- /* pixi wheels reuse the account-scoped uv cache; unset ⇒ pixi defaults */}}
+{{- if $shared_cache }}
+export PIXI_CACHE_PYPI_WHEELS_DIR="{{ $shared_cache }}/uv"
+export PIXI_CACHE_DIR="{{ $shared_cache }}/rattler"
 {{- end }}
 {{- end }}
 
-# ── Shared uv/rattler cache on <shared_workspace> (reflinks with venvs) ──
-{{- if $shared }}
-export UV_CACHE_DIR="{{ $shared }}/.cache/uv"
+# ── Account-scoped uv/rattler cache (reflinks with venvs) ──
+{{- if $shared_cache }}
+export UV_CACHE_DIR="{{ $shared_cache }}/uv"
 export UV_LINK_MODE=clone
 {{- end }}
 

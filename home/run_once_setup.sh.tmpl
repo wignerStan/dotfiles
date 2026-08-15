@@ -127,6 +127,8 @@ system_scope() {
     # dev user's home is the resolved shared workspace, when this user profile owns one.
 {{ $shared := "" -}}
 {{- if hasKey . "shared_workspace" }}{{- $shared = .shared_workspace | default "" }}{{- end -}}
+{{ $shared_cache := "" -}}
+{{- if hasKey . "shared_cache" }}{{- $shared_cache = .shared_cache | default "" }}{{- end -}}
     # shellcheck disable=SC2043  # template may render one or two fixed users
     for u in dev{{ if has "hpc" .facets }} cal{{ end }}; do
         if ! id -u "$u" &>/dev/null; then
@@ -156,11 +158,19 @@ system_scope() {
             "{{ $shared }}/mamba" \
             "{{ $shared }}/mamba/pkgs" \
             "{{ $shared }}/mamba/envs" \
+            {{- if $shared_cache }}
+            "{{ $shared_cache }}" \
+            "{{ $shared_cache }}/uv" \
+            "{{ $shared_cache }}/rattler" \
+            "{{ $shared_cache }}/npm" \
+            "{{ $shared_cache }}/kopia"; do
+            {{- else }}
             "{{ $shared }}/.cache" \
             "{{ $shared }}/.cache/uv" \
             "{{ $shared }}/.cache/rattler" \
             "{{ $shared }}/.cache/npm" \
             "{{ $shared }}/.cache/kopia"; do
+            {{- end }}
             $SUDO install -d -o dev -g dev -m 2770 "$__shared_dir"
             if command -v setfacl >/dev/null 2>&1; then
                 $SUDO setfacl -m g:dev:rwx,m:rwx "$__shared_dir"

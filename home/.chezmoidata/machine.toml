@@ -38,6 +38,9 @@ deploy = "user"
 is_guest = false
 # Incus is a physical personal Linux host with a shared multi-user workspace.
 shared_workspace = "/develop"
+# Keep the mamba root shared, but isolate mutable tool caches per account. The
+# profile is user-only, so no root-managed default ACL can be assumed.
+shared_cache = "/develop/.cache/dev"
 
 [machine."jacob@incus"]
 ownership = "personal"
