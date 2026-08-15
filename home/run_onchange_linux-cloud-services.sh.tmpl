@@ -10,6 +10,7 @@
        - HPC hosts (shared clusters, no systemd control) are excluded. */ -}}
 {{- $axesValidated := includeTemplate "validate-axes" . -}}
 {{- $systemDeploy := or (eq .deploy "system") (eq .deploy "system+user") -}}
+{{- $linuxNftEnabled := and (hasKey . "firewall") (hasKey .firewall "linux_nft") (hasKey .firewall.linux_nft "enabled") .firewall.linux_nft.enabled -}}
 {{- if and $systemDeploy (eq .platform "cloud") (eq .chezmoi.os "linux") (not (has "hpc" .facets)) -}}
 #!/bin/bash
 set -euo pipefail
@@ -84,7 +85,7 @@ install_tailscale() {
     fi
 }
 
-# ── 2. nftables firewall (tailscale CGNAT + ssh/http allowed) ─────────────
+# ── 2. nftables firewall (default-deny input, outbound + mesh exceptions) ──
 NFT_CONF=/etc/nftables.conf
 install_nft() {
     step "nftables"
@@ -95,34 +96,25 @@ install_nft() {
         esac
     }
     if command -v nft >/dev/null 2>&1; then
+        __nft_managed=0
         if [[ -f "$NFT_CONF" ]]; then
-            warn "$NFT_CONF already exists — not overwriting an existing firewall policy"
-            return 0
+            if grep -Fq '# Managed by chezmoi' "$NFT_CONF"; then
+                __nft_managed=1
+            else
+                warn "$NFT_CONF already exists and is not chezmoi-managed — leaving it untouched"
+                return 0
+            fi
         fi
-        if as_root nft list ruleset 2>/dev/null | grep -E '^[[:space:]]*table[[:space:]]' >/dev/null; then
-            warn "an active nftables ruleset already exists — refusing to flush or replace it"
-            return 0
+        __nft_tables="$(as_root nft list ruleset 2>/dev/null | awk '$1 == "table" { print $2 " " $3 }')"
+        if [[ -n "$__nft_tables" ]]; then
+            if [[ "$__nft_managed" != "1" || "$__nft_tables" != "inet chezmoi_filter" ]]; then
+                warn "an active non-managed or mixed nftables ruleset exists — refusing to flush or replace it"
+                return 0
+            fi
         fi
         __nft_tmp="$(mktemp /tmp/chezmoi-nft.XXXXXX)"
         cat > "$__nft_tmp" << 'EOF'
-# Managed by chezmoi run_onchange_linux-cloud-services.sh
-flush ruleset
-table inet filter {
-    chain input {
-        type filter hook input priority filter; policy drop;
-        ct state invalid drop
-        ct state established,related accept
-        iif lo accept
-        iifname "tailscale0" accept
-        udp dport 41641 accept
-        tcp dport { 22, 80, 443 } accept
-        icmp type { echo-request } accept
-        meta l4proto ipv6-icmp accept
-        counter drop
-    }
-    chain forward { type filter hook forward priority filter; policy drop; }
-    chain output { type filter hook output priority filter; policy accept; }
-}
+{{ includeTemplate "nftables-firewall" . }}
 EOF
         if as_root nft -c -f "$__nft_tmp" 2>/dev/null; then
             as_root install -o root -g root -m 0644 "$__nft_tmp" "$NFT_CONF"
@@ -132,7 +124,7 @@ EOF
                 systemd) as_root systemctl enable --now nftables 2>/dev/null || true ;;
                 openrc)  as_root rc-update add nftables default 2>/dev/null || true ;;
             esac
-            ok "nftables ruleset applied (drop by default, tailscale+22/80/443)"
+            ok "nftables ruleset applied (drop input, allow outbound + Tailscale/system-TUN exceptions)"
         else
             warn "nft ruleset failed validation — leaving firewall untouched"
             unlink "$__nft_tmp"
@@ -343,7 +335,11 @@ if [[ "${SKIP_SYSTEM:-0}" == "1" ]]; then
 fi
 need_root
 install_tailscale
+{{- if $linuxNftEnabled }}
 install_nft
+{{- else }}
+skip "linux_nft firewall disabled"
+{{- end }}
 install_sysctl
 install_nginx
 install_kopia

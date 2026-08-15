@@ -1,5 +1,7 @@
 # Cross-platform host-firewall policy. Product/domain filtering belongs to the
-# application or proxy layer, not here.
+# application or proxy layer, not here. Default network policy is stateful
+# outbound allow plus default input drop; Tailscale, explicit system-TUN, and
+# platform-native Apple service exceptions are opt-in rules below.
 
 [firewall.macos_pf]
 # Resource classification: system scope, personal ownership, Darwin only,
@@ -21,6 +23,12 @@ allow_apple_continuity = true
 # identityservicesd; high custom interfaces (sing-box utun100/utun101), physical
 # uplinks, VM bridges, and future third-party tunnels are deliberately excluded.
 apple_continuity_interfaces = ["awdl0", "llw0", "utun4"]
+# The current sing-box macOS TUN uses gVisor, so it does not need an inbound
+# PF exception. Set stack="system" only for a kernel/system TUN that must
+# receive traffic from the virtual interface.
+allow_proxy_tun_inbound = true
+proxy_tun_interface = "utun100"
+proxy_tun_stack = "gvisor"
 allow_airplay_lan = true
 # Keep false: File Sharing was found with guest-writable SMB shares. Campus AP
 # isolation is not a firewall boundary; trusted-mesh access remains separate.
@@ -51,3 +59,19 @@ trusted_udp_ports = []
 # dynamic underlay port. Outbound PF state handles that transport; do not add a
 # fixed UDP 41641 input exception. This trusted overlay governs decrypted
 # tailnet traffic after it enters utun101.
+
+[firewall.linux_nft]
+# Linux follows the same default-deny input model as macOS PF:
+# established/related + loopback + Tailscale + explicitly selected system-TUN
+# traffic are the only non-Apple input exceptions. Output is always allowed.
+enabled = true
+tailscale_interface = "tailscale0"
+# Zero means no fixed underlay-port exception. Native Tailscale can still use
+# its outbound/related state; set a concrete port only when the deployment pins
+# one and direct unsolicited underlay packets are required.
+tailscale_udp_port = 0
+allow_proxy_tun_inbound = true
+proxy_tun_interface = "singtun0"
+# gVisor is userspace and does not need a kernel-TUN input exception.
+proxy_tun_stack = "gvisor"
+allow_icmp = true

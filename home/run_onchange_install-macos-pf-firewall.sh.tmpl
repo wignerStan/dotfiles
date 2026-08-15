@@ -60,12 +60,70 @@ is_loaded() {
     /bin/launchctl print "system/$1" >/dev/null 2>&1
 }
 
+wait_unloaded() {
+    local label=$1
+
+    # launchd can acknowledge bootout before the service disappears from the
+    # system domain. Waiting avoids a transient EIO when bootstrap follows it.
+    for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+        if ! is_loaded "$label"; then
+            return 0
+        fi
+        /bin/sleep 0.25
+    done
+    echo "chezmoi-pf: system/$label remained registered after bootout" >&2
+    return 1
+}
+
 bootout_if_loaded() {
     local label=$1
 
     if is_loaded "$label"; then
         as_root /bin/launchctl bootout "system/$label"
+        wait_unloaded "$label"
     fi
+}
+
+bootstrap_service() {
+    local label=$1
+    local plist=$2
+    local output=""
+    local status=0
+
+    # A just-removed launchd job can briefly reject bootstrap with EIO. Retry
+    # only this transient registration step; verification still gates success.
+    for _ in 1 2 3 4 5; do
+        output="$(as_root /bin/launchctl bootstrap system "$plist" 2>&1)" && return 0
+        status=$?
+        if is_loaded "$label"; then
+            return 0
+        fi
+        /bin/sleep 1
+    done
+    printf '%s\n' "$output" >&2
+    return "$status"
+}
+
+flush_managed_pf() {
+    local managed_token=""
+
+    # The service normally performs this in its EXIT trap. Repeat it here so
+    # disabling the policy also cleans up an orphaned anchor/token after a
+    # launchd crash or manual process removal.
+    as_root /sbin/pfctl -q -a com.apple/997.chezmoi-firewall-alf-guard -F rules >/dev/null 2>&1 || true
+    as_root /sbin/pfctl -q -a com.apple/997.chezmoi-firewall-alf-guard -F Tables >/dev/null 2>&1 || true
+    as_root /sbin/pfctl -q -a com.apple/998.chezmoi-firewall-trusted -F rules >/dev/null 2>&1 || true
+    as_root /sbin/pfctl -q -a com.apple/998.chezmoi-firewall-trusted -F Tables >/dev/null 2>&1 || true
+    as_root /sbin/pfctl -q -a com.apple/999.chezmoi-firewall -F rules >/dev/null 2>&1 || true
+    as_root /sbin/pfctl -q -a com.apple/999.chezmoi-firewall -F Tables >/dev/null 2>&1 || true
+
+    if as_root /bin/test -s /var/run/local.chezmoi-pf-firewall.token; then
+        managed_token="$(as_root /bin/cat /var/run/local.chezmoi-pf-firewall.token)"
+        if [[ "$managed_token" =~ ^[0-9]+$ ]]; then
+            as_root /sbin/pfctl -X "$managed_token" >/dev/null 2>&1 || true
+        fi
+    fi
+    as_root /bin/rm -f /var/run/local.chezmoi-pf-firewall.token
 }
 
 verify_firewall_service() {
@@ -138,14 +196,14 @@ rollback_install() {
 
     if (( PREVIOUS_LABEL_LOADED == 1 )); then
         if ! as_root /bin/launchctl enable "system/$LABEL" || \
-           ! as_root /bin/launchctl bootstrap system "$PLIST_DST" || \
+           ! bootstrap_service "$LABEL" "$PLIST_DST" || \
            ! verify_firewall_service; then
             rollback_failed=1
         fi
     fi
     if (( PREVIOUS_OLD_LABEL_LOADED == 1 )) && as_root /bin/test -f "$OLD_PLIST"; then
         if ! as_root /bin/launchctl enable "system/$OLD_LABEL" || \
-           ! as_root /bin/launchctl bootstrap system "$OLD_PLIST"; then
+           ! bootstrap_service "$OLD_LABEL" "$OLD_PLIST"; then
             rollback_failed=1
         fi
     fi
@@ -184,6 +242,7 @@ cleanup_old_design() {
 
 if (( PF_ENABLED == 0 )); then
     bootout_if_loaded "$LABEL"
+    flush_managed_pf
     if [[ -e "$RULES_DST" || -e "$TRUSTED_RULES_DST" || -e "$SERVICE_DST" || -e "$PLIST_DST" ]]; then
         as_root /bin/rm -f "$RULES_DST" "$TRUSTED_RULES_DST" "$SERVICE_DST" "$PLIST_DST"
     fi
@@ -254,7 +313,7 @@ validate_pf_rules com.apple/998.chezmoi-firewall-trusted "$TRUSTED_RULES_DST" \
 bootout_if_loaded "$OLD_LABEL" || fail_with_rollback "unable to stop legacy $OLD_LABEL"
 bootout_if_loaded "$LABEL" || fail_with_rollback "unable to stop existing $LABEL"
 as_root /bin/launchctl enable "system/$LABEL" || fail_with_rollback "unable to enable system/$LABEL"
-as_root /bin/launchctl bootstrap system "$PLIST_DST" || fail_with_rollback "unable to bootstrap system/$LABEL"
+bootstrap_service "$LABEL" "$PLIST_DST" || fail_with_rollback "unable to bootstrap system/$LABEL"
 verify_firewall_service || fail_with_rollback "service registered but PF or the base anchor did not become active"
 
 cleanup_old_design

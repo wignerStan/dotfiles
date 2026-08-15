@@ -1,5 +1,27 @@
 # Chezmoi source directory .gitignore
 *.asc
 
-# Plaintext secrets — use secrets.toml.age (encrypted) for git
+# Plaintext secret material — use secrets.toml.age (encrypted) for git.
+# Keep example files trackable so templates remain discoverable.
 home/.chezmoidata/secrets.toml
+secrets.env
+secrets.env.*
+!secrets.env.example
+.env
+.env.*
+!.env.example
+*.env
+*.env.*
+!*.env.example
+
+# Unencrypted private keys and credential containers. Encrypted *.age files
+# remain trackable because these patterns only match the plaintext suffixes.
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+!*.age

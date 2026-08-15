@@ -65,6 +65,9 @@ Service provisioning (cloud, not HPC): `home/run_onchange_linux-cloud-services.s
 single/multi) → proxy → ai; nginx Restart=always drop-in is managed here;
 conflict-warning for non-managed variant overrides (slim/full in
 `.chezmoidata/facet_registry.toml`).
+The nft input policy is rendered from `home/.chezmoitemplates/nftables-firewall`:
+output is accepted, unsolicited input is dropped, and only established/related,
+loopback, Tailscale, and an explicitly selected system-TUN exception are added.
 
 macOS PF host firewall: `home/run_onchange_install-macos-pf-firewall.sh.tmpl`.
 Its resource classification is `scope=system`, `ownership=personal`,
@@ -79,6 +82,9 @@ from a security resource's tier gate.
 - **Secrets**: never put plaintext secrets in git. Encrypted secrets live in
   `secrets.toml.age` (age-encrypted, recipient pinned in `.chezmoi.toml.tmpl`).
   The plaintext decrypts to `home/.chezmoidata/secrets.toml` which is gitignored.
+  Repository-level ignore rules also cover `.env*`, `*.env*`, and `secrets.env*`;
+  only explicitly named `*.example` files are allowed through. Review staged
+  diffs and run a secret scan before every history rewrite or push.
   Regenerate the `.age` file with `age -e -r <recipient> -o secrets.toml.age <plaintext>`.
 - **`*.asc`, `*_local`** — gitignored / never synced (see `.gitignore`).
 - **No hardcoded usernames/paths.** VM scripts (winvm/tartvm) resolve the runtime

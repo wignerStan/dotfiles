@@ -1,0 +1,42 @@
+{{- $fw := .firewall.linux_nft -}}
+# Managed by chezmoi. Default policy: allow output, drop unsolicited input.
+# Order: state/loopback -> Tailscale -> explicit system-TUN -> ICMP control -> drop.
+flush ruleset
+
+table inet chezmoi_filter {
+    chain input {
+        type filter hook input priority filter; policy drop;
+
+        ct state invalid drop
+        ct state established,related accept
+        iifname "lo" accept
+
+        # Decrypted Tailscale traffic arrives on the authenticated mesh device.
+        iifname "{{ $fw.tailscale_interface }}" accept
+{{- if gt (int $fw.tailscale_udp_port) 0 }}
+        # Optional native Tailscale underlay port; zero disables fixed-port exposure.
+        udp dport {{ int $fw.tailscale_udp_port }} accept
+{{- end }}
+{{- if and $fw.allow_proxy_tun_inbound (eq $fw.proxy_tun_stack "system") }}
+        # Only a kernel/system TUN needs an inbound exception. gVisor stays closed.
+        iifname "{{ $fw.proxy_tun_interface }}" accept
+{{- end }}
+{{- if $fw.allow_icmp }}
+        ip protocol icmp icmp type echo-request accept
+        meta l4proto ipv6-icmp accept
+{{- else }}
+        # Keep PMTU and neighbor discovery functional under default deny.
+        meta l4proto ipv6-icmp accept
+{{- end }}
+
+        counter drop
+    }
+
+    chain forward {
+        type filter hook forward priority filter; policy drop;
+    }
+
+    chain output {
+        type filter hook output priority filter; policy accept;
+    }
+}

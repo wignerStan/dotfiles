@@ -1,2 +1,2 @@
 {{- $data := merge (dict "singbox_platform" "android") . }}
-{{- template "sing-box.tmpl" $data }}
+{{- includeTemplate "sing-box.tmpl" $data }}

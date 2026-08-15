@@ -1,7 +1,8 @@
 {{- $pf := .firewall.macos_pf -}}
 # macOS host firewall. Loaded only inside com.apple/999.chezmoi-firewall.
-# Outbound traffic is allowed and stateful; unsolicited inbound and forwarding
-# are denied unless an exception below matches.
+# Policy order: state/loopback -> explicit Tailscale overlay -> optional
+# system-TUN -> Apple services -> default input drop; output is always allowed.
+# Unsolicited inbound and forwarding are denied unless an exception below matches.
 # The installer requires macOS Application Firewall for application-identity
 # enforcement inside Apple link-local and trusted-interface exceptions.
 
@@ -30,6 +31,11 @@ pass in quick inet6 proto udp from fe80::/10 port 5353 to ff02::fb port 5353 kee
 # observed Apple peer interfaces; ALF remains the application-identity layer.
 pass in quick on { {{ $pf.apple_continuity_interfaces | join ", " }} } inet6 proto tcp from fe80::/10 to self port 1024:65535 flags S/SA keep state label "chezmoi-pf-continuity-tcp"
 pass in quick on { {{ $pf.apple_continuity_interfaces | join ", " }} } inet6 proto udp from fe80::/10 to self port 1024:65535 keep state label "chezmoi-pf-continuity-udp"
+{{- end }}
+{{- if and $pf.allow_proxy_tun_inbound (eq $pf.proxy_tun_stack "system") }}
+# A kernel/system proxy TUN may receive traffic; gVisor deliberately has no
+# inbound exception because it is a userspace stack.
+pass in quick on {{ $pf.proxy_tun_interface }} all keep state label "chezmoi-pf-proxy-tun-system"
 {{- end }}
 {{- if $pf.allow_airplay_lan }}
 pass in quick inet proto tcp from <chezmoi_lan_v4> to self port { 5000, 7000 } flags S/SA keep state label "chezmoi-pf-airplay-tcp4"
