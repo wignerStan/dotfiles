@@ -35,7 +35,7 @@ l3 = [
   "pandoc",
   "wireshark", "tcpdump", "ast-grep", "bazel",
   "docker", "docker-compose", "docker-credential-helper",
-  "kopia", "cloudflared", "wgcf", "syncthing", "rclone", "ngrok",
+  "kopia", "cloudflared", "wgcf", "syncthing", "rclone",
   "et",
 ]
 

@@ -220,6 +220,11 @@ user_scope() {
         # pixi is research-facet; pnpm/bun are dev-facet. python → linux system pkg (no user install).
         # ───────────────────────────────────────────────────────────
         echo "L2 basic tools..."
+        __brew_prefix="$(brew --prefix)"
+        if [[ ! -w "$__brew_prefix/Cellar" || ! -w "$__brew_prefix/bin" ]]; then
+            echo "Homebrew prefix is not writable by $(id -un); package install deferred to its owner"
+            return 0
+        fi
         brew_install() {
             local __pkg
             for __pkg in "$@"; do
