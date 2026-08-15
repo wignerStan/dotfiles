@@ -1,6 +1,8 @@
 # ═══════════════════════════════════════════════════════════════
 # .zshrc — Interactive Shell (managed by chezmoi)
 # ═══════════════════════════════════════════════════════════════
+{{- $shared_cache := "" -}}
+{{- if hasKey . "shared_cache" }}{{- $shared_cache = .shared_cache | default "" }}{{- end -}}
 
 # Site HPC tools: Lmod, Spack, and modulefile search paths.
 [[ -r /etc/profile.d/cakrue-hpc.sh ]] && source /etc/profile.d/cakrue-hpc.sh
@@ -175,7 +177,9 @@ alias catp="bat"
 command -v zoxide &>/dev/null && eval "$(zoxide init zsh)"
 
 # Bun completions
-{{- if stat (joinPath .chezmoi.homeDir ".bun" "_bun") }}
+{{- if $shared_cache }}
+[ -s "$BUN_INSTALL/_bun" ] && source "$BUN_INSTALL/_bun"
+{{- else if stat (joinPath .chezmoi.homeDir ".bun" "_bun") }}
 [ -s "$HOME/.bun/_bun" ] && source "$HOME/.bun/_bun"
 {{- end }}
 

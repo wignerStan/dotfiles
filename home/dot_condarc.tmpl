@@ -23,13 +23,15 @@ changeps1: false
 {{- $shared := "" -}}
 {{- if hasKey . "shared_workspace" }}{{- $shared = .shared_workspace | default "" }}{{- end -}}
 {{- if $shared }}
-# ── Package cache: shared on {{ $shared }}/mamba, fallback to user cache ──
+{{- $cache := "" -}}
+{{- if hasKey . "shared_cache" }}{{- $cache = .shared_cache | default "" -}}{{- end -}}
+# ── Package cache: account cache on {{ if $cache }}{{ $cache }}{{ else }}{{ $shared }}/mamba{{ end }}, fallback to user cache ──
 pkgs_dirs:
-  - {{ $shared }}/mamba/pkgs
+  - {{ if $cache }}{{ $cache }}/mamba{{ else }}{{ $shared }}/mamba/pkgs{{ end }}
 {{- if eq .chezmoi.username "jacob" }}
   - ~/.cache/conda/pkgs
 {{- else if eq .chezmoi.username "dev" }}
-  - ~/.cache/conda/pkgs
+  - {{ if $cache }}{{ $cache }}/conda{{ else }}~/.cache/conda/pkgs{{ end }}
 {{- end }}
 # ── Environments: shared base on {{ $shared }}/mamba, user-specific fallback ──
 envs_dirs:

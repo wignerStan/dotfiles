@@ -168,16 +168,19 @@ For pure-Python projects with no conda dependencies, use `uv` directly:
 ## Cache sharing
 
 Cache placement is independent from the mamba root. A machine may set
-`shared_cache` when a shared workspace exists; the Incus `dev` profile uses an
-account-scoped root because it is user-only and cannot assume root-managed ACLs:
+`shared_cache` when a shared workspace exists; the Incus `dev` profile uses
+`/develop/cache` (the parent is `2755 dev:dev`, while mutable subdirectories
+are account-owned) because it is user-only and cannot assume root-managed ACLs:
 ```
 <shared_cache>/uv                     <- uv + pixi wheel cache
 <shared_cache>/rattler                <- pixi conda package cache
+<shared_cache>/mamba                  <- conda package cache
 <shared_cache>/npm                    <- npm cache redirect
+<shared_cache>/pnpm                   <- pnpm store + global bin directory
+<shared_cache>/bun                    <- Bun cache + global install root
 <shared_cache>/kopia                  <- backup cache (if applicable)
 ```
 Other machines use default user caches (`~/.cache/uv`, `~/.cache/npm`, ...).
-The mamba package cache remains shared where `shared_workspace` is set;
-mutable tool caches are account-scoped unless a profile explicitly opts into a
-shared `shared_cache`. Reflinks (btrfs CoW) connect cache to project venvs on
-the same filesystem.
+The mamba environment root remains at `<shared_workspace>/mamba`; mutable tool
+and package caches are under `shared_cache`. Reflinks (btrfs CoW) connect cache
+to project venvs on the same filesystem.

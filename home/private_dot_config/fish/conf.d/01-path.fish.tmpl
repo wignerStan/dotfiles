@@ -10,14 +10,26 @@ fish_add_path --move ~/.antigravity/antigravity/bin
 {{- if and (eq .bootstrap "full") (has "dev" .facets) }}
 # pnpm
 {{- if eq .chezmoi.os "darwin" }}
+{{- if and (hasKey . "shared_cache") .shared_cache }}
+set -gx PNPM_HOME "{{ .shared_cache }}/pnpm"
+{{- else }}
 set -gx PNPM_HOME ~/Library/pnpm
+{{- end }}
+{{- else }}
+{{- if and (hasKey . "shared_cache") .shared_cache }}
+set -gx PNPM_HOME "{{ .shared_cache }}/pnpm"
 {{- else }}
 set -gx PNPM_HOME ~/.local/share/pnpm
+{{- end }}
 {{- end }}
 fish_add_path --move $PNPM_HOME/bin
 
 # Bun
+{{- if and (hasKey . "shared_cache") .shared_cache }}
+set -gx BUN_INSTALL "{{ .shared_cache }}/bun"
+{{- else }}
 set -gx BUN_INSTALL ~/.bun
+{{- end }}
 fish_add_path --move $BUN_INSTALL/bin
 {{- end }}
 

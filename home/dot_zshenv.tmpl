@@ -22,7 +22,11 @@ setopt NO_FLOW_CONTROL     # No ^S/^Q flow control (bash default)
 
 # ── XDG Base Directory ───────────────────────────────────────────
 export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+{{- if $shared_cache }}
+export XDG_CACHE_HOME="${XDG_CACHE_HOME:-{{ $shared_cache }}}"
+{{- else }}
 export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
+{{- end }}
 export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 export XDG_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
 
@@ -145,15 +149,27 @@ command_not_found_handler() {
 {{- if and (eq .bootstrap "full") (has "dev" .facets) }}
 # pnpm
 {{- if eq .chezmoi.os "darwin" }}
+{{- if $shared_cache }}
+export PNPM_HOME="{{ $shared_cache }}/pnpm"
+{{- else }}
 [[ -d "$HOME/Library/pnpm" ]] && export PNPM_HOME="$HOME/Library/pnpm"
+{{- end }}
+{{- else }}
+{{- if $shared_cache }}
+export PNPM_HOME="{{ $shared_cache }}/pnpm"
 {{- else }}
 [[ -d "$HOME/.local/share/pnpm" ]] && export PNPM_HOME="$HOME/.local/share/pnpm"
+{{- end }}
 {{- end }}
 [[ -n "$PNPM_HOME" ]] && path+=("$PNPM_HOME/bin")
 
 # Bun
+{{- if $shared_cache }}
+export BUN_INSTALL="{{ $shared_cache }}/bun"
+{{- else }}
 [[ -d "$HOME/.bun" ]] && export BUN_INSTALL="$HOME/.bun"
-[[ -d "$HOME/.bun/bin" ]] && path+=("$BUN_INSTALL/bin")
+{{- end }}
+[[ -d "$BUN_INSTALL/bin" ]] && path+=("$BUN_INSTALL/bin")
 {{- if .use_china_mirrors }}
 export BUN_CONFIG_REGISTRY="https://registry.npmmirror.com"
 {{- end }}

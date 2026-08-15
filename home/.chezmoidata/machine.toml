@@ -40,7 +40,7 @@ is_guest = false
 shared_workspace = "/develop"
 # Keep the mamba root shared, but isolate mutable tool caches per account. The
 # profile is user-only, so no root-managed default ACL can be assumed.
-shared_cache = "/develop/.cache/dev"
+shared_cache = "/develop/cache"
 
 [machine."jacob@incus"]
 ownership = "personal"
@@ -60,9 +60,8 @@ tier = "simple"
 facets = ["proxy", "ai"]
 bootstrap = "basic"
 deploy = "system+user"
-# Multi-user shared workspace: uv/pixi/npm caches live under
-# <shared_workspace>/.cache (single btrfs → reflinks). Only the personal
-# Linux box sets this; other machines leave it unset (default user caches).
+# Cloud workspace: profiles without an explicit shared_cache derive it as
+# <shared_workspace>/.cache (single filesystem for cache-to-venv reflinks).
 shared_workspace = "/develop"
 
 [machine."nscc"]

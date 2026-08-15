@@ -9,6 +9,12 @@ registry=https://registry.npmmirror.com
 # npm cache lives outside the default ~/.npm: per-account cache under the
 # shared workspace on the Linux box, ~/.cache/npm everywhere else.
 cache={{- if $shared_cache }}{{ $shared_cache }}/npm{{ else }}${HOME}/.cache/npm{{ end }}
+{{- if $shared_cache }}
+# pnpm reads this npm-compatible config; keep its content-addressed store in
+# the same account-owned cache root while PNPM_HOME supplies global binaries.
+store-dir={{ $shared_cache }}/pnpm/store
+global-bin-dir={{ $shared_cache }}/pnpm/bin
+{{- end }}
 {{- if not (eq .ownership "work") }}
 # Redirect npm global installs to a read-only dir (blocks npm -g pollution)
 prefix=${HOME}/.npm-global-blocked

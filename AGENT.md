@@ -54,8 +54,9 @@ Package layers (`home/run_once_setup.sh.tmpl` + `home/.chezmoidata/packages.toml
 L1 self-bootstrap → L2 basic (all non-simple tiers; shell/dir tooling only, NO
 language stack) → L3 standard (bootstrap=full: uv/mamba/node + npm
 global-block + tooling/services; pnpm/bun are dev-facet-gated; pixi is research-facet) → facet overlays
-(`facets.*` in packages.toml; dev carries pnpm/bun, research carries pixi). npm cache redirected to
-`~/.cache/npm` (dot_npmrc.tmpl). System commands are ALWAYS sudo-elevated when not
+(`facets.*` in packages.toml; dev carries pnpm/bun, research carries pixi). npm,
+pnpm, Bun, uv, pixi, and mamba package caches use `.shared_cache` when declared
+(dot_npmrc.tmpl and shell configs), otherwise their user defaults. System commands are ALWAYS sudo-elevated when not
 root (native/plain-user hosts need the password; root runs them directly).
 Local & cloud are NOT isolated package trees;
 overlays live in `home/.chezmoi/overlay/{facets,platform}/`.

@@ -20,7 +20,11 @@ end
 
 # ── XDG Base Directory ──────────────────────────────────────────
 set -qx XDG_CONFIG_HOME; or set -gx XDG_CONFIG_HOME ~/.config
+{{- if and (hasKey . "shared_cache") .shared_cache }}
+set -qx XDG_CACHE_HOME; or set -gx XDG_CACHE_HOME "{{ .shared_cache }}"
+{{- else }}
 set -qx XDG_CACHE_HOME; or set -gx XDG_CACHE_HOME ~/.cache
+{{- end }}
 set -qx XDG_DATA_HOME; or set -gx XDG_DATA_HOME ~/.local/share
 set -qx XDG_STATE_HOME; or set -gx XDG_STATE_HOME ~/.local/state
 
