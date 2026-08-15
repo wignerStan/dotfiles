@@ -220,7 +220,21 @@ user_scope() {
         # pixi is research-facet; pnpm/bun are dev-facet. python → linux system pkg (no user install).
         # ───────────────────────────────────────────────────────────
         echo "L2 basic tools..."
-        brew_install() { brew install "$@" 2>/dev/null || echo "Warning: some packages failed: $*"; }
+        brew_install() {
+            local __pkg
+            for __pkg in "$@"; do
+                if brew list --formula "$__pkg" &>/dev/null || brew list --cask "$__pkg" &>/dev/null; then
+                    continue
+                fi
+                if brew info --formula "$__pkg" &>/dev/null; then
+                    brew install "$__pkg" 2>/dev/null || echo "Warning: formula install failed: $__pkg"
+                elif brew info --cask "$__pkg" &>/dev/null; then
+                    brew install --cask "$__pkg" 2>/dev/null || echo "Warning: cask install failed: $__pkg"
+                else
+                    echo "Warning: no Homebrew formula or cask found: $__pkg"
+                fi
+            done
+        }
         brew_install {{ range .packages.brew.l2 }}{{ . }} {{ end }}
         {{- if eq .os_platform "linux" }}
         brew_install byobu
