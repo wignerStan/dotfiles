@@ -16,7 +16,6 @@ log() { printf '[mamba-sync] %s\n' "$*"; }
 
 MM="$(command -v micromamba 2>/dev/null || command -v mamba 2>/dev/null || command -v conda 2>/dev/null || true)"
 [ -z "$MM" ] && { log "no micromamba/mamba/conda found, skipping"; exit 0; }
-case "$MM" in *micromamba|*mamba) "$MM" env list 2>/dev/null | grep -qw base || { log "base env not present, skipping"; exit 0; } ;; esac
 
 # Render environment.yaml
 ENV_YAML="$(mktemp /tmp/mamba-base-env.XXXXXX.yaml)"
@@ -47,8 +46,15 @@ dependencies:
 {{- end }}
 YAMLEOF
 
-log "running mamba env update (tier={{ .tier }} sections={{ .mamba_sections | join "," }})..."
-"$MM" env update -n base -f "$ENV_YAML" --use-uv 2>&1 || log "mamba env update reported errors"
+if [ -f "$MAMBA_ROOT_PREFIX/conda-meta/history" ]; then
+    log "updating base env (tier={{ .tier }} sections={{ .mamba_sections | join "," }})..."
+    "$MM" env update -y -p "$MAMBA_ROOT_PREFIX" -f "$ENV_YAML" --use-uv 2>&1 \
+        || log "mamba env update reported errors"
+else
+    log "creating base env (tier={{ .tier }} sections={{ .mamba_sections | join "," }})..."
+    "$MM" env create -y -p "$MAMBA_ROOT_PREFIX" -f "$ENV_YAML" --use-uv 2>&1 \
+        || log "mamba env create reported errors"
+fi
 
 log "base sync complete (tier={{ .tier }})"
 
