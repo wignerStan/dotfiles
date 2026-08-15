@@ -16,7 +16,7 @@ Short guide for safe, convention-preserving edits. Read before changing anything
 
 Computed in `home/.chezmoi.toml.tmpl` (data exposed to every template).
 At `chezmoi init`, precedence per axis is `CHEZMOI_*` env >
-`home/.chezmoidata/machine.toml` (keyed by hostname) > auto-detection. The
+`home/.chezmoidata/machine.toml` (keyed by `user@hostname`, then hostname) > auto-detection. The
 generated config persists across applies. Use `--override-data` for a one-off
 apply and re-run `chezmoi init` after changing machine declarations.
 

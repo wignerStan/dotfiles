@@ -2,11 +2,9 @@
      Renders environment.yaml, then mamba env update.
      use_uv: true in .condarc enables uv for pip installs where available. */ -}}
 {{- if and (ne .chezmoi.os "windows") (eq .bootstrap "full") (lookPath "micromamba") (and (ne .tier "simple") (not (has "hpc" .facets))) -}}
-{{- /* shared multi-user cache root, per-machine (machine.toml) */ -}}
+{{- /* Resolved per-user machine profile; empty means user-local caches. */ -}}
 {{- $shared := "" -}}
-{{- if and (hasKey . "machine") (hasKey .machine .chezmoi.hostname) -}}
-{{-   $shared = index (index .machine .chezmoi.hostname) "shared_workspace" | default "" -}}
-{{- end -}}
+{{- if hasKey . "shared_workspace" }}{{- $shared = .shared_workspace | default "" }}{{- end -}}
 #!/bin/sh
 set -eu
 export MAMBA_ROOT_PREFIX="{{ .mamba_root }}"

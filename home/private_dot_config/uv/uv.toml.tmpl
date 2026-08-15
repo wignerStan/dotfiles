@@ -1,9 +1,7 @@
 # uv config — managed by chezmoi
-{{- /* shared multi-user cache root, per-machine (machine.toml) */ -}}
+{{- /* Resolved per-user machine profile; empty means user-local caches. */ -}}
 {{- $shared := "" -}}
-{{- if and (hasKey . "machine") (hasKey .machine .chezmoi.hostname) -}}
-{{-   $shared = index (index .machine .chezmoi.hostname) "shared_workspace" | default "" -}}
-{{- end -}}
+{{- if hasKey . "shared_workspace" }}{{- $shared = .shared_workspace | default "" }}{{- end -}}
 {{- if $shared }}
 # Shared cache on {{ $shared }}/.cache (same btrfs filesystem as project venvs → reflinks)
 cache-dir = "{{ $shared }}/.cache/uv"

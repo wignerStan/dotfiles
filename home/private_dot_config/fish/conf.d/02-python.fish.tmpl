@@ -1,8 +1,6 @@
-{{- /* shared multi-user cache root, per-machine (machine.toml); unset ⇒ default user caches */ -}}
+{{- /* Resolved per-user machine profile; unset means user-local caches. */ -}}
 {{- $shared := "" -}}
-{{- if and (hasKey . "machine") (hasKey .machine .chezmoi.hostname) -}}
-{{-   $shared = index (index .machine .chezmoi.hostname) "shared_workspace" | default "" -}}
-{{- end -}}
+{{- if hasKey . "shared_workspace" }}{{- $shared = .shared_workspace | default "" }}{{- end -}}
 # ── Mamba (global Python base environment; L3 standard) ────────────────
 {{- if eq .bootstrap "full" }}
 set -gx MAMBA_ROOT_PREFIX {{ .mamba_root | quote }}

@@ -1,5 +1,7 @@
 # Per-machine declarations, keyed by hostname (chezmoi.hostname; LocalHostName on macOS).
-# Nested under [machine] so normal templates see .machine."<hostname>".
+# Add a `user@hostname` entry for a per-account override; it takes precedence
+# over the hostname entry during chezmoi init. Nested under [machine] so normal
+# templates see .machine."<hostname>".
 # The config template reads/parses this source file directly during init because
 # chezmoi loads .chezmoidata only after config generation.
 # Any axis set here is used when the corresponding CHEZMOI_* env var is absent
@@ -32,10 +34,21 @@ platform = "local"
 tier = "advanced"
 facets = ["dev", "research"]
 bootstrap = "full"
-deploy = "system+user"
+deploy = "user"
 is_guest = false
 # Incus is a physical personal Linux host with a shared multi-user workspace.
 shared_workspace = "/develop"
+
+[machine."jacob@incus"]
+ownership = "personal"
+platform = "local"
+tier = "default"
+facets = ["dev", "ai", "research"]
+bootstrap = "full"
+deploy = "user"
+is_guest = false
+# Jacob has a separate home; do not route his caches or mamba root into the
+# dev-owned /develop workspace.
 
 [machine."racknerd"]
 ownership = "personal"

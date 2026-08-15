@@ -10,11 +10,11 @@
                                         (drop privileges to default uid 1000/501)
 
      At `chezmoi init`, precedence per axis is CHEZMOI_* env > machine.toml
-     (by hostname) > auto-detect. The generated config is persistent; for a
+     (by user@hostname, then hostname) > auto-detect. The generated config is persistent; for a
      one-off apply use --override-data instead of expecting env to re-render it.
      Legacy CHEZMOI_TIER=develop is translated to tier=advanced + facets+=dev. */ -}}
 
-{{- /* hostname (needed for machine.toml lookup) */ -}}
+{{- /* hostname/user (needed for machine.toml profile lookup) */ -}}
 {{- $hostname := .chezmoi.hostname -}}
 {{- if eq .chezmoi.os "darwin" -}}
 {{-   $hostname = output "scutil" "--get" "LocalHostName" | trim -}}
@@ -24,8 +24,15 @@
      after config generation; `.machine` is not available at init time. */ -}}
 {{- $machine_data := include ".chezmoidata/machine.toml" | fromToml -}}
 {{- $machine_cfg := dict -}}
-{{- if and (hasKey $machine_data "machine") (hasKey $machine_data.machine $hostname) -}}
+{{- $machine_key := printf "%s@%s" .chezmoi.username $hostname -}}
+{{- if and (hasKey $machine_data "machine") (hasKey $machine_data.machine $machine_key) -}}
+{{-   $machine_cfg = index $machine_data.machine $machine_key -}}
+{{- else if and (hasKey $machine_data "machine") (hasKey $machine_data.machine $hostname) -}}
 {{-   $machine_cfg = index $machine_data.machine $hostname -}}
+{{- end -}}
+{{- $shared_workspace := "" -}}
+{{- if hasKey $machine_cfg "shared_workspace" -}}
+{{-   $shared_workspace = index $machine_cfg "shared_workspace" | default "" -}}
 {{- end -}}
 
 {{- /* guest role: separate from tier (resource depth). Explicit machine data
@@ -244,7 +251,8 @@ encryption = "age"
     is_ephemeral = {{ $ephemeral }}
     is_headless = {{ $headless }}
     mamba_sections = {{ $mamba_sections | toJson }}
+    shared_workspace = {{ $shared_workspace | quote }}
     use_china_mirrors = {{ $use_china_mirrors }}
     geo = {{ $geo | quote }}
-    mamba_root = {{ if hasKey $machine_cfg "shared_workspace" }}{{ joinPath (index $machine_cfg "shared_workspace") "mamba" | quote }}{{ else }}{{ joinPath .chezmoi.homeDir "mamba" | quote }}{{ end }}
+    mamba_root = {{ if $shared_workspace }}{{ joinPath $shared_workspace "mamba" | quote }}{{ else }}{{ joinPath .chezmoi.homeDir "mamba" | quote }}{{ end }}
     arch = {{ .chezmoi.arch | quote }}

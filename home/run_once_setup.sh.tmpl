@@ -124,11 +124,9 @@ system_scope() {
 
     # Auto-create dev/cal users (personal Linux) — system op
 {{ if and (eq .chezmoi.os "linux") (eq .ownership "personal") -}}
-    # dev user's home is the shared multi-user workspace root (machine.toml)
+    # dev user's home is the resolved shared workspace, when this user profile owns one.
 {{ $shared := "" -}}
-{{- if and (hasKey . "machine") (hasKey .machine .chezmoi.hostname) -}}
-{{-   $shared = index (index .machine .chezmoi.hostname) "shared_workspace" | default "" -}}
-{{- end -}}
+{{- if hasKey . "shared_workspace" }}{{- $shared = .shared_workspace | default "" }}{{- end -}}
     # shellcheck disable=SC2043  # template may render one or two fixed users
     for u in dev{{ if has "hpc" .facets }} cal{{ end }}; do
         if ! id -u "$u" &>/dev/null; then
@@ -233,8 +231,10 @@ user_scope() {
         chmod -R 0500 "$HOME/.npm-global-blocked"
         {{- end }}
 
-        # AI CLI agents (cask on macOS, formula on Linux)
+        {{- if has "ai" .facets }}
+        # AI CLI agents and helpers belong to the ai facet (not generic L3).
         brew install --cask codex claude-code 2>/dev/null || { brew_install codex claude-code 2>/dev/null || echo "Warning: AI CLI agents failed"; }
+        {{- end }}
 
         {{- if eq .chezmoi.os "darwin" }}
         brew_install afsctool duti
@@ -304,6 +304,10 @@ user_scope() {
         {{- if has "hpc" .facets }}
         echo "hpc facet..."
         brew_install {{ range .packages.facets.hpc.brew }}{{ . }} {{ end }}
+        {{- end }}
+        {{- if has "ai" .facets }}
+        echo "ai facet..."
+        brew_install {{ range .packages.facets.ai.brew }}{{ . }} {{ end }}
         {{- end }}
         echo "Brew path complete"
     else

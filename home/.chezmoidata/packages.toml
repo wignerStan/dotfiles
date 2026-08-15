@@ -33,7 +33,6 @@ l3 = [
   "lazygit", "lazydocker", "yazi",
   "gh", "glab", "git-delta", "git-filter-repo", "gitleaks",
   "pandoc",
-  "cc-switch-cli", "beads", "cliproxyapi", "opencode",
   "wireshark", "tcpdump", "ast-grep", "bazel",
   "docker", "docker-compose", "docker-credential-helper",
   "kopia", "cloudflared", "wgcf", "syncthing", "rclone", "ngrok",
@@ -62,7 +61,7 @@ apt  = ["xray-core", "sing-box"]
 apk  = ["xray-core", "sing-box"]   # alpine coverage varies; best-effort only
 
 [packages.facets.ai]
-brew = []
+brew = ["cc-switch-cli", "beads", "cliproxyapi", "opencode"]
 apt  = ["postgresql", "redis-server"]           # sub2api backend needs pg; redis optional
 apk  = ["postgresql", "redis"]
 
