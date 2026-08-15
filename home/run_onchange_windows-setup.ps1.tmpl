@@ -267,13 +267,11 @@ else {
     } catch { Write-Host "    scoop install failed: $($_.Exception.Message)" -ForegroundColor Yellow }
 }
 
-# Tools via winget (scoop fallback): git (full, with Git Bash + GUI), uv, micromamba, pixi.
+# Tools via winget (scoop fallback): git (full, with Git Bash + GUI) and the
+# bootstrap/facet-gated language tools below.
 # (sing-box core is installed directly in both tiers — see below — since its winget
 # package is unreliable and the core binary has clean GitHub releases.)
 Install-Tool -WingetId 'Git.Git'              -ScoopName 'git'        -BinName 'git'        -Label 'git (full)'
-Install-Tool -WingetId 'astral-sh.uv'          -ScoopName 'uv'         -BinName 'uv'         -Label 'uv'
-Install-Tool -WingetId 'Mamba.Micromamba'      -ScoopName 'micromamba' -BinName 'micromamba' -Label 'micromamba'
-Install-Tool -WingetId 'prefix-dev.pixi'       -ScoopName 'pixi'       -BinName 'pixi'       -Label 'pixi'
 
 # Basic CLI/shell/dev tools — mirror of the unix brew basic, via winget (scoop fallback).
 Install-Tool -WingetId 'Starship.Starship'       -ScoopName 'starship'  -BinName 'starship'  -Label 'starship'
@@ -290,13 +288,22 @@ Install-Tool -WingetId 'GLab.GLab'               -ScoopName 'glab'      -BinName
 Install-Tool -WingetId 'FiloSottile.age'         -ScoopName 'age'       -BinName 'age'       -Label 'age'
 Install-Tool -WingetId 'Fastfetch-cli.Fastfetch' -ScoopName 'fastfetch' -BinName 'fastfetch' -Label 'fastfetch'
 Install-Tool -WingetId '7zip.7zip'               -ScoopName '7zip'      -BinName '7z'        -Label '7zip'
+{{- if eq .bootstrap "full" }}
+Install-Tool -WingetId 'astral-sh.uv'            -ScoopName 'uv'         -BinName 'uv'        -Label 'uv'
+Install-Tool -WingetId 'Mamba.Micromamba'        -ScoopName 'micromamba' -BinName 'micromamba' -Label 'micromamba'
 Install-Tool -WingetId 'astral-sh.ruff'          -ScoopName 'ruff'      -BinName 'ruff'      -Label 'ruff'
 Install-Tool -WingetId 'JohnnyMorganz.StyLua'    -ScoopName 'stylua'    -BinName 'stylua'    -Label 'stylua'
-Install-Tool -WingetId 'Nushell.Nushell'         -ScoopName 'nushell'   -BinName 'nu'        -Label 'nushell'
-# Frontend/UI/package stack (basic). rust/go/C++ toolchains stay in WSL, NOT native windows.
 Install-Tool -WingetId 'OpenJS.NodeJS'           -ScoopName 'nodejs'    -BinName 'node'      -Label 'Node.js'
+{{- end }}
+Install-Tool -WingetId 'Nushell.Nushell'         -ScoopName 'nushell'   -BinName 'nu'        -Label 'nushell'
+{{- if has "dev" .facets }}
+# Frontend/UI/package stack (dev facet). rust/go/C++ toolchains stay in WSL, NOT native windows.
 Install-Tool -WingetId 'pnpm.pnpm'               -ScoopName 'pnpm'      -BinName 'pnpm'      -Label 'pnpm'
 Install-Tool -WingetId 'Oven-sh.Bun'             -ScoopName 'bun'       -BinName 'bun'       -Label 'Bun'
+{{- end }}
+{{- if has "research" .facets }}
+Install-Tool -WingetId 'prefix-dev.pixi'          -ScoopName 'pixi'     -BinName 'pixi'     -Label 'pixi'
+{{- end }}
 
 # Coreutils via winget (Microsoft.Coreutils) + scoop unix/text utils (basic windows).
 # NOTE: perl is NOT installed here. Git Bash (Git.Git, full install) already embeds perl —
@@ -425,8 +432,9 @@ Write-Skip 'sing-box (not personal, or guest rides host proxy)'
 {{- end }}
 
 # ---------------------------------------------------------------
-# 2. MAMBA BASE ENV (python) — both tiers
+# 2. MAMBA BASE ENV (python) — bootstrap=full, non-simple tiers
 # ---------------------------------------------------------------
+{{- if and (eq .bootstrap "full") (ne .tier "simple") }}
 if (Test-Cmd 'micromamba') {
     Update-EnvPath
     try {
@@ -442,6 +450,9 @@ if (Test-Cmd 'micromamba') {
         Write-Host "    micromamba env init warning: $($_.Exception.Message)" -ForegroundColor Yellow
     }
 }
+{{- else }}
+Write-Skip 'micromamba base (bootstrap/tier does not select L3)'
+{{- end }}
 
 # ---------------------------------------------------------------
 # 3. pywinauto (GUI automation, Windows-only)

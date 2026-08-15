@@ -44,11 +44,11 @@ l3 = [
 # python3 = the system python (no user-level python install on linux).
 [packages.system.apt]
 l2 = ["git", "curl", "wget", "tmux", "ripgrep", "fd-find", "fzf", "bat", "neovim", "jq", "htop", "tree", "rsync", "bash-completion", "python3", "python3-pip", "acl"]
-l3 = ["nginx", "kopia", "postgresql", "redis-server", "nftables", "software-properties-common"]
+l3 = ["nginx", "kopia", "nftables", "software-properties-common"]
 
 [packages.system.apk]
 l2 = ["bash", "git", "curl", "wget", "tmux", "ripgrep", "fd", "fzf", "bat", "neovim", "jq", "htop", "tree", "rsync", "python3", "py3-pip", "acl"]
-l3 = ["nginx", "kopia", "postgresql", "redis", "nftables"]
+l3 = ["nginx", "kopia", "nftables"]
 
 # ── Facet overlays (any tier may carry them) ─────────────────────────────
 [packages.facets.dev]

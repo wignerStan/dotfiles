@@ -35,7 +35,7 @@ imagemagick = "slim"    # full → imagemagick-full
 [facet_registry.order]
 layers = ["tailscale", "nft", "sysctl", "nginx", "kopia", "pgredis", "proxy", "ai"]
 
-# pg/redis install depth is scaled by tier, NOT by facet:
+# pg/redis install depth is scaled by tier when the ai facet is enabled:
 #   simple   → single instance (sub2api on a 1C1G box)
 #   default  → single instance
 #   advanced → multi instance (primary + replica)

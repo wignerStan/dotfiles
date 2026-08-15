@@ -26,6 +26,17 @@ bootstrap = "basic"
 deploy = "system+user"
 is_guest = true
 
+[machine."incus"]
+ownership = "personal"
+platform = "local"
+tier = "advanced"
+facets = ["dev", "research"]
+bootstrap = "full"
+deploy = "system+user"
+is_guest = false
+# Incus is a physical personal Linux host with a shared multi-user workspace.
+shared_workspace = "/develop"
+
 [machine."racknerd"]
 ownership = "personal"
 platform = "cloud"

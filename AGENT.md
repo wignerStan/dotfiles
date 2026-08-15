@@ -62,12 +62,15 @@ overlays live in `home/.chezmoi/overlay/{facets,platform}/`.
 
 Service provisioning (cloud, not HPC): `home/run_onchange_linux-cloud-services.sh.tmpl`
 — fixed order tailscale → nft → sysctl → nginx → kopia → pg/redis (tier-scaled
-single/multi) → proxy → ai; nginx Restart=always drop-in is managed here;
+single/multi, ai facet only) → proxy → ai; nginx Restart=always drop-in is managed here;
 conflict-warning for non-managed variant overrides (slim/full in
 `.chezmoidata/facet_registry.toml`).
 The nft input policy is rendered from `home/.chezmoitemplates/nftables-firewall`:
 output is accepted, unsolicited input is dropped, and only established/related,
 loopback, Tailscale, and an explicitly selected system-TUN exception are added.
+Facet package overlays must be installed by every platform-specific package
+path: dev owns pnpm/bun, research owns pixi, hpc owns spack, and ai owns
+PostgreSQL/Redis. Do not put these packages back into an unconditional L3 list.
 
 macOS PF host firewall: `home/run_onchange_install-macos-pf-firewall.sh.tmpl`.
 Its resource classification is `scope=system`, `ownership=personal`,

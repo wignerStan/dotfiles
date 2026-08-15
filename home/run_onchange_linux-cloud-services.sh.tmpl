@@ -343,7 +343,11 @@ skip "linux_nft firewall disabled"
 install_sysctl
 install_nginx
 install_kopia
+{{- if has "ai" .facets }}
 install_pgredis
+{{- else }}
+skip "ai facet not enabled: pg/redis skipped"
+{{- end }}
 install_proxy_facet
 install_ai_facet
 

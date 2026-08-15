@@ -1,7 +1,7 @@
 {{- /* Reconcile mamba base env against .chezmoidata/mamba_base.toml.
      Renders environment.yaml, then mamba env update.
      use_uv: true in .condarc enables uv for pip installs where available. */ -}}
-{{- if and (ne .chezmoi.os "windows") (lookPath "micromamba") (and (ne .tier "simple") (not (has "hpc" .facets))) -}}
+{{- if and (ne .chezmoi.os "windows") (eq .bootstrap "full") (lookPath "micromamba") (and (ne .tier "simple") (not (has "hpc" .facets))) -}}
 {{- /* shared multi-user cache root, per-machine (machine.toml) */ -}}
 {{- $shared := "" -}}
 {{- if and (hasKey . "machine") (hasKey .machine .chezmoi.hostname) -}}

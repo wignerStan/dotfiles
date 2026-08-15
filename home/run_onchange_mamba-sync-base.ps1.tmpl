@@ -1,6 +1,6 @@
 {{- /* Windows: reconcile the mamba base env and facet-specific envs.
      chezmoi run_onchange trigger; idempotent. */ -}}
-{{- if and (eq .chezmoi.os "windows") (lookPath "micromamba") -}}
+{{- if and (eq .chezmoi.os "windows") (eq .bootstrap "full") (ne .tier "simple") (lookPath "micromamba") -}}
 #powershell
 $ErrorActionPreference = 'SilentlyContinue'
 $ProgressPreference = 'SilentlyContinue'

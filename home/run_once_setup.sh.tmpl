@@ -216,6 +216,7 @@ user_scope() {
         brew_install {{ range .packages.brew.l2 }}{{ . }} {{ end }}
         {{- if eq .os_platform "linux" }}
         brew_install byobu
+        brew_install zellij
         {{- end }}
         {{- if eq .chezmoi.os "darwin" }}
         brew_install pngpaste terminal-notifier
@@ -250,8 +251,13 @@ user_scope() {
         {{-   end }}
         {{- if and (eq .chezmoi.os "linux") (eq .ownership "personal") }}
         brew_install poppler
-        __tl_deps=$(brew deps --direct texlive | tr '\n' ' ' | sed 's/mesa//g')
-        if [ -n "$__tl_deps" ]; then brew install $__tl_deps 2>/dev/null || echo "Warning: some texlive deps failed"; fi
+        __tl_deps=()
+        while IFS= read -r __tl_dep; do
+            [[ -n "$__tl_dep" && "$__tl_dep" != "mesa" ]] && __tl_deps+=("$__tl_dep")
+        done < <(brew deps --direct texlive)
+        if (( ${#__tl_deps[@]} > 0 )); then
+            brew install "${__tl_deps[@]}" 2>/dev/null || echo "Warning: some texlive deps failed"
+        fi
         brew install --ignore-dependencies texlive 2>/dev/null || echo "Warning: texlive install failed"
         {{- end }}
         {{- end }}
@@ -290,6 +296,14 @@ user_scope() {
         {{- if has "proxy" .facets }}
         echo "proxy facet..."
         brew_install {{ range .packages.facets.proxy.brew }}{{ . }} {{ end }}
+        {{- end }}
+        {{- if has "research" .facets }}
+        echo "research facet..."
+        brew_install {{ range .packages.facets.research.brew }}{{ . }} {{ end }}
+        {{- end }}
+        {{- if has "hpc" .facets }}
+        echo "hpc facet..."
+        brew_install {{ range .packages.facets.hpc.brew }}{{ . }} {{ end }}
         {{- end }}
         echo "Brew path complete"
     else
