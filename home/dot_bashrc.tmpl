@@ -1,6 +1,9 @@
 # Jacob's Bash Configuration
 # Managed by Chezmoi
 
+# Site HPC tools: Lmod, Spack, and modulefile search paths.
+[[ -r /etc/profile.d/cakrue-hpc.sh ]] && source /etc/profile.d/cakrue-hpc.sh
+
 # ── Homebrew ──
 if [[ -n "$HOMEBREW_PREFIX" ]]; then
     eval "$("$HOMEBREW_PREFIX/bin/brew" shellenv)"
