@@ -26,12 +26,11 @@ l2 = [
 ]
 l3 = [
   "uv", "micromamba", "node",
-  "ruff", "luarocks",
-  "biome", "pyright", "typescript", "typescript-language-server", "pre-commit",
+  "luarocks",
   "neovim", "aria2",
   "ffmpeg", "imagemagick",
   "lazygit", "lazydocker", "yazi",
-  "gh", "glab", "git-delta", "git-filter-repo", "gitleaks",
+  "git-delta", "git-filter-repo", "gitleaks",
   "pandoc",
   "wireshark", "tcpdump", "ast-grep", "bazel",
   "docker", "docker-compose", "docker-credential-helper",
@@ -51,7 +50,11 @@ l3 = ["nginx", "kopia", "nftables"]
 
 # ── Facet overlays (any tier may carry them) ─────────────────────────────
 [packages.facets.dev]
-brew = ["lefthook", "just", "pnpm", "bun"]
+brew = [
+  "bun", "gh", "glab", "pre-commit", "lefthook", "pnpm",
+  "ruff", "biome", "pyright", "typescript", "typescript-language-server",
+  "just",
+]
 apt  = []
 apk  = []
 
