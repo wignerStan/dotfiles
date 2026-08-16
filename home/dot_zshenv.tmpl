@@ -44,7 +44,7 @@ path=(/opt/homebrew/bin /opt/homebrew/sbin ${path[@]})
 {{- if $homebrew_overlay_prefix }}
 if [[ -x "{{ $homebrew_overlay_prefix }}/bin/brew" ]]; then
     export HOMEBREW_PREFIX="{{ $homebrew_overlay_prefix }}"
-    path=("{{ $homebrew_overlay_prefix }}/bin" "{{ $homebrew_overlay_prefix }}/sbin" ${path[@]})
+    path=("{{ $homebrew_overlay_prefix }}/bin" "{{ $homebrew_overlay_prefix }}/sbin" /home/linuxbrew/.linuxbrew/bin /home/linuxbrew/.linuxbrew/sbin ${path[@]})
 elif [[ -d "/home/linuxbrew/.linuxbrew" ]]; then
     export HOMEBREW_PREFIX="/home/linuxbrew/.linuxbrew"
     path=(/home/linuxbrew/.linuxbrew/bin /home/linuxbrew/.linuxbrew/sbin ${path[@]})
