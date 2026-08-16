@@ -11,6 +11,7 @@ set -euo pipefail
 {{- if lookPath "brew" }}
 TRUST=~/.config/homebrew/trust.json
 mkdir -p "$(dirname "$TRUST")"
+chmod 700 "$(dirname "$TRUST")"
 
 # Managed entries: user/REPO taps and fully-qualified tap/formula trust records.
 # sing-box now ships in homebrew/core; the wignerstan/singbox tap was dropped
@@ -43,6 +44,7 @@ fi
 if [ ! -f "$TRUST" ]; then
     echo '{"trustedtaps":[],"trustedformulae":[]}' > "$TRUST"
 fi
+chmod 600 "$TRUST"
 
 # Union managed entries into the existing arrays, prune retired ones
 # (order preserved, dups removed).
