@@ -44,4 +44,19 @@ if ((Test-Path $devEnv) -and $devPip.Count -gt 0) {
 }
 Log 'develop env sync complete'
 {{- end }}
+{{- if has "trade" .facets }}
+$tradeEnv = Join-Path $HOME '.conda\envs\trade'
+$tradeConda = @({{- range (index .mamba_base "trade").conda }} '{{ . }}' {{- end }})
+$tradePip = @({{- range (index .mamba_base "trade").pip }} '{{ . }}' {{- end }})
+if (-not (Test-Path $tradeEnv)) {
+    Log "creating trade env at $tradeEnv"
+    & $mm create -y -p $tradeEnv @channels 'python=3.12' 'pip' 'uv' @tradeConda 2>&1 | Out-Null
+} elseif ($tradeConda.Count -gt 0) {
+    & $mm install -y -p $tradeEnv @channels @tradeConda 2>&1 | Out-Null
+}
+if ((Test-Path $tradeEnv) -and $tradePip.Count -gt 0) {
+    & $mm run -p $tradeEnv python -m pip install --upgrade @tradePip 2>&1 | Out-Null
+}
+Log 'trade env sync complete'
+{{- end }}
 Log "sync complete (tier={{ .tier }})"{{- end -}}

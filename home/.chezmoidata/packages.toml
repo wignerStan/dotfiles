@@ -8,9 +8,9 @@
 #
 # L1 = self-bootstrap (scripts/bootstrap-l1.sh — NOT chezmoi-rendered).
 # L2 = basic — all non-simple tiers (shell/dir tools; NO language stack).
-# L3 = standard — bootstrap=full: language base (uv/mamba/node) +
-#     dev-tooling/services; pnpm/bun live in the dev facet overlay (pixi = research facet)
-# facets.* = stackable capability overlays (dev/proxy/ai/hpc/research), any tier.
+# L3 = standard — bootstrap=full: language base and generally useful tooling.
+# facets.* = stackable capability overlays (dev/proxy/ai/hpc/research/trade), any tier.
+# tiers.advanced = costly/specialist tools added only for an advanced profile.
 # system.* = root/system-scoped (install only when running as root/system).
 
 [packages.brew]
@@ -27,7 +27,7 @@ l2 = [
 l3 = [
   "uv", "micromamba", "node",
   "ruff", "luarocks",
-  "biome", "pyright", "typescript-language-server", "pre-commit",
+  "biome", "pyright", "typescript", "typescript-language-server", "pre-commit",
   "neovim", "aria2",
   "ffmpeg", "imagemagick",
   "lazygit", "lazydocker", "yazi",
@@ -51,9 +51,16 @@ l3 = ["nginx", "kopia", "nftables"]
 
 # ── Facet overlays (any tier may carry them) ─────────────────────────────
 [packages.facets.dev]
-brew = ["trivy", "lefthook", "just", "supabase", "azure-cli", "radare2", "binwalk", "lief", "pnpm", "bun"]
+brew = ["lefthook", "just", "pnpm", "bun"]
 apt  = []
 apk  = []
+
+# Specialist scanners, cloud tooling, and reverse-engineering packages are not
+# part of the standard developer profile. A personal advanced account installs
+# these in its user overlay after inherited base packages have been projected.
+[packages.tiers.advanced]
+brew = ["osv-scanner", "trivy", "supabase", "azure-cli", "binwalk", "lief"]
+brew_head = ["radare2"]
 
 [packages.facets.proxy]
 brew = ["sing-box", "xray-core"]
@@ -67,6 +74,11 @@ apk  = ["postgresql", "redis"]
 
 [packages.facets.research]
 brew = ["pixi"]
+apt  = []
+apk  = []
+
+[packages.facets.trade]
+brew = []
 apt  = []
 apk  = []
 

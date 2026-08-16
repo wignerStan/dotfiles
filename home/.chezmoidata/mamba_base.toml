@@ -296,9 +296,8 @@ pip = [
 ]
 
 [mamba_base.dev]
-# app/web + dev tools + trade — applied when facets includes "dev"
+# app/web + developer tools — applied when facets includes "dev"
 conda = [
-    "ta-lib",
 ]
 pip = [
     "alembic",
@@ -347,9 +346,16 @@ pip = [
     "wsproto",
 ]
 
+[mamba_base.trade]
+# Native financial-analysis dependency kept out of the general develop env.
+conda = [
+    "ta-lib",
+]
+pip = [
+]
+
 [mamba_base.hpc]
 conda = [
 ]
 pip = [
 ]
-

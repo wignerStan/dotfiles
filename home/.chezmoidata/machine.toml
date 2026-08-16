@@ -51,7 +51,7 @@ homebrew_branch = "overlay-store"
 ownership = "personal"
 platform = "local"
 tier = "default"
-facets = ["dev", "ai", "research"]
+facets = ["dev", "ai", "research", "trade"]
 bootstrap = "full"
 deploy = "user"
 is_guest = false
@@ -59,6 +59,9 @@ is_guest = false
 # dev-owned /develop workspace.
 homebrew_repository = "https://github.com/wignerStan/brew.git"
 homebrew_branch = "overlay-store"
+# Jacob owns the shared base. His user deployment reconciles the standard
+# package set there; other accounts inherit it through their private overlays.
+homebrew_manage_base = true
 
 [machine."racknerd"]
 ownership = "personal"

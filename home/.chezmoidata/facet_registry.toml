@@ -18,7 +18,10 @@ description = "AI gateway: sub2api (+ backend pg/redis)"
 description = "HPC cluster host (spack/fortran/cuda; formerly the 'calculate' tier)"
 
 [facet_registry.facet.research]
-description = "Research workspace: project Python via pixi (env shells/fish only; installs via L3/dev overlay)"
+description = "Research workspace: project Python via pixi (env shells/fish only; installs via its facet)"
+
+[facet_registry.facet.trade]
+description = "Quantitative trading and market-data research tooling"
 
 # Package variant table (slim/full) — conflict-warning scope in the cloud
 # services script: a non-managed override (different variant or custom install)

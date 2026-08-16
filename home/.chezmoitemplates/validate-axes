@@ -3,7 +3,7 @@
 {{- $tiers := list "simple" "default" "advanced" -}}
 {{- $bootstraps := list "basic" "full" -}}
 {{- $deploys := list "user" "system" "system+user" -}}
-{{- $allowedFacets := list "dev" "proxy" "ai" "hpc" "research" -}}
+{{- $allowedFacets := list "dev" "proxy" "ai" "hpc" "research" "trade" -}}
 {{- if not (has .ownership $ownerships) -}}
 {{-   fail (printf "invalid ownership %q (want one of: %s)" .ownership ($ownerships | join ", ")) -}}
 {{- end -}}

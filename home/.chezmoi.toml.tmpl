@@ -2,7 +2,7 @@
      ownership (personal|work)         — who owns it (work = stub gate for now)
      platform  (local|cloud)           — where it runs (own hardware vs 3rd-party cloud platform)
      tier      (simple|default|advanced) — resource/install depth (develop renamed advanced)
-     facets    (dev|proxy|ai|hpc|research) — stackable capability overlays, ANY tier
+     facets    (dev|proxy|ai|hpc|research|trade) — stackable capability overlays, ANY tier
      bootstrap (basic|full)            — L2 basic vs L3 full (renamed from setup_mode)
      deploy    (user|system|system+user) — deploy scope: user (default), system,
                                            or both (system+user); plain-user system ops
@@ -99,7 +99,7 @@
 {{-   $tier = "advanced" -}}
 {{- end -}}
 
-{{- /* facets: stackable capability overlays (dev|proxy|ai|hpc|research), ANY tier may carry
+{{- /* facets: stackable capability overlays (dev|proxy|ai|hpc|research|trade), ANY tier may carry
      them. Sources: CHEZMOI_FACETS env (space/comma list) > machine.toml.
      Auto-added: hpc on apptainer/singularity hosts or cal user; dev for dev user
      (or legacy "develop" tier). */ -}}
@@ -189,6 +189,7 @@
 {{- $homebrew_overlay_prefix := "" -}}
 {{- $homebrew_repository_path := "" -}}
 {{- $homebrew_base_prefix := "" -}}
+{{- $homebrew_manage_base := false -}}
 {{- if and (eq .chezmoi.os "linux") (eq $ownership "personal") (eq $platform "local") (not $is_guest) -}}
 {{-   $homebrew_repository = "https://github.com/wignerStan/brew.git" -}}
 {{-   $homebrew_branch = "overlay-store" -}}
@@ -201,6 +202,10 @@
 {{-     $homebrew_repository_path = joinPath .chezmoi.homeDir ".local/share/homebrew-overlay/Homebrew" -}}
 {{-   end -}}
 {{-   $homebrew_base_prefix = "/home/linuxbrew/.linuxbrew" -}}
+{{-   if hasKey $machine_cfg "homebrew_manage_base" -}}
+{{-     if not (kindIs "bool" $machine_cfg.homebrew_manage_base) -}}{{- fail "homebrew_manage_base must be a boolean" -}}{{- end -}}
+{{-     $homebrew_manage_base = $machine_cfg.homebrew_manage_base -}}
+{{-   end -}}
 {{- end -}}
 
 {{- /* OS platform: detect WSL2 (chezmoi reports "linux" for WSL2).
@@ -287,6 +292,7 @@ encryption = "age"
     homebrew_overlay_prefix = {{ $homebrew_overlay_prefix | quote }}
     homebrew_repository_path = {{ $homebrew_repository_path | quote }}
     homebrew_base_prefix = {{ $homebrew_base_prefix | quote }}
+    homebrew_manage_base = {{ $homebrew_manage_base }}
     use_china_mirrors = {{ $use_china_mirrors }}
     geo = {{ $geo | quote }}
     mamba_root = {{ if $shared_workspace }}{{ joinPath $shared_workspace "mamba" | quote }}{{ else }}{{ joinPath .chezmoi.homeDir "mamba" | quote }}{{ end }}

@@ -1,0 +1,90 @@
+{{- if and (eq .chezmoi.os "linux") (eq .ownership "personal") (eq .platform "local") (not .is_guest) .homebrew_repository -}}
+#!/usr/bin/env bash
+# Reconcile declared Linux Homebrew packages whenever the profile or manifest
+# changes. This is additive: packages outside the manifest are not removed.
+set -euo pipefail
+
+if [[ "$(id -u)" -eq 0 ]]; then
+    echo "Skipping user package reconciliation for root" >&2
+    exit 0
+fi
+
+{{- if .homebrew_manage_base }}
+brew_cmd="{{ .homebrew_base_prefix }}/bin/brew"
+scope="shared base"
+{{- else }}
+brew_cmd="{{ .homebrew_overlay_prefix }}/bin/brew"
+scope="user overlay"
+{{- end }}
+
+[[ -x "$brew_cmd" ]] || {
+    echo "Homebrew $scope is unavailable: $brew_cmd" >&2
+    exit 1
+}
+
+brew_prefix="$($brew_cmd --prefix)"
+[[ -d "$brew_prefix/Cellar" && -w "$brew_prefix/Cellar" && -w "$brew_prefix/bin" ]] || {
+    echo "Homebrew $scope is not writable by $(id -un): $brew_prefix" >&2
+    exit 1
+}
+{{- if .homebrew_manage_base }}
+[[ "$(stat -c %u "$brew_prefix")" = "$(id -u)" ]] || {
+    echo "Refusing to manage a shared base not owned by $(id -un): $brew_prefix" >&2
+    exit 1
+}
+{{- end }}
+
+brew_install() {
+    local package
+    for package in "$@"; do
+        # In overlay mode this intentionally treats a base formula as present.
+        # That is the core invariant of the custom Homebrew patch.
+        if "$brew_cmd" list --formula "$package" >/dev/null 2>&1; then
+            continue
+        fi
+        if ! "$brew_cmd" info --formula "$package" >/dev/null 2>&1; then
+            echo "Warning: no Homebrew formula found: $package" >&2
+            continue
+        fi
+        if [[ "$package" = bun ]]; then
+            "$brew_cmd" install --force-bottle "$package" || echo "Warning: formula install failed: $package" >&2
+        else
+            "$brew_cmd" install "$package" || echo "Warning: formula install failed: $package" >&2
+        fi
+    done
+}
+
+echo "Reconciling Homebrew packages in $scope ($brew_prefix)"
+brew_install {{ range .packages.brew.l2 }}{{ . }} {{ end }}
+{{- if eq .bootstrap "full" }}
+brew_install {{ range .packages.brew.l3 }}{{ . }} {{ end }}
+{{- end }}
+{{- if has "dev" .facets }}
+brew_install {{ range .packages.facets.dev.brew }}{{ . }} {{ end }}
+{{- end }}
+{{- if has "proxy" .facets }}
+brew_install {{ range .packages.facets.proxy.brew }}{{ . }} {{ end }}
+{{- end }}
+{{- if has "ai" .facets }}
+brew_install {{ range .packages.facets.ai.brew }}{{ . }} {{ end }}
+{{- end }}
+{{- if has "research" .facets }}
+brew_install {{ range .packages.facets.research.brew }}{{ . }} {{ end }}
+{{- end }}
+{{- if has "trade" .facets }}
+brew_install {{ range .packages.facets.trade.brew }}{{ . }} {{ end }}
+{{- end }}
+{{- if and (eq .tier "advanced") (has "dev" .facets) }}
+brew_install {{ range .packages.tiers.advanced.brew }}{{ . }} {{ end }}
+{{- range .packages.tiers.advanced.brew_head }}
+if ! "$brew_cmd" list --formula {{ . }} >/dev/null 2>&1; then
+    "$brew_cmd" install --HEAD {{ . }} || echo "Warning: HEAD formula install failed: {{ . }}" >&2
+fi
+{{- end }}
+{{- end }}
+
+echo "Homebrew package reconciliation complete ($scope)"
+{{- else -}}
+#!/usr/bin/env bash
+exit 0
+{{- end -}}

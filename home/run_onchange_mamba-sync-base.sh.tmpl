@@ -95,4 +95,39 @@ fi
 log "develop env sync complete"
 {{- end }}
 
+# ── Trade env (separate from develop) — trade facet ─────────────
+{{- if has "trade" .facets }}
+TRADE_YAML="$(mktemp /tmp/mamba-trade-env.XXXXXX.yaml)"
+trap 'rm -f "$ENV_YAML" "${DEV_YAML:-}" "$TRADE_YAML"' EXIT
+cat > "$TRADE_YAML" << 'YAMLEOF'
+name: trade
+channels:
+{{- range .mamba_base.channels }}
+  - {{ . }}
+{{- end }}
+dependencies:
+  - uv
+  - python=3.12
+  - pip
+{{- range (index .mamba_base "trade").conda }}
+  - {{ . }}
+{{- end }}
+{{- if (index .mamba_base "trade").pip }}
+  - pip:
+{{- range (index .mamba_base "trade").pip }}
+    - {{ . }}
+{{- end }}
+{{- end }}
+YAMLEOF
+
+log "creating/updating trade env..."
+TRADE_ENV="{{ .chezmoi.homeDir }}/.conda/envs/trade"
+if [ ! -d "$TRADE_ENV" ]; then
+    "$MM" env create -f "$TRADE_YAML" -y --use-uv --prefix "$TRADE_ENV" 2>&1 || log "trade env create reported errors"
+else
+    "$MM" env update -p "$TRADE_ENV" -f "$TRADE_YAML" --use-uv 2>&1 || log "trade env update reported errors"
+fi
+log "trade env sync complete"
+{{- end }}
+
 {{- end -}}

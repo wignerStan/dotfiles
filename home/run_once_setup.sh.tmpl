@@ -68,6 +68,9 @@ system_scope() {
 {{- if has "research" .facets }}
         __facet_pkgs+=({{- range .packages.facets.research.apk }} {{ . }}{{- end }})
 {{- end }}
+{{- if has "trade" .facets }}
+        __facet_pkgs+=({{- range .packages.facets.trade.apk }} {{ . }}{{- end }})
+{{- end }}
 {{- if has "hpc" .facets }}
         __facet_pkgs+=({{- range .packages.facets.hpc.apk }} {{ . }}{{- end }})
 {{- end }}
@@ -95,6 +98,9 @@ system_scope() {
 {{- end }}
 {{- if has "research" .facets }}
         __facet_pkgs+=({{- range .packages.facets.research.apt }} {{ . }}{{- end }})
+{{- end }}
+{{- if has "trade" .facets }}
+        __facet_pkgs+=({{- range .packages.facets.trade.apt }} {{ . }}{{- end }})
 {{- end }}
 {{- if has "hpc" .facets }}
         __facet_pkgs+=({{- range .packages.facets.hpc.apt }} {{ . }}{{- end }})
@@ -261,11 +267,19 @@ user_scope() {
 {{- end }}
 {{- if and (eq .chezmoi.os "linux") (eq .ownership "personal") (eq .platform "local") (not .is_guest) .homebrew_repository }}
     # Personal Linux profiles always select the forked user overlay, even when
-    # the caller inherited the shared base Homebrew PATH.
+    # the caller inherited the shared base Homebrew PATH. The declared base
+    # owner is the exception: its package transaction must target the base so
+    # other overlays can inherit the standard package set.
     export HOMEBREW_BREW_GIT_REMOTE="{{ .homebrew_repository }}"
+    {{- if .homebrew_manage_base }}
+    if [[ -x "{{ .homebrew_base_prefix }}/bin/brew" ]]; then
+        eval "$("{{ .homebrew_base_prefix }}/bin/brew" shellenv)"
+    fi
+    {{- else }}
     if [[ -x "{{ .homebrew_overlay_prefix }}/bin/brew" ]]; then
         eval "$("{{ .homebrew_overlay_prefix }}/bin/brew" shellenv)"
     fi
+    {{- end }}
 {{- end }}
     if ! command -v brew &> /dev/null; then
         if [[ -x /home/linuxbrew/.linuxbrew/bin/brew ]]; then
@@ -282,7 +296,7 @@ user_scope() {
         # ───────────────────────────────────────────────────────────
         # L2 BASIC — all non-simple tiers. Shell/dir tooling only;
         # language stack (uv/mamba/node) is L3 (bootstrap=full);
-        # pixi is research-facet; pnpm/bun are dev-facet. python → linux system pkg (no user install).
+        # pixi is research-facet; pnpm/bun are dev-facet. python -> linux system pkg (no user install).
         # ───────────────────────────────────────────────────────────
         echo "L2 basic tools..."
         __brew_prefix="$(brew --prefix)"
@@ -371,29 +385,8 @@ user_scope() {
 
         # ──── facet overlays (any tier) ─────────────────────────────
         {{- if has "dev" .facets }}
-        echo "dev facet (L4 overlay)..."
-        {{- if and (eq .chezmoi.os "linux") .homebrew_repository }}
-        # The Linux user overlay is intentionally non-default. Bun's Linux
-        # bottle is tied to the administrator prefix and its source build is
-        # a large WebKit build, so install it with the user installer into the
-        # already-configured BUN_INSTALL root. radare2 uses HEAD until the
-        # current stable source checksum is corrected upstream.
-        brew_install trivy lefthook just supabase azure-cli binwalk lief pnpm
-        if ! brew list --formula radare2 &>/dev/null; then
-            brew install --HEAD radare2 2>/dev/null || echo "Warning: radare2 HEAD install failed"
-        fi
-        if ! command -v bun &>/dev/null; then
-            if [[ -n "{{ .shared_cache }}" ]]; then
-                export BUN_INSTALL="{{ .shared_cache }}/bun"
-            else
-                export BUN_INSTALL="$HOME/.bun"
-            fi
-            mkdir -p "$BUN_INSTALL" "$BUN_INSTALL/cache" "$BUN_INSTALL/global" "$BUN_INSTALL/bin"
-            curl -fsSL https://bun.sh/install | bash -s -- || echo "Warning: Bun user install failed"
-        fi
-        {{- else }}
+        echo "dev facet..."
         brew_install {{ range .packages.facets.dev.brew }}{{ . }} {{ end }}
-        {{- end }}
         {{- if eq .chezmoi.os "darwin" }}
         brew tap openai/tools 2>/dev/null || true
         brew install openai/tools/tart 2>/dev/null || echo "Warning: tart install failed"
@@ -416,6 +409,10 @@ user_scope() {
         echo "research facet..."
         brew_install {{ range .packages.facets.research.brew }}{{ . }} {{ end }}
         {{- end }}
+        {{- if has "trade" .facets }}
+        echo "trade facet..."
+        brew_install {{ range .packages.facets.trade.brew }}{{ . }} {{ end }}
+        {{- end }}
         {{- if has "hpc" .facets }}
         echo "hpc facet..."
         brew_install {{ range .packages.facets.hpc.brew }}{{ . }} {{ end }}
@@ -423,6 +420,15 @@ user_scope() {
         {{- if has "ai" .facets }}
         echo "ai facet..."
         brew_install {{ range .packages.facets.ai.brew }}{{ . }} {{ end }}
+        {{- end }}
+        {{- if and (eq .tier "advanced") (has "dev" .facets) }}
+        echo "advanced developer tools..."
+        brew_install {{ range .packages.tiers.advanced.brew }}{{ . }} {{ end }}
+        {{- range .packages.tiers.advanced.brew_head }}
+        if ! brew list --formula {{ . }} &>/dev/null; then
+            brew install --HEAD {{ . }} 2>/dev/null || echo "Warning: HEAD formula install failed: {{ . }}"
+        fi
+        {{- end }}
         {{- end }}
         echo "Brew path complete"
     else
