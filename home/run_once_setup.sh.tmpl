@@ -372,7 +372,28 @@ user_scope() {
         # ──── facet overlays (any tier) ─────────────────────────────
         {{- if has "dev" .facets }}
         echo "dev facet (L4 overlay)..."
+        {{- if and (eq .chezmoi.os "linux") .homebrew_repository }}
+        # The Linux user overlay is intentionally non-default. Bun's Linux
+        # bottle is tied to the administrator prefix and its source build is
+        # a large WebKit build, so install it with the user installer into the
+        # already-configured BUN_INSTALL root. radare2 uses HEAD until the
+        # current stable source checksum is corrected upstream.
+        brew_install trivy lefthook just supabase azure-cli binwalk lief pnpm
+        if ! brew list --formula radare2 &>/dev/null; then
+            brew install --HEAD radare2 2>/dev/null || echo "Warning: radare2 HEAD install failed"
+        fi
+        if ! command -v bun &>/dev/null; then
+            if [[ -n "{{ .shared_cache }}" ]]; then
+                export BUN_INSTALL="{{ .shared_cache }}/bun"
+            else
+                export BUN_INSTALL="$HOME/.bun"
+            fi
+            mkdir -p "$BUN_INSTALL" "$BUN_INSTALL/cache" "$BUN_INSTALL/global" "$BUN_INSTALL/bin"
+            curl -fsSL https://bun.sh/install | bash -s -- || echo "Warning: Bun user install failed"
+        fi
+        {{- else }}
         brew_install {{ range .packages.facets.dev.brew }}{{ . }} {{ end }}
+        {{- end }}
         {{- if eq .chezmoi.os "darwin" }}
         brew tap openai/tools 2>/dev/null || true
         brew install openai/tools/tart 2>/dev/null || echo "Warning: tart install failed"
