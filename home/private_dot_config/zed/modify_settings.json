@@ -1,0 +1,42 @@
+#!/usr/bin/env python3
+import json
+import re
+import sys
+
+overlay = {
+    "base_keymap": "VSCode",
+    "theme": {
+        "mode": "system",
+        "light": "Solarized Light",
+        "dark": "Solarized Dark",
+    },
+    "buffer_font_size": 16,
+    "buffer_line_height": "comfortable",
+}
+
+
+def parse_jsonc(text):
+    text = re.sub(r"^\s*//.*?$", "", text, flags=re.M)
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    text = re.sub(r",(\s*[}\]])", r"\1", text)
+    return json.loads(text)
+
+
+def deep_merge(base, overlay):
+    for key, value in overlay.items():
+        if isinstance(value, dict) and isinstance(base.get(key), dict):
+            deep_merge(base[key], value)
+        else:
+            base[key] = value
+    return base
+
+
+data = sys.stdin.read()
+try:
+    doc = parse_jsonc(data)
+except Exception:
+    sys.stdout.write(data)
+    sys.exit(0)
+
+merged = deep_merge(doc, overlay)
+sys.stdout.write(json.dumps(merged, indent=2, ensure_ascii=False) + "\n")

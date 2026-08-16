@@ -7,7 +7,7 @@ shell-integration-features = ssh-terminfo,ssh-env,no-cursor,title
 command = /opt/homebrew/bin/fish
 
 # ========== Theme ==========
-theme = iTerm2 Solarized Dark
+theme = light:iTerm2 Solarized Light,dark:iTerm2 Solarized Dark
 
 # ========== Font ==========
 font-family = "Maple Mono NF CN Light"
