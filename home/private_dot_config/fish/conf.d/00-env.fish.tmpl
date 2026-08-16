@@ -36,14 +36,11 @@ set -qx XDG_STATE_HOME; or set -gx XDG_STATE_HOME ~/.local/state
 
 # ── Homebrew (China mirrors) ──────────────────────────────────
 {{- if .use_china_mirrors }}
-set -gx HOMEBREW_BREW_GIT_REMOTE "https://mirrors.ustc.edu.cn/brew.git"
-set -gx HOMEBREW_CORE_GIT_REMOTE "https://mirrors.ustc.edu.cn/homebrew-core.git"
+# Keep the source checkout's configured Git remote authoritative. The old
+# USTC Git endpoints are not reliable; bottles/API remain mirror-accelerated.
 set -gx HOMEBREW_BOTTLE_DOMAIN "https://mirrors.ustc.edu.cn/homebrew-bottles"
 set -gx HOMEBREW_API_DOMAIN "https://mirrors.ustc.edu.cn/homebrew-bottles/api"
 {{- end }}
-{{- if hasKey . "homebrew_repository" }}{{- if .homebrew_repository }}
-set -gx HOMEBREW_BREW_GIT_REMOTE "{{ .homebrew_repository }}"
-{{- end }}{{- end }}
 
 # ── HuggingFace & Models ──────────────────────────────────────
 # ── Editor ────────────────────────────────────────────────────

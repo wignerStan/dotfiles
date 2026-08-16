@@ -79,14 +79,10 @@ fi
 
 {{- if .use_china_mirrors }}
 # ── Homebrew (China mirrors) ──────────────────────────────────
-export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.ustc.edu.cn/brew.git"
-export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.ustc.edu.cn/homebrew-core.git"
+# Keep the source checkout's configured Git remote authoritative. The old
+# USTC Git endpoints are not reliable; bottles/API remain mirror-accelerated.
 export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.ustc.edu.cn/homebrew-bottles"
 export HOMEBREW_API_DOMAIN="https://mirrors.ustc.edu.cn/homebrew-bottles/api"
-{{- end }}
-{{- if $homebrew_repository }}
-# Personal Linux uses the fork; this must override the generic mirror remote.
-export HOMEBREW_BREW_GIT_REMOTE="{{ $homebrew_repository }}"
 {{- end }}
 
 # ── HuggingFace & Models ──────────────────────────────────────

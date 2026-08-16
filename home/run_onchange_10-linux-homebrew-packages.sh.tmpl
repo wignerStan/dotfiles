@@ -3,6 +3,7 @@
 # Reconcile declared Linux Homebrew packages whenever the profile or manifest
 # changes. This is additive: packages outside the manifest are not removed.
 set -euo pipefail
+export HOMEBREW_NO_AUTO_UPDATE=1
 
 if [[ "$(id -u)" -eq 0 ]]; then
     echo "Skipping user package reconciliation for root" >&2
