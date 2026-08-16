@@ -27,6 +27,9 @@ fish_add_path --move $PNPM_HOME/bin
 # Bun
 {{- if and (hasKey . "shared_cache") .shared_cache }}
 set -gx BUN_INSTALL "{{ .shared_cache }}/bun"
+set -gx BUN_INSTALL_CACHE_DIR "{{ .shared_cache }}/bun/cache"
+set -gx BUN_INSTALL_GLOBAL_DIR "{{ .shared_cache }}/bun/global"
+set -gx BUN_INSTALL_BIN "{{ .shared_cache }}/bun/bin"
 {{- else }}
 set -gx BUN_INSTALL ~/.bun
 {{- end }}

@@ -174,7 +174,15 @@ system_scope() {
             "{{ $shared_cache }}/rattler" \
             "{{ $shared_cache }}/npm" \
             "{{ $shared_cache }}/pnpm" \
+            "{{ $shared_cache }}/pnpm/store" \
+            "{{ $shared_cache }}/pnpm/bin" \
+            "{{ $shared_cache }}/pnpm/global" \
+            "{{ $shared_cache }}/pnpm/cache" \
+            "{{ $shared_cache }}/pnpm/state" \
             "{{ $shared_cache }}/bun" \
+            "{{ $shared_cache }}/bun/cache" \
+            "{{ $shared_cache }}/bun/global" \
+            "{{ $shared_cache }}/bun/bin" \
             "{{ $shared_cache }}/kopia"; do
             $SUDO install -d -o dev -g dev -m 0700 "$__cache_dir"
         done
@@ -220,11 +228,22 @@ user_scope() {
         "{{ .shared_cache }}/rattler" \
         "{{ .shared_cache }}/npm" \
         "{{ .shared_cache }}/pnpm" \
+        "{{ .shared_cache }}/pnpm/store" \
+        "{{ .shared_cache }}/pnpm/bin" \
+        "{{ .shared_cache }}/pnpm/global" \
+        "{{ .shared_cache }}/pnpm/cache" \
+        "{{ .shared_cache }}/pnpm/state" \
         "{{ .shared_cache }}/bun" \
+        "{{ .shared_cache }}/bun/cache" \
+        "{{ .shared_cache }}/bun/global" \
+        "{{ .shared_cache }}/bun/bin" \
         "{{ .shared_cache }}/kopia"; do
         mkdir -p "$__cache_dir"
         chmod 0700 "$__cache_dir"
     done
+    if [[ ! -f "{{ .shared_cache }}/bun/global/package.json" ]]; then
+        printf '%s\n' '{"dependencies":{}}' > "{{ .shared_cache }}/bun/global/package.json"
+    fi
 {{- end }}
 
     # 2. Mirror-aware Homebrew setup

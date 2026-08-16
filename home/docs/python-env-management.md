@@ -176,8 +176,8 @@ are account-owned) because it is user-only and cannot assume root-managed ACLs:
 <shared_cache>/rattler                <- pixi conda package cache
 <shared_cache>/mamba                  <- conda package cache
 <shared_cache>/npm                    <- npm cache redirect
-<shared_cache>/pnpm                   <- pnpm store + global bin directory
-<shared_cache>/bun                    <- Bun cache + global install root
+<shared_cache>/pnpm                   <- pnpm store/cache/state/global/bin
+<shared_cache>/bun                    <- Bun cache/global/bin (BUN_INSTALL_*)
 <shared_cache>/kopia                  <- backup cache (if applicable)
 ```
 Other machines use default user caches (`~/.cache/uv`, `~/.cache/npm`, ...).

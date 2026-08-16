@@ -1,0 +1,12 @@
+# pnpm 11 global config - managed by chezmoi
+{{- $shared_cache := "" -}}
+{{- if hasKey . "shared_cache" }}{{- $shared_cache = .shared_cache | default "" }}{{- end -}}
+{{- if $shared_cache }}
+storeDir: {{ printf "%s/pnpm/store" $shared_cache | quote }}
+globalBinDir: {{ printf "%s/pnpm/bin" $shared_cache | quote }}
+globalDir: {{ printf "%s/pnpm/global" $shared_cache | quote }}
+cacheDir: {{ printf "%s/pnpm/cache" $shared_cache | quote }}
+stateDir: {{ printf "%s/pnpm/state" $shared_cache | quote }}
+{{- else }}
+{}
+{{- end }}
