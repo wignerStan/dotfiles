@@ -259,6 +259,14 @@ user_scope() {
     export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.ustc.edu.cn/homebrew-bottles"
     export HOMEBREW_API_DOMAIN="https://mirrors.ustc.edu.cn/homebrew-bottles/api"
 {{- end }}
+{{- if and (eq .chezmoi.os "linux") (eq .ownership "personal") (eq .platform "local") (not .is_guest) .homebrew_repository }}
+    # Personal Linux profiles always select the forked user overlay, even when
+    # the caller inherited the shared base Homebrew PATH.
+    export HOMEBREW_BREW_GIT_REMOTE="{{ .homebrew_repository }}"
+    if [[ -x "{{ .homebrew_overlay_prefix }}/bin/brew" ]]; then
+        eval "$("{{ .homebrew_overlay_prefix }}/bin/brew" shellenv)"
+    fi
+{{- end }}
     if ! command -v brew &> /dev/null; then
         if [[ -x /home/linuxbrew/.linuxbrew/bin/brew ]]; then
             eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"

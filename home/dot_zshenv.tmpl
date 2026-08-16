@@ -6,6 +6,12 @@
 {{- /* Resolved per-user cache root; unset means user-local caches. */ -}}
 {{- $shared_cache := "" -}}
 {{- if hasKey . "shared_cache" }}{{- $shared_cache = .shared_cache | default "" }}{{- end -}}
+{{- $homebrew_overlay_prefix := "" -}}
+{{- if hasKey . "homebrew_overlay_prefix" }}{{- $homebrew_overlay_prefix = .homebrew_overlay_prefix | default "" }}{{- end -}}
+{{- $homebrew_repository_path := "" -}}
+{{- if hasKey . "homebrew_repository_path" }}{{- $homebrew_repository_path = .homebrew_repository_path | default "" }}{{- end -}}
+{{- $homebrew_repository := "" -}}
+{{- if hasKey . "homebrew_repository" }}{{- $homebrew_repository = .homebrew_repository | default "" }}{{- end -}}
 
 # Prevent PATH from accumulating duplicates
 typeset -U path PATH
@@ -35,10 +41,20 @@ export XDG_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
 export HOMEBREW_PREFIX="/opt/homebrew"
 path=(/opt/homebrew/bin /opt/homebrew/sbin ${path[@]})
 {{- else if eq .chezmoi.os "linux" }}
+{{- if $homebrew_overlay_prefix }}
+if [[ -x "{{ $homebrew_overlay_prefix }}/bin/brew" ]]; then
+    export HOMEBREW_PREFIX="{{ $homebrew_overlay_prefix }}"
+    path=("{{ $homebrew_overlay_prefix }}/bin" "{{ $homebrew_overlay_prefix }}/sbin" ${path[@]})
+elif [[ -d "/home/linuxbrew/.linuxbrew" ]]; then
+    export HOMEBREW_PREFIX="/home/linuxbrew/.linuxbrew"
+    path=(/home/linuxbrew/.linuxbrew/bin /home/linuxbrew/.linuxbrew/sbin ${path[@]})
+fi
+{{- else }}
 if [[ -d "/home/linuxbrew/.linuxbrew" ]]; then
     export HOMEBREW_PREFIX="/home/linuxbrew/.linuxbrew"
     path=(/home/linuxbrew/.linuxbrew/bin /home/linuxbrew/.linuxbrew/sbin ${path[@]})
 fi
+{{- end }}
 {{- end }}
 
 # Brew zsh ships autoloadable helpers (is-at-least, add-zsh-hook) that the
@@ -67,10 +83,14 @@ export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.ustc.edu.cn/brew.git"
 export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.ustc.edu.cn/homebrew-core.git"
 export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.ustc.edu.cn/homebrew-bottles"
 export HOMEBREW_API_DOMAIN="https://mirrors.ustc.edu.cn/homebrew-bottles/api"
+{{- end }}
+{{- if $homebrew_repository }}
+# Personal Linux uses the fork; this must override the generic mirror remote.
+export HOMEBREW_BREW_GIT_REMOTE="{{ $homebrew_repository }}"
+{{- end }}
 
 # ── HuggingFace & Models ──────────────────────────────────────
 export HF_ENDPOINT=https://hf-mirror.com
-{{- end }}
 
 # ── No-proxy (local/private networks always bypass) ────────────
 export NO_PROXY="127.0.0.1,localhost,::1,192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,100.64.0.0/10,100.100.0.0/16,*.local,*.crashlytics.com"

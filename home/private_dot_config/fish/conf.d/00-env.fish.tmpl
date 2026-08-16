@@ -7,8 +7,14 @@ if not contains -- no-query-term $fish_features
     set -U fish_features $fish_features no-query-term
 end
 
+{{ $homebrew_overlay_prefix := "" }}
+{{ if hasKey . "homebrew_overlay_prefix" }}{{ $homebrew_overlay_prefix = .homebrew_overlay_prefix | default "" }}{{ end }}
 if test -x /opt/homebrew/bin/brew
     set -gx HOMEBREW_PREFIX /opt/homebrew
+{{ if $homebrew_overlay_prefix }}
+else if test -x "{{ $homebrew_overlay_prefix }}/bin/brew"
+    set -gx HOMEBREW_PREFIX "{{ $homebrew_overlay_prefix }}"
+{{ end }}
 else if test -x /home/linuxbrew/.linuxbrew/bin/brew
     set -gx HOMEBREW_PREFIX /home/linuxbrew/.linuxbrew
 end
@@ -34,10 +40,12 @@ set -gx HOMEBREW_BREW_GIT_REMOTE "https://mirrors.ustc.edu.cn/brew.git"
 set -gx HOMEBREW_CORE_GIT_REMOTE "https://mirrors.ustc.edu.cn/homebrew-core.git"
 set -gx HOMEBREW_BOTTLE_DOMAIN "https://mirrors.ustc.edu.cn/homebrew-bottles"
 set -gx HOMEBREW_API_DOMAIN "https://mirrors.ustc.edu.cn/homebrew-bottles/api"
+{{- end }}
+{{- if hasKey . "homebrew_repository" }}{{- if .homebrew_repository }}
+set -gx HOMEBREW_BREW_GIT_REMOTE "{{ .homebrew_repository }}"
+{{- end }}{{- end }}
 
 # ── HuggingFace & Models ──────────────────────────────────────
-{{- end }}
-
 # ── Editor ────────────────────────────────────────────────────
 set -gx EDITOR nvim
 

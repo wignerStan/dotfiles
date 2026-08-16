@@ -41,6 +41,11 @@ shared_workspace = "/develop"
 # Keep the mamba root shared, but isolate mutable tool caches per account. The
 # profile is user-only, so no root-managed default ACL can be assumed.
 shared_cache = "/develop/cache"
+# Personal Linux uses the maintained fork rather than the shared distribution
+# Homebrew checkout. The user overlay remains private; only the source cache
+# is shared by the dev account.
+homebrew_repository = "https://github.com/wignerStan/brew.git"
+homebrew_branch = "overlay-store"
 
 [machine."jacob@incus"]
 ownership = "personal"
@@ -52,6 +57,8 @@ deploy = "user"
 is_guest = false
 # Jacob has a separate home; do not route his caches or mamba root into the
 # dev-owned /develop workspace.
+homebrew_repository = "https://github.com/wignerStan/brew.git"
+homebrew_branch = "overlay-store"
 
 [machine."racknerd"]
 ownership = "personal"

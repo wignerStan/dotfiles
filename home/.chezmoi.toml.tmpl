@@ -180,6 +180,29 @@
 {{- /* Derived */ -}}
 {{- $ephemeral := eq $platform "cloud" -}}
 
+{{- /* Personal local Linux profiles use the forked native Homebrew checkout.
+     Keep these paths explicit in generated data so every shell and bootstrap
+     script selects the same user overlay instead of falling back silently to
+     the shared prefix. */ -}}
+{{- $homebrew_repository := "" -}}
+{{- $homebrew_branch := "" -}}
+{{- $homebrew_overlay_prefix := "" -}}
+{{- $homebrew_repository_path := "" -}}
+{{- $homebrew_base_prefix := "" -}}
+{{- if and (eq .chezmoi.os "linux") (eq $ownership "personal") (eq $platform "local") (not $is_guest) -}}
+{{-   $homebrew_repository = "https://github.com/wignerStan/brew.git" -}}
+{{-   $homebrew_branch = "overlay-store" -}}
+{{-   if hasKey $machine_cfg "homebrew_repository" -}}{{- $homebrew_repository = index $machine_cfg "homebrew_repository" | default $homebrew_repository -}}{{- end -}}
+{{-   if hasKey $machine_cfg "homebrew_branch" -}}{{- $homebrew_branch = index $machine_cfg "homebrew_branch" | default $homebrew_branch -}}{{- end -}}
+{{-   $homebrew_overlay_prefix = joinPath .chezmoi.homeDir ".linuxbrew" -}}
+{{-   if $shared_cache -}}
+{{-     $homebrew_repository_path = joinPath $shared_cache "homebrew-overlay/Homebrew" -}}
+{{-   else -}}
+{{-     $homebrew_repository_path = joinPath .chezmoi.homeDir ".local/share/homebrew-overlay/Homebrew" -}}
+{{-   end -}}
+{{-   $homebrew_base_prefix = "/home/linuxbrew/.linuxbrew" -}}
+{{- end -}}
+
 {{- /* OS platform: detect WSL2 (chezmoi reports "linux" for WSL2).
      Distinct from the local/cloud platform axis — this is the OS kind. */ -}}
 {{- $os_platform := .chezmoi.os -}}
@@ -259,6 +282,11 @@ encryption = "age"
     mamba_sections = {{ $mamba_sections | toJson }}
     shared_workspace = {{ $shared_workspace | quote }}
     shared_cache = {{ $shared_cache | quote }}
+    homebrew_repository = {{ $homebrew_repository | quote }}
+    homebrew_branch = {{ $homebrew_branch | quote }}
+    homebrew_overlay_prefix = {{ $homebrew_overlay_prefix | quote }}
+    homebrew_repository_path = {{ $homebrew_repository_path | quote }}
+    homebrew_base_prefix = {{ $homebrew_base_prefix | quote }}
     use_china_mirrors = {{ $use_china_mirrors }}
     geo = {{ $geo | quote }}
     mamba_root = {{ if $shared_workspace }}{{ joinPath $shared_workspace "mamba" | quote }}{{ else }}{{ joinPath .chezmoi.homeDir "mamba" | quote }}{{ end }}

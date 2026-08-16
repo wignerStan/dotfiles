@@ -1,0 +1,73 @@
+{{- if and (eq .chezmoi.os "linux") (eq .ownership "personal") (eq .platform "local") (not .is_guest) .homebrew_repository -}}
+#!/usr/bin/env bash
+# Keep the personal Linux Homebrew source and user overlay reproducible.
+# Existing generated trees/prefixes are moved aside before migration; no user
+# package data is deleted by this script.
+set -euo pipefail
+
+if [[ "$(id -u)" -eq 0 ]]; then
+    echo "Skipping user Homebrew overlay bootstrap for root" >&2
+    exit 0
+fi
+
+repo_dir="{{ .homebrew_repository_path }}"
+overlay_prefix="{{ .homebrew_overlay_prefix }}"
+base_prefix="{{ .homebrew_base_prefix }}"
+remote_url="{{ .homebrew_repository }}"
+branch="{{ .homebrew_branch }}"
+timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
+
+[[ -x "$base_prefix/bin/brew" ]] || {
+    echo "Shared Homebrew base is unavailable: $base_prefix" >&2
+    exit 0
+}
+base_lock="$base_prefix/var/homebrew/locks/overlay-mutation.lock"
+[[ -f "$base_lock" && -r "$base_lock" ]] || {
+    echo "Shared Homebrew mutation lock is not readable: $base_lock" >&2
+    echo "Its owner must grant the overlay account read access before deployment." >&2
+    exit 1
+}
+
+mkdir -p "$(dirname "$repo_dir")"
+
+# Earlier deployments extracted a source archive without .git. Preserve it as
+# a rollback copy and replace it with a real checkout of the fork branch.
+if [[ -e "$repo_dir" && ! -d "$repo_dir/.git" ]]; then
+    mv "$repo_dir" "${repo_dir}.pre-fork-${timestamp}"
+fi
+
+if [[ ! -d "$repo_dir/.git" ]]; then
+    git clone --branch "$branch" --single-branch "$remote_url" "$repo_dir"
+else
+    configured_remote="$(git -C "$repo_dir" remote get-url origin 2>/dev/null || true)"
+    if [[ "$configured_remote" != "$remote_url" && "$configured_remote" != "git@github.com:wignerStan/brew.git" ]]; then
+        echo "Refusing to use unexpected Homebrew origin: ${configured_remote:-<missing>}" >&2
+        exit 1
+    fi
+    if ! git -C "$repo_dir" diff --quiet || ! git -C "$repo_dir" diff --cached --quiet; then
+        echo "Refusing to overwrite a dirty Homebrew checkout: $repo_dir" >&2
+        exit 1
+    fi
+    git -C "$repo_dir" fetch --prune origin "$branch"
+    git -C "$repo_dir" checkout -B "$branch" "origin/$branch"
+fi
+
+# A prior test deployment used a copied lower base. Move it aside so the
+# production overlay inherits the shared read-only base and owns only private
+# formulae. This also makes the transition reversible.
+marker="$overlay_prefix/var/homebrew/overlay/base-prefix"
+if [[ -e "$overlay_prefix" && ( ! -f "$marker" || "$(<"$marker")" != "$base_prefix" ) ]]; then
+    mv "$overlay_prefix" "${overlay_prefix}.pre-shared-base-${timestamp}"
+fi
+
+mkdir -p "$overlay_prefix"
+# shellcheck disable=SC1091
+source "$repo_dir/Library/Homebrew/utils/overlay.sh"
+homebrew-overlay-initialize-prefix "$base_prefix" "$repo_dir" "$overlay_prefix"
+
+chmod 700 "$overlay_prefix/etc/homebrew" "$overlay_prefix/var/homebrew" 2>/dev/null || true
+echo "Homebrew overlay ready: $overlay_prefix (source=$repo_dir branch=$branch base=$base_prefix)"
+{{- else -}}
+#!/usr/bin/env bash
+exit 0
+{{- end -}}

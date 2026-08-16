@@ -5,13 +5,23 @@
 # ═══════════════════════════════════════════════════════════════
 
 # ── Homebrew (static — PATH already set in .zshenv, just export vars)
+{{- $homebrew_repository_path := "" -}}
+{{- if hasKey . "homebrew_repository_path" }}{{- $homebrew_repository_path = .homebrew_repository_path | default "" }}{{- end -}}
 {{- if eq .chezmoi.os "darwin" }}
 export HOMEBREW_CELLAR="/opt/homebrew/Cellar"
 export HOMEBREW_REPOSITORY="/opt/homebrew"
 {{- else if eq .chezmoi.os "linux" }}
-if [[ -d "/home/linuxbrew/.linuxbrew" ]]; then
-    export HOMEBREW_CELLAR="/home/linuxbrew/.linuxbrew/Cellar"
-    export HOMEBREW_REPOSITORY="/home/linuxbrew/.linuxbrew/Homebrew"
+if [[ -n "${HOMEBREW_PREFIX:-}" && -d "$HOMEBREW_PREFIX" ]]; then
+    export HOMEBREW_CELLAR="$HOMEBREW_PREFIX/Cellar"
+{{- if $homebrew_repository_path }}
+    if [[ -d "{{ $homebrew_repository_path }}" ]]; then
+        export HOMEBREW_REPOSITORY="{{ $homebrew_repository_path }}"
+    else
+        export HOMEBREW_REPOSITORY="$HOMEBREW_PREFIX/Homebrew"
+    fi
+{{- else }}
+    export HOMEBREW_REPOSITORY="$HOMEBREW_PREFIX/Homebrew"
+{{- end }}
 fi
 {{- end }}
 
