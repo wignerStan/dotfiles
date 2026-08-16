@@ -28,6 +28,7 @@ channels:
 {{- end }}
 dependencies:
   - uv
+  - pip
 {{- range .mamba_sections }}
 {{-   $sec := . }}
 {{-   range (index $.mamba_base $sec).conda }}
