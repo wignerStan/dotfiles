@@ -8,5 +8,9 @@ globalDir: {{ printf "%s/pnpm/global" $shared_cache | quote }}
 cacheDir: {{ printf "%s/pnpm/cache" $shared_cache | quote }}
 stateDir: {{ printf "%s/pnpm/state" $shared_cache | quote }}
 {{- else }}
-{}
+storeDir: {{ printf "%s/.local/share/pnpm/store" .chezmoi.homeDir | quote }}
+globalBinDir: {{ printf "%s/.local/share/pnpm/bin" .chezmoi.homeDir | quote }}
+globalDir: {{ printf "%s/.local/share/pnpm/global" .chezmoi.homeDir | quote }}
+cacheDir: {{ printf "%s/.cache/pnpm" .chezmoi.homeDir | quote }}
+stateDir: {{ printf "%s/.local/state/pnpm" .chezmoi.homeDir | quote }}
 {{- end }}
