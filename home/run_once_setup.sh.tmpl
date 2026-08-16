@@ -244,6 +244,12 @@ user_scope() {
     if [[ ! -f "{{ .shared_cache }}/bun/global/package.json" ]]; then
         printf '%s\n' '{"dependencies":{}}' > "{{ .shared_cache }}/bun/global/package.json"
     fi
+{{- else if and (eq .chezmoi.os "linux") (has "dev" .facets) }}
+    # Keep Bun's user global root usable on profiles without a shared cache.
+    mkdir -p "$HOME/.bun/install/cache" "$HOME/.bun/install/global" "$HOME/.bun/bin"
+    if [[ ! -f "$HOME/.bun/install/global/package.json" ]]; then
+        printf '%s\n' '{"dependencies":{}}' > "$HOME/.bun/install/global/package.json"
+    fi
 {{- end }}
 
     # 2. Mirror-aware Homebrew setup

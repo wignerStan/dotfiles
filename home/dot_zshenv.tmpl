@@ -170,7 +170,7 @@ export BUN_INSTALL_CACHE_DIR="{{ $shared_cache }}/bun/cache"
 export BUN_INSTALL_GLOBAL_DIR="{{ $shared_cache }}/bun/global"
 export BUN_INSTALL_BIN="{{ $shared_cache }}/bun/bin"
 {{- else }}
-[[ -d "$HOME/.bun" ]] && export BUN_INSTALL="$HOME/.bun"
+export BUN_INSTALL="$HOME/.bun"
 {{- end }}
 [[ -d "$BUN_INSTALL/bin" ]] && path+=("$BUN_INSTALL/bin")
 {{- if .use_china_mirrors }}
