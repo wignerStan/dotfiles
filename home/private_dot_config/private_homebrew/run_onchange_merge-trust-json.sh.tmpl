@@ -8,7 +8,6 @@
 # preserved rather than clobbered. Idempotent and only runs when this script changes.
 set -euo pipefail
 
-{{- if lookPath "brew" }}
 TRUST=~/.config/homebrew/trust.json
 mkdir -p "$(dirname "$TRUST")"
 chmod 700 "$(dirname "$TRUST")"
@@ -35,7 +34,13 @@ wignerstan/singbox/sing-box
 EOF
 )
 
-if ! command -v jq &>/dev/null; then
+JQ="$(command -v jq 2>/dev/null || true)"
+for candidate in "$HOME/.linuxbrew/bin/jq" /opt/homebrew/bin/jq /home/linuxbrew/.linuxbrew/bin/jq; do
+    if [[ -z "$JQ" && -x "$candidate" ]]; then
+        JQ="$candidate"
+    fi
+done
+if [[ -z "$JQ" ]]; then
     echo "homebrew/trust.json: jq not found, skipping merge" >&2
     exit 0
 fi
@@ -49,10 +54,11 @@ chmod 600 "$TRUST"
 # Union managed entries into the existing arrays, prune retired ones
 # (order preserved, dups removed).
 tmp=$(mktemp)
-jq --slurpfile taps <(printf '%s\n' "$MANAGED_TAPS" | jq -R . | jq -s .) \
-   --slurpfile formulae <(printf '%s\n' "$MANAGED_FORMULAE" | jq -R . | jq -s .) \
-   --slurpfile retired_taps <(printf '%s\n' "$RETIRED_TAPS" | jq -R . | jq -s .) \
-   --slurpfile retired_formulae <(printf '%s\n' "$RETIRED_FORMULAE" | jq -R . | jq -s .) '
+# shellcheck disable=SC2016 # The jq program is intentionally single-quoted.
+"$JQ" --slurpfile taps <(printf '%s\n' "$MANAGED_TAPS" | "$JQ" -R . | "$JQ" -s .) \
+   --slurpfile formulae <(printf '%s\n' "$MANAGED_FORMULAE" | "$JQ" -R . | "$JQ" -s .) \
+   --slurpfile retired_taps <(printf '%s\n' "$RETIRED_TAPS" | "$JQ" -R . | "$JQ" -s .) \
+   --slurpfile retired_formulae <(printf '%s\n' "$RETIRED_FORMULAE" | "$JQ" -R . | "$JQ" -s .) '
     (.trustedtaps // []) as $t |
     (.trustedformulae // []) as $f |
     {
@@ -63,9 +69,4 @@ jq --slurpfile taps <(printf '%s\n' "$MANAGED_TAPS" | jq -R . | jq -s .) \
 mv "$tmp" "$TRUST"
 
 echo "homebrew/trust.json: merged managed taps/formulae (additive, retired pruned)"
-{{- else if eq .chezmoi.os "windows" -}}
-{{- /* no-op on windows */ -}}
-{{- else }}
-echo "homebrew/trust.json: brew not installed, skipping"
-{{- end }}
 {{- end -}}
