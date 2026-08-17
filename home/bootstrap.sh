@@ -51,7 +51,8 @@ chezmoi init "$DOTFILES_HTTPS" || chezmoi init "$DOTFILES_REPO"
 SRC_DIR="$(chezmoi source-path)"
 DATA_DIR="$SRC_DIR/.chezmoidata"
 AGE_KEY="${AGE_KEY:-$HOME/.config/chezmoi/age-key.txt}"
-SRC_SECRETS="$SRC_DIR/secrets.toml.age"
+SOURCE_ROOT="$(git -C "$SRC_DIR" rev-parse --show-toplevel)"
+SRC_SECRETS="$SOURCE_ROOT/secrets.toml.age"
 if [ -f "$SRC_SECRETS" ]; then
     if [ ! -f "$AGE_KEY" ]; then
         echo "age can decrypt .chezmoidata secrets but no key at $AGE_KEY."
@@ -59,9 +60,14 @@ if [ -f "$SRC_SECRETS" ]; then
         echo "Continuing WITHOUT secrets so non-secret files can still apply."
     else
         mkdir -p "$DATA_DIR"
-        if age -d -i "$AGE_KEY" "$SRC_SECRETS" > "$DATA_DIR/secrets.toml"; then
+        SECRETS_TMP="$(mktemp "$DATA_DIR/.secrets.toml.XXXXXX")"
+        chmod 600 "$SECRETS_TMP"
+        if age -d -i "$AGE_KEY" "$SRC_SECRETS" > "$SECRETS_TMP"; then
+            mv "$SECRETS_TMP" "$DATA_DIR/secrets.toml"
+            chmod 600 "$DATA_DIR/secrets.toml"
             echo "Decrypted secrets.toml.age -> .chezmoidata/secrets.toml"
         else
+            rm -f "$SECRETS_TMP"
             echo "Warning: age decrypt failed for $SRC_SECRETS (secrets left unset)."
         fi
     fi

@@ -75,6 +75,9 @@ brew_install {{ range .packages.facets.research.brew }}{{ . }} {{ end }}
 {{- if has "trade" .facets }}
 brew_install {{ range .packages.facets.trade.brew }}{{ . }} {{ end }}
 {{- end }}
+{{- if has "hpc" .facets }}
+brew_install {{ range .packages.facets.hpc.brew }}{{ . }} {{ end }}
+{{- end }}
 {{- if and (eq .tier "advanced") (has "dev" .facets) }}
 brew_install {{ range .packages.tiers.advanced.brew }}{{ . }} {{ end }}
 {{- range .packages.tiers.advanced.brew_head }}

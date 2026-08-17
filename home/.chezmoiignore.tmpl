@@ -53,6 +53,10 @@ Library/
 
 {{- if has "hpc" .facets }}
 # HPC: skip workstation-only tools, use container-data/zsh instead
+# Without a personal age identity chezmoi sees the encrypted source's literal
+# pre-decryption target; ignore both forms so compute accounts need no secrets.
+.ssh/config
+.ssh/config.tmpl.age
 .config/ghostty/
 .config/zellij/
 .config/yazi/

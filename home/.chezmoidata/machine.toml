@@ -63,6 +63,20 @@ homebrew_branch = "overlay-store"
 # package set there; other accounts inherit it through their private overlays.
 homebrew_manage_base = true
 
+[machine."comp@incus"]
+ownership = "personal"
+platform = "local"
+tier = "advanced"
+facets = ["hpc", "research"]
+bootstrap = "full"
+deploy = "user"
+is_guest = false
+# The computation account can read /develop through the dev group, but
+# /develop/cache is intentionally dev-owned and not writable by comp. Keep all
+# mutable package, cache, and environment state inside /home/comp.
+homebrew_repository = "https://github.com/wignerStan/brew.git"
+homebrew_branch = "overlay-store"
+
 [machine."racknerd"]
 ownership = "personal"
 platform = "cloud"
